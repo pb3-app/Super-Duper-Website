@@ -1,0 +1,2 @@
+gate: no build is active in /Users/jmperugini/Documents/GitHub/Super-Duper-Website (no .taste-skill/build.json); begin one with: node "/Users/jmperugini/Documents/GitHub/Super-Duper-Website/.claude/skills/design-taste-frontend/scripts/gate.mjs" --start index.html
+GATE: OFF (no build active)

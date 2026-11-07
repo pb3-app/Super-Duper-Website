@@ -1,0 +1,22 @@
+[
+ {
+  "check": "no-visual",
+  "target": "section#leaderboards",
+  "reason": "the section's picture is the live leaderboard table the server fills; with no players yet it shows the empty table"
+ },
+ {
+  "check": "card-layout",
+  "target": "Tung Tung Chess",
+  "reason": "24 open tiles are the game catalogue: one tile per game is the content, there is no other layout for them"
+ },
+ {
+  "check": "copy-headings",
+  "target": "The Imposter",
+  "reason": "the tile heading is the game's own name"
+ },
+ {
+  "check": "no-visual",
+  "target": "section#games",
+  "reason": "on a phone the 27 game thumbnails are the section's pictures; there are too many for two screens at a larger size"
+ }
+]

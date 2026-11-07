@@ -1,0 +1,391 @@
+{
+ "start": "2026-11-07T18:53:18.454Z",
+ "round": 3,
+ "idle": 0,
+ "errors": 0,
+ "status": "open",
+ "history": [
+  {
+   "at": "2026-11-07T19:23:49.268Z",
+   "mode": "manual",
+   "status": "fail",
+   "fails": 47,
+   "round": 1,
+   "reused": false,
+   "stopHookActive": false
+  },
+  {
+   "at": "2026-11-07T19:36:57.540Z",
+   "mode": "manual",
+   "status": "fail",
+   "fails": 4,
+   "round": 2,
+   "reused": false,
+   "stopHookActive": false
+  },
+  {
+   "at": "2026-11-07T19:44:54.748Z",
+   "mode": "manual",
+   "status": "open",
+   "fails": 2,
+   "round": 3,
+   "reused": false,
+   "stopHookActive": false
+  }
+ ],
+ "max": 3,
+ "marker": {
+  "page": "index.html",
+  "url": null,
+  "root": null,
+  "kind": "gaming",
+  "category": "multiplayer browser arcade with 27 games",
+  "primary": "Play games",
+  "rounds": 3,
+  "start": "2026-11-07T18:53:18.454Z",
+  "by": "gate.mjs --start"
+ },
+ "manual": true,
+ "roundKey": "ee56dc6cd955ad0c:771b84f4",
+ "roundFree": false,
+ "idleFree": false,
+ "blockKey": null,
+ "fp": "ee56dc6cd955ad0c",
+ "page": "index.html",
+ "found": {
+  "fails": [
+   {
+    "check": "no-visual",
+    "where": "section#leaderboards \"Leaderboards for all 27 games\"",
+    "msg": "no picture, effect or mock in this section; a feature section needs a visual",
+    "fix": "give the section a visual: a UI fragment on a ground, real icons, or a photograph that fits",
+    "widths": [
+     1440,
+     390
+    ],
+    "from": "consistency",
+    "ids": [
+     "no-visual"
+    ],
+    "wheres": [
+     "section#leaderboards \"Leaderboards for all 27 games\""
+    ]
+   },
+   {
+    "check": "card-layout",
+    "where": "section#games > div.wrap > div.group:nth-of-type(2) > div.grid.grid--top \"Tung Tung Chess\"",
+    "msg": "24 of 24 cards drawn one way (one panel, ground, placement and fragment): copies of one card",
+    "fix": "a card layout at most twice on a page: build the other sections another way",
+    "widths": [
+     1440
+    ],
+    "from": "consistency",
+    "ids": [
+     "card-layout"
+    ],
+    "wheres": [
+     "section#games > div.wrap > div.group:nth-of-type(2) > div.grid.grid--top \"Tung Tung Chess\""
+    ]
+   },
+   {
+    "check": "copy-headings",
+    "where": "div.grid.grid--top > a.tile.span-2:nth-of-type(16) > div.tile__head > h3 \"The Imposter\"",
+    "msg": "\"The Imposter\" names no product, part, place or section (2 headings like it; at most one brand line per page) (and 1 more like it: \"Brainrot Merge\")",
+    "fix": "name the thing in every heading: the product, a part, the place or a section noun",
+    "widths": [
+     1440
+    ],
+    "from": "consistency",
+    "ids": [
+     "copy-headings"
+    ],
+    "wheres": [
+     "div.grid.grid--top > a.tile.span-2:nth-of-type(16) > div.tile__head > h3 \"The Imposter\""
+    ]
+   },
+   {
+    "check": "no-visual",
+    "where": "section#games \"27 games, from Snake to Cup Pong\"",
+    "msg": "no picture, effect or mock in this section; a feature section needs a visual",
+    "fix": "give the section a visual: a UI fragment on a ground, real icons, or a photograph that fits",
+    "widths": [
+     390
+    ],
+    "from": "consistency",
+    "ids": [
+     "no-visual"
+    ],
+    "wheres": [
+     "section#games \"27 games, from Snake to Cup Pong\""
+    ]
+   },
+   {
+    "check": "screen-height",
+    "where": "#games section.section.g2 \"27 games, from Snake to Cup Pong\"",
+    "msg": "1744px, 2.07 screens; a section is exactly one or two (--h), or on a phone at least one that its content fills",
+    "fix": "make the section exactly one or two screens (--h: 1 or 2)",
+    "widths": [
+     390
+    ],
+    "from": "layout",
+    "ids": [
+     "screen-height"
+    ],
+    "wheres": [
+     "#games section.section.g2 \"27 games, from Snake to Cup Pong\""
+    ]
+   },
+   {
+    "check": "sparse",
+    "where": "#leaderboards section.section \"Leaderboards for all 27 games Th\"",
+    "msg": "its content fills 39% of its screen; merge it or give it its visual (0.55 is the aim)",
+    "fix": "fill the section or make it a screen shorter",
+    "widths": [
+     390
+    ],
+    "from": "layout",
+    "ids": [
+     "sparse"
+    ],
+    "wheres": [
+     "#leaderboards section.section \"Leaderboards for all 27 games Th\""
+    ]
+   }
+  ],
+  "warns": [
+   {
+    "check": "assets",
+    "where": "(the page)",
+    "msg": "the data file api/config did not load (404)",
+    "fix": "fix the path, or remove the reference",
+    "widths": [
+     1440
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "scroll-reveal",
+    "where": "section#record > div.wrap > p.mo-wh__text \"A match against a friend adds a win or a\"",
+    "msg": "starts \"color\" (0.2 s) the moment it is scrolled into view (an IntersectionObserver) on span.mo-w:nth-of-type(6) (inside a dealt moment's section, [data-moment]: an enter moment is expected on every kind; its still is judged under reduced motion)",
+    "fix": "show it at rest: no fade, rise or unmask when it is scrolled into view",
+    "widths": [
+     1440,
+     390
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "section-gaps",
+    "where": "main#top > section.hero.hero--photo / section#games",
+    "msg": "121px between these sections, -39% against the median 197px",
+    "fix": "use one gap between sections (all within 25% of each other)",
+    "widths": [
+     1440
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "photo-set",
+    "where": "div.grid.grid--top > a.tile.span-4:nth-of-type(3) > div.tile__media > img \"pictionary.jpg\"",
+    "msg": "28 photographs in more than one look: lightness from 0.11 to 0.74; saturation from 0.28 to 0.79; warm and cool photographs mixed (b* -20 to +34); the odd one out is pictionary.jpg",
+    "fix": "grade the photographs to one look (light, colour, warmth), or replace the odd one out",
+    "widths": [
+     1440
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "nav-labels",
+    "where": "div.wrap.nav__bar > nav.nav__links > div.nav__item:nth-of-type(2) > a.nav__link \"Multiplayer\"",
+    "msg": "\"Multiplayer\" opens a section headed \"Challenge friends online\"",
+    "fix": "name each nav link after the heading of the section it opens",
+    "widths": [
+     1440
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "copy-length",
+    "where": "section#play \"Challenge friends online\"",
+    "msg": "1 section over 90 words a screen outside the UI mocks (\"Challenge friends online\" 92); 52 words a screen across the page (309 words in 6 screens): a tech page says it in about 80 or fewer",
+    "fix": "cut every section to its heading, one line and the product UI: the UI says the rest; no second paragraph, no list of feature sentences",
+    "widths": [
+     1440
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "nav-current",
+    "where": "header.nav.nav--cards",
+    "msg": "the nav stays on screen with 4 links to the page's sections, but never marks the one you are in (no link changes as the page scrolls)",
+    "fix": "mark the link of the section on screen (a colour, a weight or a line under it) as the visitor scrolls",
+    "widths": [
+     1440
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "action-repeat",
+    "where": "header.nav.nav--cards > div.wrap.nav__bar > div.nav__actions > a.btn.btn--primary \"play games\"",
+    "msg": "\"play games\" shows 2 times on the first screen at 1440px (nav, hero): the nav's button and the hero's; nothing else on the screen may repeat it",
+    "fix": "show the action once a screen besides the nav's button: the hero's, the close's or the phone bar's, never all at once",
+    "widths": [
+     1440
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "cta",
+    "where": "section#play \"Challenge friends online\"",
+    "msg": "a section over 1.5 screens long with no link or button in it",
+    "fix": "add the action: a button in the hero, one on every priced item, one in the closing section",
+    "widths": [
+     390
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "proximity",
+    "where": "section#games > div.wrap > div.group:nth-of-type(2) > div.grid.grid--top \"Tung Tung Chess\"",
+    "msg": "the rows sit 12px apart, about as close as a picture to its own caption (8px): a caption reads with the row below",
+    "fix": "set the gap between rows at twice the gap between a picture and its caption or more",
+    "widths": [
+     390
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "photo-weight",
+    "where": "main#top > section.hero.hero--photo > img.hero__bg \"hero-wall.jpg\"",
+    "msg": "a photograph is 3x or more wider than drawn on the phone, with no srcset: hero-wall.jpg is 1920px (354 KB) for a 390px frame; on a phone it arrives late and its frame shows only its ground until then",
+    "fix": "give each photograph srcset and sizes (a 800px and a 1600px file), or a smaller file: the frame never shows empty",
+    "widths": [
+     390
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "copy-exclaim",
+    "msg": "1 line with an exclamation mark",
+    "fix": "end on a full stop: copy.md bans exclamation marks (references/copy-tells.md)",
+    "widths": [],
+    "from": "copy",
+    "where": "copy x1: \"Tung Up!\"",
+    "exact": false
+   }
+  ],
+  "crashed": [],
+  "seconds": {
+   "consistency": 97,
+   "layout": 4
+  }
+ },
+ "open": [
+  {
+   "check": "screen-height",
+   "where": "#games section.section.g2 \"27 games, from Snake to Cup Pong\"",
+   "msg": "1744px, 2.07 screens; a section is exactly one or two (--h), or on a phone at least one that its content fills",
+   "fix": "make the section exactly one or two screens (--h: 1 or 2)",
+   "widths": [
+    390
+   ],
+   "from": "layout",
+   "ids": [
+    "screen-height"
+   ],
+   "wheres": [
+    "#games section.section.g2 \"27 games, from Snake to Cup Pong\""
+   ]
+  },
+  {
+   "check": "sparse",
+   "where": "#leaderboards section.section \"Leaderboards for all 27 games Th\"",
+   "msg": "its content fills 39% of its screen; merge it or give it its visual (0.55 is the aim)",
+   "fix": "fill the section or make it a screen shorter",
+   "widths": [
+    390
+   ],
+   "from": "layout",
+   "ids": [
+    "sparse"
+   ],
+   "wheres": [
+    "#leaderboards section.section \"Leaderboards for all 27 games Th\""
+   ]
+  }
+ ],
+ "waived": [
+  {
+   "check": "no-visual",
+   "where": "section#leaderboards \"Leaderboards for all 27 games\"",
+   "msg": "no picture, effect or mock in this section; a feature section needs a visual",
+   "fix": "give the section a visual: a UI fragment on a ground, real icons, or a photograph that fits",
+   "widths": [
+    1440,
+    390
+   ],
+   "from": "consistency",
+   "ids": [
+    "no-visual"
+   ],
+   "wheres": [
+    "section#leaderboards \"Leaderboards for all 27 games\""
+   ],
+   "reason": "the section's picture is the live leaderboard table the server fills; with no players yet it shows the empty table"
+  },
+  {
+   "check": "card-layout",
+   "where": "section#games > div.wrap > div.group:nth-of-type(2) > div.grid.grid--top \"Tung Tung Chess\"",
+   "msg": "24 of 24 cards drawn one way (one panel, ground, placement and fragment): copies of one card",
+   "fix": "a card layout at most twice on a page: build the other sections another way",
+   "widths": [
+    1440
+   ],
+   "from": "consistency",
+   "ids": [
+    "card-layout"
+   ],
+   "wheres": [
+    "section#games > div.wrap > div.group:nth-of-type(2) > div.grid.grid--top \"Tung Tung Chess\""
+   ],
+   "reason": "24 open tiles are the game catalogue: one tile per game is the content, there is no other layout for them"
+  },
+  {
+   "check": "copy-headings",
+   "where": "div.grid.grid--top > a.tile.span-2:nth-of-type(16) > div.tile__head > h3 \"The Imposter\"",
+   "msg": "\"The Imposter\" names no product, part, place or section (2 headings like it; at most one brand line per page) (and 1 more like it: \"Brainrot Merge\")",
+   "fix": "name the thing in every heading: the product, a part, the place or a section noun",
+   "widths": [
+    1440
+   ],
+   "from": "consistency",
+   "ids": [
+    "copy-headings"
+   ],
+   "wheres": [
+    "div.grid.grid--top > a.tile.span-2:nth-of-type(16) > div.tile__head > h3 \"The Imposter\""
+   ],
+   "reason": "the tile heading is the game's own name"
+  },
+  {
+   "check": "no-visual",
+   "where": "section#games \"27 games, from Snake to Cup Pong\"",
+   "msg": "no picture, effect or mock in this section; a feature section needs a visual",
+   "fix": "give the section a visual: a UI fragment on a ground, real icons, or a photograph that fits",
+   "widths": [
+    390
+   ],
+   "from": "consistency",
+   "ids": [
+    "no-visual"
+   ],
+   "wheres": [
+    "section#games \"27 games, from Snake to Cup Pong\""
+   ],
+   "reason": "on a phone the 27 game thumbnails are the section's pictures; there are too many for two screens at a larger size"
+  }
+ ],
+ "warnCount": 12,
+ "at": "2026-11-07T19:44:54.748Z",
+ "openTold": true
+}
