@@ -52,7 +52,11 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
         break;
       case "arena_sd": sdBoard = m.board; break;
       case "arena_event":
-        if (m.type === "bonk") { effects.push({ x: m.x, y: m.y, life: 0.7, text: "TUNG!" }); feed(`${m.from} bonked ${m.to}`); }
+        if (m.type === "bonk") {
+          effects.push({ x: m.x, y: m.y, life: 0.7, text: "TUNG!" }); feed(`${m.from} bonked ${m.to}`);
+          const me = rendered().find((p) => p.id === myId), d = me ? Math.hypot(me.x - m.x, me.y - m.y) : 0; // quieter the further away it is
+          if (d < 1400) bonkSound(1 - d / 1500);
+        }
         else if (m.type === "coins") { feed(`+${m.n} tung ${m.n === 1 ? "buck" : "bucks"} for a ${m.streak} streak!`); loadShop(); }
         else if (m.type === "streak") feed(`${m.name} is on a ${m.streak} streak in the Showdown`);
         else if (m.type === "safe") feed("No bonking on logs or in the practice corner");
@@ -82,6 +86,32 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     const div = document.createElement("div"); div.textContent = text; $("feed").appendChild(div);
     while ($("feed").children.length > 5) $("feed").firstChild.remove();
     setTimeout(() => div.remove(), 5000);
+  }
+
+  // ---------- the bonk: a hit on a tom drum ----------
+  let actx = null;
+  function bonkSound(volume) {
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === "suspended") actx.resume();
+      const t = actx.currentTime, out = actx.createGain(); out.gain.value = Math.max(0.05, Math.min(1, volume)); out.connect(actx.destination);
+      // the skin: a low note that drops quickly in pitch as it rings out
+      const body = actx.createOscillator(), bg = actx.createGain();
+      body.type = "sine"; body.frequency.setValueAtTime(190, t); body.frequency.exponentialRampToValueAtTime(78, t + 0.2);
+      bg.gain.setValueAtTime(0.0001, t); bg.gain.exponentialRampToValueAtTime(0.9, t + 0.004); bg.gain.exponentialRampToValueAtTime(0.0008, t + 0.42);
+      body.connect(bg).connect(out); body.start(t); body.stop(t + 0.45);
+      // the shell: a quieter overtone that dies sooner
+      const ring = actx.createOscillator(), rg = actx.createGain();
+      ring.type = "triangle"; ring.frequency.setValueAtTime(330, t); ring.frequency.exponentialRampToValueAtTime(150, t + 0.12);
+      rg.gain.setValueAtTime(0.0001, t); rg.gain.exponentialRampToValueAtTime(0.28, t + 0.004); rg.gain.exponentialRampToValueAtTime(0.0008, t + 0.16);
+      ring.connect(rg).connect(out); ring.start(t); ring.stop(t + 0.2);
+      // the stick: a very short burst of noise
+      const n = Math.floor(actx.sampleRate * 0.035), buf = actx.createBuffer(1, n, actx.sampleRate), ch = buf.getChannelData(0);
+      for (let i = 0; i < n; i++) ch[i] = (Math.random() * 2 - 1) * (1 - i / n);
+      const src = actx.createBufferSource(), hp = actx.createBiquadFilter(), sg = actx.createGain();
+      src.buffer = buf; hp.type = "highpass"; hp.frequency.value = 1400; sg.gain.value = 0.35;
+      src.connect(hp).connect(sg).connect(out); src.start(t);
+    } catch (_) {}
   }
 
   // ---------- controls ----------

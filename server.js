@@ -1826,8 +1826,11 @@ function inSafeZone(p) {
 const SD = { cx: AR.w / 2, cy: 780, plat: 300, abyss: 470, bx0: AR.w / 2 - 60, bx1: AR.w / 2 + 60, by0: 780 + 300 - 40, by1: 780 + 470 + 60 };
 SD.respawn = { x: SD.cx, y: SD.by1 + 90 }; // where a tung that fell comes back: on the floor below the bridge
 const sdOnPlatform = (p) => Math.hypot(p.x - SD.cx, p.y - SD.cy) <= SD.plat;
-const sdOnBridge = (p) => p.x >= SD.bx0 && p.x <= SD.bx1 && p.y >= SD.by0 && p.y <= SD.by1;
-const sdInPit = (p) => Math.hypot(p.x - SD.cx, p.y - SD.cy) <= SD.abyss;
+const sdBridgeAt = (x, y) => x >= SD.bx0 && x <= SD.bx1 && y >= SD.by0 && y <= SD.by1;
+const sdPitAt = (x, y) => Math.hypot(x - SD.cx, y - SD.cy) <= SD.abyss;
+const sdZoneAt = (x, y) => sdPitAt(x, y) || sdBridgeAt(x, y);
+const sdOnBridge = (p) => sdBridgeAt(p.x, p.y);
+const sdInPit = (p) => sdPitAt(p.x, p.y);
 const SD_COIN_CAP = 16; // tung coins per 10-streak step: 1, 2, 4, 8, 16, then 16 each
 let sdDirty = true, sdSentAt = 0;
 function sdBoard() {
@@ -1836,11 +1839,7 @@ function sdBoard() {
   return { cur, all };
 }
 function sdEndStreak(p) { if (p.streak) { p.streak = 0; sdDirty = true; } }
-function sdAddStreak(a, victim) {
-  const now = Date.now();
-  a.credited = a.credited || {};
-  if (a.credited[victim.key] && now - a.credited[victim.key] < 15000) return; // the same tung can't be knocked off again and again for credit
-  a.credited[victim.key] = now;
+function sdAddStreak(a) {
   a.streak++; sdDirty = true;
   const u = db.users[a.key]; if (!u) return;
   u.showdown = u.showdown || { best: 0 };
@@ -1855,7 +1854,7 @@ function sdAddStreak(a, victim) {
 function sdFall(p) {
   p.fall = 1; p.vx = p.vy = 0;
   const hit = p.lastHit;
-  if (hit && Date.now() - hit.at < 5000) { const a = arenaPlayers.get(hit.key); if (a && a !== p && a.z && !a.fall) sdAddStreak(a, p); }
+  if (hit && Date.now() - hit.at < 5000) { const a = arenaPlayers.get(hit.key); if (a && a !== p && a.z && !a.fall) sdAddStreak(a); }
   p.lastHit = null; sdEndStreak(p);
 }
 
@@ -1914,6 +1913,7 @@ function onArena(ws, msg) {
       p.cooldown = AR.cooldown; p.swing = 0.2;
       for (const o of arenaPlayers.values()) {
         if (o === p || o.fall > 0 || inSafeZone(o)) continue; // nobody on a log or in the practice corner can be bonked
+        if (!!o.z !== !!p.z) continue; // the showdown is its own place: no bonking across its edge, in or out
         const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy);
         if (d > AR.range + AR.r) continue;
         let diff = Math.abs(Math.atan2(dy, dx) - p.facing);
@@ -1941,7 +1941,16 @@ function arenaStep() {
       if (p.input.up) my--; if (p.input.down) my++; if (p.input.left) mx--; if (p.input.right) mx++;
       const len = Math.hypot(mx, my); if (len) { mx /= len; my /= len; }
     }
-    p.x += (mx * AR.speed + p.vx) * dt; p.y += (my * AR.speed + p.vy) * dt;
+    // Outside the showdown, its pit is walled off except at the bridge, and a bonk can never carry you into it (you walk in yourself).
+    let nx = p.x + mx * AR.speed * dt, ny = p.y + my * AR.speed * dt;
+    if (!p.z && sdPitAt(nx, ny) && !sdBridgeAt(nx, ny)) {
+      if (!(sdPitAt(nx, p.y) && !sdBridgeAt(nx, p.y))) ny = p.y; // slide along the wall
+      else if (!(sdPitAt(p.x, ny) && !sdBridgeAt(p.x, ny))) nx = p.x;
+      else { nx = p.x; ny = p.y; }
+    }
+    p.x = nx; p.y = ny;
+    const kx = p.x + p.vx * dt, ky = p.y + p.vy * dt;
+    if (!p.z && sdZoneAt(kx, ky)) { p.vx = p.vy = 0; } else { p.x = kx; p.y = ky; }
     const decay = Math.exp(-AR.friction * dt); p.vx *= decay; p.vy *= decay;
     if (p.x < AR.r) { p.x = AR.r; p.vx = Math.abs(p.vx) * 0.5; }
     if (p.x > AR.w - AR.r) { p.x = AR.w - AR.r; p.vx = -Math.abs(p.vx) * 0.5; }
