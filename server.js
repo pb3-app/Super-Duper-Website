@@ -128,6 +128,17 @@ const GAMES = {
     title: 'Tung Tung Mini Golf', icon: '⛳', progressLabel: 'Strokes', judge: 'low', realtime: true,
     options: { level: { label: 'Course', values: GOLF_COURSES, default: 'meadow' } },
   },
+  archery: {
+    title: 'Tung Tung Archery', icon: '🏹', progressLabel: 'Points', judge: 'score', realtime: true,
+    options: {
+      arrows: { label: 'Arrows each', values: [5, 10, 15], default: 10 },
+      wind: { label: 'Wind', values: ['calm', 'breezy', 'gusty'], default: 'breezy' },
+    },
+  },
+  cuppong: {
+    title: 'Tung Tung Cup Pong', icon: '🥤', progressLabel: 'Cups sunk', judge: 'score', realtime: true, soloWL: true,
+    options: { cups: { label: 'Cups each', values: [6, 10], default: 6 } },
+  },
   pictionary: { title: 'Tung Tung Pictionary', icon: '🎨', progressLabel: 'Points', rooms: true, picRooms: true },
   paper: {
     title: 'Tung Paper.io', icon: '📄', progressLabel: 'Peak land', judge: 'score', realtime: true,
@@ -150,8 +161,10 @@ const SCORE_CAP = {
   airhockey: (ms) => Math.floor(ms / 2200) + 2,
   bomber: (ms) => Math.floor(ms / 25000) + 1,
   sumo: (ms) => Math.floor(ms / 8000) + 1,
+  archery: (ms) => (Math.floor(ms / 900) + 2) * 10,
+  cuppong: (ms) => Math.min(10, Math.floor(ms / 1200) + 2),
 };
-const SOLO_MAX = { snake: SNAKE_GRID * SNAKE_GRID, slope: 99999, brainrot: 999999, flappy: 999, whack: 9999, paper: 1000 };
+const SOLO_MAX = { snake: SNAKE_GRID * SNAKE_GRID, slope: 99999, brainrot: 999999, flappy: 999, whack: 9999, paper: 1000, archery: 150 };
 const isAuth = (g) => g === 'sprouts' || g === 'pool' || !!GAMES[g].turnBased; // server decides these, clients do not report scores
 
 const TURN_MS = 120 * 1000;

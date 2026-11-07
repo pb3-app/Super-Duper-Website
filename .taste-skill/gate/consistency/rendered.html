@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en" data-type="software" data-radius="soft" data-buttons="block" data-motion="" data-mode="dark" style="--g-kl: 1.000; --g-k: 1.000; --g-kp: 0.420; --g-kd: 1.000;" data-tone="dark" data-ready="1"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tung Tung Arcade: multiplayer games to play online</title>
+<meta name="description" content="Play 27 games including Chess, Go, Bomber Arena, Air Hockey, Mini Golf, Pictionary, Pool, F1 racing and The Imposter against friends online or alone, with wins and losses on live leaderboards.">
+<meta name="site-kind" content="gaming">
+<meta name="page-type" content="software">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Anybody:wdth,wght@50..150,400..600&amp;family=Onest:wght@400..600&amp;family=Martian+Mono:wght@400..500&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/system.css">
+<link rel="stylesheet" href="assets/ui/cards.css">
+<link rel="stylesheet" href="assets/motion/motion.css">
+<link rel="stylesheet" href="assets/backgrounds/backgrounds.css">
+<link rel="stylesheet" href="assets/layout/layout.css">
+<link rel="stylesheet" href="assets/icons/icon.css">
+<style>
+:root {
+  --p-bg: #0f0f0f; --p-surface: #1a1a1a; --p-ink: #ffffff; --p-muted: #8f8f8f;
+  --p-accent: #dafa9c; --p-accent-ink: #0f0f0f; --p-action: #dafa9c; --p-action-ink: #0f0f0f;
+  --p-inv-bg: #ffffff; --p-inv-surface: #ececec; --p-inv-ink: #0f0f0f; --p-inv-muted: #5f5f5f;
+  --p-inv-accent: #0f0f0f; --p-inv-accent-ink: #ffffff; --p-inv-action: #0f0f0f; --p-inv-action-ink: #ffffff;
+  --font-display: "Anybody", system-ui, sans-serif;
+  --font-text: "Onest", system-ui, sans-serif;
+  --font-mono: "Martian Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --display-weight: 400;
+  --display-tracking: -0.02em;
+  --display-tracking-xl: -0.03em;
+  --display-stretch: 115%;
+  --ly-scale: 0.86;
+}
+</style>
+<link rel="stylesheet" href="mp.css">
+<link rel="stylesheet" href="home.css">
+<script src="assets/backgrounds/backgrounds.js"></script>
+</head>
+<body>
+<!-- type: software (gaming). deal: hero product (the game's own objects as the scene), nav nav-centre, footer footer-dark,
+     close close-type, rhythm space, buttons block, mark stack, palette soot-pale-lime, type anybody (Anybody / Onest / Martian Mono).
+     Screens: hero 1, games 1, play 1, leaderboards 1, footer 1. -->
+
+<header class="nav nav--centre" data-m-nav="1">
+  <div class="wrap nav__bar">
+    <a class="nav__logo" href="#top"><span class="mark" data-mark="stack" aria-hidden="true"></span>Tung Tung Arcade</a>
+    <nav class="nav__links" aria-label="Main">
+      <div class="nav__item"><a class="nav__link" href="#games">Games</a></div>
+      <div class="nav__item"><a class="nav__link" href="#play">Multiplayer</a></div>
+      <div class="nav__item"><a class="nav__link" href="#leaderboards">Leaderboards</a></div>
+    </nav>
+    <div class="nav__actions">
+      <div id="mpSlot" class="mp-slot"><span class="mp-chip warn" title="Start the server with: npm start">⚠️ Offline</span></div>
+      <a class="btn btn--primary" href="#games">Play games</a>
+    </div>
+    <button class="nav__toggle" type="button" aria-expanded="false" aria-label="Menu">
+      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M2 5h14M2 13h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg>
+    </button>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero hero--product" aria-labelledby="hero-h">
+    <div class="wrap"><div class="hero-text hero__in">
+      <div class="hero__head">
+        <div>
+          <h1 id="hero-h">Tung Tung Arcade</h1>
+          <p class="hero__lead">A multiplayer arcade with 27 games, from Snake and Chess to Go, Bomber Arena and Pictionary. Play friends online or the computer alone, and every win and loss goes on a live leaderboard.</p>
+        </div>
+        <div class="btn-row"><a class="btn btn--primary" href="#games">Play games<svg class="m-arrow" viewBox="0 0 12 12" aria-hidden="true"><path class="m-arrow__stem" d="M1 6h8"></path><path class="m-arrow__head" d="M4.5 2.5 8 6l-3.5 3.5"></path></svg></a><a class="btn btn--secondary" href="#leaderboards">See leaderboards</a></div>
+      </div>
+      <div class="hero__stage">
+        <img class="is-cutout" id="heroScene" width="1290" height="520" src="assets/hero-scene.svg" alt="The Tung log mascot with its bat, standing among a snake, a minesweeper board, clue chips and a Sprouts drawing" fetchpriority="high">
+        <div class="ly-spot ly-spot--left" data-svg="309,470" style="--x: 412.37572115384614px; --y: 398.74158653846155px; --dx: 0px;">
+          <button type="button" aria-label="About Tung Snake" aria-expanded="false"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1.5v9M1.5 6h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></button>
+          <div class="ly-spot__card" role="note"><strong>Tung Snake</strong>Eat drums and grow longer. 1 or 2 players.</div>
+        </div>
+        <div class="ly-spot ly-spot--left" data-svg="428,410" style="--x: 500.89627403846157px; --y: 354.109375px; --dx: 0px;">
+          <button type="button" aria-label="About Tung Minesweeper" aria-expanded="false"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1.5v9M1.5 6h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></button>
+          <div class="ly-spot__card" role="note"><strong>Tung Minesweeper</strong>Clear the field without waking the Tung. 1 or 2 players.</div>
+        </div>
+        <div class="ly-spot ly-spot--left" data-svg="918,476" style="--x: 865.3926682692309px; --y: 403.2048076923077px; --dx: 0px;">
+          <button type="button" aria-label="About The Imposter" aria-expanded="false"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1.5v9M1.5 6h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></button>
+          <div class="ly-spot__card" role="note"><strong>The Imposter</strong>Find the one player who doesn’t know the word. 4 to 8 players.</div>
+        </div>
+        <div class="ly-spot ly-spot--left" data-svg="1140,346" style="--x: 1030.5318509615386px; --y: 306.50168269230767px; --dx: 0px;" data-ly-side="left">
+          <button type="button" aria-label="About Tung Sprouts" aria-expanded="false"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1.5v9M1.5 6h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></button>
+          <div class="ly-spot__card" role="note"><strong>Tung Sprouts</strong>Draw lines between dots until one player is stuck. 1 or 2 players.</div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <section class="section" id="games" aria-labelledby="games-h">
+    <div class="wrap">
+      <div class="section-head">
+        <h2 id="games-h">All games</h2>
+      </div>
+      <ul class="gamegrid">
+        <li><a class="gtile" href="games/snake/index.html"><img src="assets/play/snake.jpg" width="640" height="480" alt="Tung Snake gameplay" loading="eager"><span>Tung Snake</span></a></li>
+        <li><a class="gtile" href="games/minesweeper/index.html"><img src="assets/play/minesweeper.jpg" width="640" height="480" alt="Tung Minesweeper gameplay" loading="eager"><span>Tung Minesweeper</span></a></li>
+        <li><a class="gtile" href="games/sprouts/index.html"><img src="assets/play/sprouts.jpg" width="640" height="480" alt="Tung Sprouts gameplay" loading="eager"><span>Tung Sprouts</span></a></li>
+        <li><a class="gtile" href="games/imposter/index.html"><img src="assets/play/imposter.jpg" width="640" height="480" alt="The Imposter gameplay" loading="eager"><span>The Imposter</span></a></li>
+        <li><a class="gtile" href="games/pool/index.html"><img src="assets/play/pool.jpg" width="640" height="480" alt="Tung Pool gameplay" loading="eager"><span>Tung Pool</span></a></li>
+        <li><a class="gtile" href="games/slope/index.html"><img src="assets/play/slope.jpg" width="640" height="480" alt="Tung Slope gameplay" loading="eager"><span>Tung Slope</span></a></li>
+        <li><a class="gtile" href="games/brainrot/index.html"><img src="assets/play/brainrot.jpg" width="640" height="480" alt="Brainrot Merge gameplay" loading="eager"><span>Brainrot Merge</span></a></li>
+        <li><a class="gtile" href="games/clicker/index.html"><img src="assets/play/clicker.jpg" width="640" height="480" alt="Tung Clicker gameplay" loading="eager"><span>Tung Clicker</span></a></li>
+        <li><a class="gtile" href="games/battleship/index.html"><img src="assets/play/battleship.jpg" width="640" height="480" alt="Tung Battleship gameplay" loading="eager"><span>Tung Battleship</span></a></li>
+        <li><a class="gtile" href="games/chess/index.html"><img src="assets/play/chess.jpg" width="640" height="480" alt="Tung Tung Chess gameplay" loading="eager"><span>Tung Tung Chess</span></a></li>
+        <li><a class="gtile" href="games/boxes/index.html"><img src="assets/play/boxes.jpg" width="640" height="480" alt="Tung Dots &amp; Boxes gameplay" loading="eager"><span>Tung Dots &amp; Boxes</span></a></li>
+        <li><a class="gtile" href="games/uttt/index.html"><img src="assets/play/uttt.jpg" width="640" height="480" alt="Tung Super Tic-Tac-Toe gameplay" loading="eager"><span>Tung Super Tic-Tac-Toe</span></a></li>
+        <li><a class="gtile" href="games/hangman/index.html"><img src="assets/play/hangman.jpg" width="640" height="480" alt="Tung Hangman gameplay" loading="eager"><span>Tung Hangman</span></a></li>
+        <li><a class="gtile" href="games/flappy/index.html"><img src="assets/play/flappy.jpg" width="640" height="480" alt="Flappy Tung gameplay" loading="eager"><span>Flappy Tung</span></a></li>
+        <li><a class="gtile" href="games/whack/index.html"><img src="assets/play/whack.jpg" width="640" height="480" alt="Whack-a-Tung gameplay" loading="eager"><span>Whack-a-Tung</span></a></li>
+        <li><a class="gtile" href="games/basketball/index.html"><img src="assets/play/basketball.jpg" width="640" height="480" alt="Tung 2x2 Basketball gameplay" loading="eager"><span>Tung 2x2 Basketball</span></a></li>
+        <li><a class="gtile" href="games/f1/index.html"><img src="assets/play/f1.jpg" width="640" height="480" alt="Tung F1 Racing gameplay" loading="eager"><span>Tung F1 Racing</span></a></li>
+        <li><a class="gtile" href="games/paper/index.html"><img src="assets/play/paper.jpg" width="640" height="480" alt="Tung Paper.io gameplay" loading="eager"><span>Tung Paper.io</span></a></li>
+        <li><a class="gtile" href="games/tungup/index.html"><img src="assets/play/tungup.jpg" width="640" height="480" alt="Tung Up! gameplay" loading="eager"><span>Tung Up!</span></a></li>
+        <li><a class="gtile" href="games/airhockey/index.html"><img src="assets/play/airhockey.jpg" width="640" height="480" alt="Tung Tung Air Hockey gameplay" loading="eager"><span>Tung Tung Air Hockey</span></a></li>
+        <li><a class="gtile" href="games/go/index.html"><img src="assets/play/go.jpg" width="640" height="480" alt="Tung Tung Go gameplay" loading="eager"><span>Tung Tung Go</span></a></li>
+        <li><a class="gtile" href="games/bomber/index.html"><img src="assets/play/bomber.jpg" width="640" height="480" alt="Tung Bomber Arena gameplay" loading="eager"><span>Tung Bomber Arena</span></a></li>
+        <li><a class="gtile" href="games/sumo/index.html"><img src="assets/play/sumo.jpg" width="640" height="480" alt="Tung Tung Sumo gameplay" loading="eager"><span>Tung Tung Sumo</span></a></li>
+        <li><a class="gtile" href="games/golf/index.html"><img src="assets/play/golf.jpg" width="640" height="480" alt="Tung Tung Mini Golf gameplay" loading="eager"><span>Tung Tung Mini Golf</span></a></li>
+        <li><a class="gtile" href="games/pictionary/index.html"><img src="assets/play/pictionary.jpg" width="640" height="480" alt="Tung Tung Pictionary gameplay" loading="eager"><span>Tung Tung Pictionary</span></a></li>
+        <li><a class="gtile" href="games/archery/index.html"><img src="assets/play/archery.jpg" width="640" height="480" alt="Tung Tung Archery gameplay" loading="eager"><span>Tung Tung Archery</span></a></li>
+        <li><a class="gtile" href="games/cuppong/index.html"><img src="assets/play/cuppong.jpg" width="640" height="480" alt="Tung Tung Cup Pong gameplay" loading="eager"><span>Tung Tung Cup Pong</span></a></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section" id="play" aria-labelledby="play-h">
+    <div class="wrap">
+      <div class="section-head">
+        <h2 id="play-h">Multiplayer with anyone online</h2>
+        <p>Single player games never count. Multiplayer matches always do.</p>
+      </div>
+      <div class="grid grid--top fill">
+        <ol class="rows span-6 steps">
+          <li><span class="rows__name">Make an account</span><p>Pick a username, a profile picture and a 4-digit PIN. You enter the PIN every time you log in.</p><span class="rows__value">Step 1</span></li>
+          <li><span class="rows__name">See who is online</span><p>Everyone logged in appears in the online list, on every page.</p><span class="rows__value">Step 2</span></li>
+          <li><span class="rows__name">Send a challenge</span><p>Choose a game and its settings. They get a popup and accept in one tap.</p><span class="rows__value">Step 3</span></li>
+          <li><span class="rows__name">Climb the leaderboard</span><p>Wins and losses are counted for each game and for all games together.</p><span class="rows__value">Step 4</span></li>
+        </ol>
+        <div class="mock span-6 start-7" role="img" aria-label="The online list with three players, and a challenge popup with Decline and Accept buttons">
+          <div class="mock__head"><span>Online now</span><span class="mock__count">3 players</span></div>
+          <ul class="mock__list">
+            <li><span class="av">🥁</span><span class="who">Woody<small>Online</small></span><span class="mock__btn">Challenge</span></li>
+            <li><span class="av">🦆</span><span class="who">Drummy<small>In a match</small></span><span class="mock__btn is-off">Challenge</span></li>
+            <li><span class="av">🐸</span><span class="who">Timber<small>Online</small></span><span class="mock__btn">Challenge</span></li>
+          </ul>
+          <div class="mock__toast">
+            <div class="mock__toast-top"><span class="av">🥁</span><span>Woody challenged you to Tung Sprouts (3 dots, Normal)!</span></div>
+            <div class="mock__toast-row"><span class="mock__btn is-ghost">Decline</span><span class="mock__btn is-main">Accept</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="leaderboards" aria-labelledby="board-h">
+    <div class="wrap">
+      <div class="section-head">
+        <h2 id="board-h">Wins and losses in 24 games</h2>
+        <p>The overall board adds up every multiplayer game. Each game page also has its own board and a solo board, and the clicker has its own total.</p>
+      </div>
+      <div class="grid grid--top fill">
+        <ul class="rows span-6">
+          <li><span class="rows__name">Tung Snake</span><a class="link rows__value" href="games/snake/index.html">See Snake board</a></li>
+          <li><span class="rows__name">Tung Minesweeper</span><a class="link rows__value" href="games/minesweeper/index.html">See Minesweeper board</a></li>
+          <li><span class="rows__name">Tung Sprouts</span><a class="link rows__value" href="games/sprouts/index.html">See Sprouts board</a></li>
+          <li><span class="rows__name">The Imposter</span><a class="link rows__value" href="games/imposter/index.html">See Imposter board</a></li>
+          <li><span class="rows__name">Tung Pool</span><a class="link rows__value" href="games/pool/index.html">See Pool board</a></li>
+          <li><span class="rows__name">Tung Slope</span><a class="link rows__value" href="games/slope/index.html">See Slope board</a></li>
+          <li><span class="rows__name">Brainrot Merge</span><a class="link rows__value" href="games/brainrot/index.html">See Brainrot board</a></li>
+          <li><span class="rows__name">Tung Clicker</span><a class="link rows__value" href="games/clicker/index.html">See Clicker board</a></li>
+          <li><span class="rows__name">Tung Tung Chess</span><a class="link rows__value" href="games/chess/index.html">See Chess board</a></li>
+          <li><span class="rows__name">Tung Battleship</span><a class="link rows__value" href="games/battleship/index.html">See Battleship board</a></li>
+          <li><span class="rows__name">Tung Dots &amp; Boxes</span><a class="link rows__value" href="games/boxes/index.html">See Dots &amp; Boxes board</a></li>
+          <li><span class="rows__name">Tung Super Tic-Tac-Toe</span><a class="link rows__value" href="games/uttt/index.html">See Super Tic-Tac-Toe board</a></li>
+          <li><span class="rows__name">Tung Hangman</span><a class="link rows__value" href="games/hangman/index.html">See Hangman board</a></li>
+          <li><span class="rows__name">Flappy Tung</span><a class="link rows__value" href="games/flappy/index.html">See Flappy board</a></li>
+          <li><span class="rows__name">Whack-a-Tung</span><a class="link rows__value" href="games/whack/index.html">See Whack-a-Tung board</a></li>
+          <li><span class="rows__name">Tung 2x2 Basketball</span><a class="link rows__value" href="games/basketball/index.html">See Basketball board</a></li>
+          <li><span class="rows__name">Tung F1 Racing</span><a class="link rows__value" href="games/f1/index.html">See F1 board</a></li>
+          <li><span class="rows__name">Tung Paper.io</span><a class="link rows__value" href="games/paper/index.html">See Paper.io board</a></li>
+          <li><span class="rows__name">Tung Up!</span><a class="link rows__value" href="games/tungup/index.html">See Tung Up! board</a></li>
+          <li><span class="rows__name">Tung Tung Air Hockey</span><a class="link rows__value" href="games/airhockey/index.html">See Air Hockey board</a></li>
+          <li><span class="rows__name">Tung Tung Go</span><a class="link rows__value" href="games/go/index.html">See Go board</a></li>
+          <li><span class="rows__name">Tung Bomber Arena</span><a class="link rows__value" href="games/bomber/index.html">See Bomber Arena board</a></li>
+          <li><span class="rows__name">Tung Tung Sumo</span><a class="link rows__value" href="games/sumo/index.html">See Sumo board</a></li>
+          <li><span class="rows__name">Tung Tung Mini Golf</span><a class="link rows__value" href="games/golf/index.html">See Mini Golf board</a></li>
+          <li><span class="rows__name">Tung Tung Pictionary</span><a class="link rows__value" href="games/pictionary/index.html">See Pictionary board</a></li>
+          <li><span class="rows__name">Tung Tung Archery</span><a class="link rows__value" href="games/archery/index.html">See Archery board</a></li>
+          <li><span class="rows__name">Tung Tung Cup Pong</span><a class="link rows__value" href="games/cuppong/index.html">See Cup Pong board</a></li>
+        </ul>
+        <div class="board span-6 start-7" id="leaderboardPanel"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer closing footer--dark ground-inverse" id="contact" aria-labelledby="close-h">
+  <div class="wrap">
+    <div class="closing__cta close--type">
+      <div class="section-head">
+        <h2 id="close-h">Twenty-five games to play today</h2>
+        <p>Sign up in a minute with a username, a picture and a 4-digit PIN.</p>
+      </div>
+      <a class="btn btn--primary btn--xl btn--wide" href="#games">Play games<svg class="m-arrow" viewBox="0 0 12 12" aria-hidden="true"><path class="m-arrow__stem" d="M1 6h8"></path><path class="m-arrow__head" d="M4.5 2.5 8 6l-3.5 3.5"></path></svg></a>
+    </div>
+    <div class="closing__links">
+      <div class="grid">
+        <div class="span-6 stack-4">
+          <a class="nav__logo" href="#top"><span class="mark" data-mark="stack" aria-hidden="true"></span>Tung Tung Arcade</a>
+          <p class="footer__lede">A multiplayer arcade with twenty-five games and live leaderboards.</p>
+        </div>
+        <div class="span-3 footer__col"><h4>Games</h4><ul>
+          <li><a href="games/snake/index.html">Tung Snake</a></li>
+          <li><a href="games/minesweeper/index.html">Tung Minesweeper</a></li>
+          <li><a href="games/sprouts/index.html">Tung Sprouts</a></li>
+          <li><a href="games/imposter/index.html">The Imposter</a></li>
+          <li><a href="games/pool/index.html">Tung Pool</a></li>
+          <li><a href="games/slope/index.html">Tung Slope</a></li>
+          <li><a href="games/brainrot/index.html">Brainrot Merge</a></li>
+          <li><a href="games/clicker/index.html">Tung Clicker</a></li>
+        </ul></div>
+        <div class="span-3 footer__col"><h4>Site</h4><ul>
+          <li><a href="#games">All games</a></li>
+          <li><a href="#play">Multiplayer</a></li>
+          <li><a href="#leaderboards">Leaderboards</a></li>
+        </ul></div>
+      </div>
+      <div class="footer__legal">
+        <span>© 2026 Tung Tung Arcade</span>
+        <div class="socials"></div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="mp.js"></script>
+<script type="module" src="assets/system.js"></script>
+<script type="module" src="assets/motion/motion.js"></script>
+<script type="module" src="assets/layout/layout.js"></script>
+<script src="app.js"></script>
+
+
+</body></html>

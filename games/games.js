@@ -68,5 +68,7 @@ window.TUNG_GAMES = [
   { id: "sumo", title: "Tung Tung Sumo", description: "Shove every other Tung out of the ring.", icon: "🤼", players: "1 player, 1v1 or rooms of up to 4", url: "games/sumo/index.html" },
   { id: "golf", title: "Tung Tung Mini Golf", description: "Two courses of windmills, water and teleporters. Fewest strokes wins.", icon: "⛳", players: "1 or 2 players", url: "games/golf/index.html" },
   { id: "pictionary", title: "Tung Tung Pictionary", description: "Draw the secret word, guess the others'. Practice sketchpad when alone.", icon: "🎨", players: "Sketchpad, or rooms of 2 to 8", url: "games/pictionary/index.html" },
+  { id: "archery", title: "Tung Tung Archery", description: "Read the wind, steady your breath and hit the gold.", icon: "🏹", players: "1 or 2 players", url: "games/archery/index.html" },
+  { id: "cuppong", title: "Tung Tung Cup Pong", description: "Arc the ball into the cups. Sink two and throw again.", icon: "🥤", players: "1 or 2 players", url: "games/cuppong/index.html" },
   // Add more games here
 ];

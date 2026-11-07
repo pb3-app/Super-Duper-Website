@@ -1,0 +1,20 @@
+{
+ "palettes": [
+  "lunar-grey-bronze"
+ ],
+ "types": [
+  "anybody"
+ ],
+ "dealt": [
+  "anybody",
+  "sora",
+  "epilogue"
+ ],
+ "moments": [
+  {
+   "id": "word-highlight",
+   "at": "2026-11-07T18:57:52.865Z",
+   "seed": "570a76dc"
+  }
+ ]
+}
