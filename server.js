@@ -1784,6 +1784,8 @@ setInterval(() => {
 // started by standing on its log: 2 tungs on the same log for 10 seconds start the 1v1 match, and 1 tung alone on a
 // practice-corner log for 10 seconds goes to that game's solo mode.
 const AR = { w: 4600, h: 3200, r: 28, tick: 30, speed: 320, range: 85, cooldown: 0.6, knock: 900, friction: 6, hold: 10, max: 40 };
+// Every 10 bonks you have ever landed, anywhere in the arena, make you 10% faster, up to double speed at 100 bonks.
+const bonkBoost = (bonks) => Math.min(1, Math.floor((bonks || 0) / 10) / 10);
 const AR_COLORS = ['#c8874a', '#a86b35', '#d9a066', '#8b5a2b', '#e0b07a', '#b5793f'];
 const arenaPlayers = new Map(); // key -> player
 let arenaTimer = null, arenaTickNo = 0;
@@ -1873,12 +1875,12 @@ function arenaJoin(ws) {
     const sp = arenaSpawn(), u = db.users[ws.key];
     p = { key: ws.key, name: u.username, color: AR_COLORS[[...ws.key].reduce((a, c) => a + c.charCodeAt(0), 0) % AR_COLORS.length],
       x: sp.x, y: sp.y, vx: 0, vy: 0, facing: 0, input: { up: false, down: false, left: false, right: false, aim: 0 },
-      cooldown: 0, swing: 0, stunned: 0, score: 0, q: gearOf(u), streak: 0, z: false, fall: 0, lastHit: null, ws };
+      cooldown: 0, swing: 0, stunned: 0, score: 0, q: gearOf(u), boost: bonkBoost(u.bonks), streak: 0, z: false, fall: 0, lastHit: null, ws };
     arenaPlayers.set(ws.key, p);
     arenaBroadcast({ t: 'arena_event', type: 'join', name: p.name });
   }
   p.ws = ws;
-  wsSend(ws, { t: 'arena_welcome', you: ws.key, ...arenaInfo() });
+  wsSend(ws, { t: 'arena_welcome', you: ws.key, bonks: (db.users[ws.key] && db.users[ws.key].bonks) || 0, ...arenaInfo() });
   if (!arenaTimer) arenaTimer = setInterval(arenaStep, 1000 / AR.tick);
 }
 function arenaLeave(key, quiet) {
@@ -1911,6 +1913,7 @@ function onArena(ws, msg) {
         return;
       }
       p.cooldown = AR.cooldown; p.swing = 0.2;
+      let landed = 0;
       for (const o of arenaPlayers.values()) {
         if (o === p || o.fall > 0 || inSafeZone(o)) continue; // nobody on a log or in the practice corner can be bonked
         if (!!o.z !== !!p.z) continue; // the showdown is its own place: no bonking across its edge, in or out
@@ -1919,8 +1922,16 @@ function onArena(ws, msg) {
         let diff = Math.abs(Math.atan2(dy, dx) - p.facing);
         if (diff > Math.PI) diff = Math.PI * 2 - diff;
         if (diff > Math.PI / 2) continue;
-        o.vx += (dx / (d || 1)) * AR.knock; o.vy += (dy / (d || 1)) * AR.knock; o.stunned = 0.35; p.score++; o.lastHit = { key: p.key, at: Date.now() };
+        o.vx += (dx / (d || 1)) * AR.knock; o.vy += (dy / (d || 1)) * AR.knock; o.stunned = 0.35; p.score++; landed++; o.lastHit = { key: p.key, at: Date.now() };
         arenaBroadcast({ t: 'arena_event', type: 'bonk', from: p.name, to: o.name, x: Math.round(o.x), y: Math.round(o.y) });
+      }
+      if (landed) { // every landed bonk counts towards your lifetime total, which sets your speed
+        const u = db.users[p.key];
+        if (u) {
+          u.bonks = (u.bonks || 0) + landed; saveDb();
+          const boost = bonkBoost(u.bonks), up = boost > p.boost; p.boost = boost;
+          wsSend(p.ws, { t: 'arena_me', bonks: u.bonks, pct: Math.round(boost * 100), up });
+        }
       }
     }
   }
@@ -1932,7 +1943,7 @@ function arenaStep() {
     p.cooldown = Math.max(0, p.cooldown - dt); p.swing = Math.max(0, p.swing - dt); p.stunned = Math.max(0, p.stunned - dt);
     if (p.fall > 0) { // falling into the pit: no control, then back on the floor below the bridge
       p.fall -= dt;
-      if (p.fall <= 0) { p.fall = 0; p.x = SD.respawn.x + (Math.random() - 0.5) * 80; p.y = SD.respawn.y; p.vx = p.vy = 0; p.stunned = 0.3; p.z = false; }
+      if (p.fall <= 0) { p.fall = 0; p.x = SD.respawn.x + (Math.random() - 0.5) * 80; p.y = SD.respawn.y; p.vx = p.vy = 0; p.stunned = 0.3; p.z = false; p.sdIn = false; }
       continue;
     }
     p.facing = p.input.aim;
@@ -1942,15 +1953,20 @@ function arenaStep() {
       const len = Math.hypot(mx, my); if (len) { mx /= len; my /= len; }
     }
     // Outside the showdown, its pit is walled off except at the bridge, and a bonk can never carry you into it (you walk in yourself).
-    let nx = p.x + mx * AR.speed * dt, ny = p.y + my * AR.speed * dt;
+    let nx = p.x + mx * AR.speed * (1 + p.boost) * dt, ny = p.y + my * AR.speed * (1 + p.boost) * dt;
     if (!p.z && sdPitAt(nx, ny) && !sdBridgeAt(nx, ny)) {
       if (!(sdPitAt(nx, p.y) && !sdBridgeAt(nx, p.y))) ny = p.y; // slide along the wall
       else if (!(sdPitAt(p.x, ny) && !sdBridgeAt(p.x, ny))) nx = p.x;
       else { nx = p.x; ny = p.y; }
     }
+    // Once you are out over the pit (on the bridge past the bank, or on the platform) there is no walking back: the way out is down.
+    if (p.sdIn && !sdPitAt(nx, ny)) {
+      if (sdPitAt(nx, p.y)) ny = p.y; else if (sdPitAt(p.x, ny)) nx = p.x; else { nx = p.x; ny = p.y; }
+    }
     p.x = nx; p.y = ny;
     const kx = p.x + p.vx * dt, ky = p.y + p.vy * dt;
-    if (!p.z && sdZoneAt(kx, ky)) { p.vx = p.vy = 0; } else { p.x = kx; p.y = ky; }
+    if ((!p.z && sdZoneAt(kx, ky)) || (p.sdIn && !sdPitAt(kx, ky))) { p.vx = p.vy = 0; } else { p.x = kx; p.y = ky; }
+    p.sdIn = sdPitAt(p.x, p.y);
     const decay = Math.exp(-AR.friction * dt); p.vx *= decay; p.vy *= decay;
     if (p.x < AR.r) { p.x = AR.r; p.vx = Math.abs(p.vx) * 0.5; }
     if (p.x > AR.w - AR.r) { p.x = AR.w - AR.r; p.vx = -Math.abs(p.vx) * 0.5; }

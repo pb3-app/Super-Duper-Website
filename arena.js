@@ -11,7 +11,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   const Shop = window.TungShop;
   const INTERP_DELAY = 100; // ms behind real time, so movement looks smooth
 
-  let myId = null, arena = { w: 4600, h: 3200 }, radius = 28, holdSecs = 10, safe = null, showdown = null, sdBoard = { cur: [], all: [] };
+  let myId = null, arena = { w: 4600, h: 3200 }, radius = 28, holdSecs = 10, safe = null, showdown = null, sdBoard = { cur: [], all: [] }, me$ = { bonks: 0, pct: 0 };
   let logs = [];                 // the logs, from the server's welcome
   let logState = {};             // log id -> [id, how many on it, seconds left or -1]
   const snapshots = [], effects = [];
@@ -41,7 +41,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   function onMsg(m) {
     switch (m.t) {
       case "arena_welcome":
-        myId = m.you; arena = m.arena; radius = m.radius; holdSecs = m.hold; logs = m.logs; safe = m.safe; showdown = m.showdown; sdBoard = m.board || sdBoard; joined = true;
+        myId = m.you; arena = m.arena; radius = m.radius; holdSecs = m.hold; logs = m.logs; safe = m.safe; showdown = m.showdown; sdBoard = m.board || sdBoard; me$ = { bonks: m.bonks || 0, pct: Math.round(Math.min(1, Math.floor((m.bonks || 0) / 10) / 10) * 100) }; joined = true;
         $("gate").hidden = true; $("scores").hidden = false;
         loadShop(); loadBoard();
         break;
@@ -51,6 +51,10 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
         snapshots.push(m); while (snapshots.length > 30) snapshots.shift();
         break;
       case "arena_sd": sdBoard = m.board; break;
+      case "arena_me":
+        me$ = { bonks: m.bonks, pct: m.pct };
+        if (m.up) feed(`Speed boost! You are ${m.pct}% faster (${m.bonks} bonks)`);
+        break;
       case "arena_event":
         if (m.type === "bonk") {
           effects.push({ x: m.x, y: m.y, life: 0.7, text: "TUNG!" }); feed(`${m.from} bonked ${m.to}`);
@@ -77,7 +81,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     }
   }
   if (T) {
-    for (const t of ["arena_welcome", "arena_state", "arena_event", "arena_solo", "arena_pair", "arena_full", "arena_sd"]) T.on("msg:" + t, onMsg);
+    for (const t of ["arena_welcome", "arena_state", "arena_event", "arena_solo", "arena_pair", "arena_full", "arena_sd", "arena_me"]) T.on("msg:" + t, onMsg);
     T.on("ready", () => { refreshGate(); join(); });
     T.on("logout", () => { joined = false; myId = null; snapshots.length = 0; refreshGate(); });
     T.booted.then(() => { refreshGate(); join(); });
@@ -477,7 +481,9 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   function updateHud(players, me) {
     const sorted = [...players].sort((a, b) => b.sc - a.sc).slice(0, 8);
     const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-    const html = "<b>BONKS</b>" + sorted.map((p) => `<div class="${p.id === myId ? "me" : ""}">${esc(p.n)}: ${p.sc}</div>`).join("");
+    const next = (Math.floor(me$.bonks / 10) + 1) * 10;
+    const html = "<b>BONKS</b>" + sorted.map((p) => `<div class="${p.id === myId ? "me" : ""}">${esc(p.n)}: ${p.sc}</div>`).join("")
+      + `<div class="boost">⚡ Speed +${me$.pct}%<small>${me$.pct >= 100 ? "full speed: " + me$.bonks + " bonks in all" : me$.bonks + " bonks in all, next boost at " + next}</small></div>`;
     if (html !== lastScores) { $("scores").innerHTML = html; lastScores = html; }
     // the streak boards: only while you are in the Showdown
     const sdBox = $("sd");
