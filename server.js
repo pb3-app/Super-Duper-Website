@@ -1712,7 +1712,7 @@ setInterval(() => {
 // Players are the logged-in accounts on the arena page. The server runs the world and the clients send inputs. A game is
 // started by standing on its log: 2 tungs on the same log for 10 seconds start the 1v1 match, and 1 tung alone on a
 // practice-corner log for 10 seconds goes to that game's solo mode.
-const AR = { w: 2600, h: 1700, r: 28, tick: 30, speed: 260, range: 85, cooldown: 0.6, knock: 900, friction: 6, hold: 10, max: 40 };
+const AR = { w: 4600, h: 3200, r: 28, tick: 30, speed: 320, range: 85, cooldown: 0.6, knock: 900, friction: 6, hold: 10, max: 40 };
 const AR_COLORS = ['#c8874a', '#a86b35', '#d9a066', '#8b5a2b', '#e0b07a', '#b5793f'];
 const arenaPlayers = new Map(); // key -> player
 let arenaTimer = null, arenaTickNo = 0;
@@ -1732,17 +1732,27 @@ const arenaLogs = (() => {
     const p = at(step * (i + 0.5));
     logs.push({ id: 'mp:' + g, game: g, kind: 'mp', need: 2, x: p.x, y: p.y, w: p.v ? 92 : 210, h: p.v ? 210 : 92 });
   });
-  // practice corner: one small log per game, a grid inside the bottom-right of the map
-  const all = Object.keys(GAMES), cols = 6, cw = 170, ch = 120, gx = AR.w - 250 - cols * cw, gy = AR.h - 330 - Math.ceil(all.length / cols) * ch;
+  // practice corner: one small log per game, in a grid well inside the map (about 600 pixels from the logs on the edge)
+  const all = Object.keys(GAMES), cols = 6, cw = 190, ch = 130, gx = Math.round(AR.w * 0.58), gy = Math.round(AR.h * 0.55);
   all.forEach((g, i) => logs.push({ id: 'solo:' + g, game: g, kind: 'solo', need: 1, x: gx + (i % cols) * cw + cw / 2, y: gy + Math.floor(i / cols) * ch + ch / 2, w: 140, h: 60 }));
   for (const l of logs) { l.order = []; l.since = null; }
   return logs;
 })();
+// The practice corner (its rug) and every log are safe: nobody can be bonked there, and nobody there can bonk.
+const arenaSafe = (() => {
+  const solos = arenaLogs.filter((l) => l.kind === 'solo');
+  return { x0: Math.min(...solos.map((l) => l.x - 95)), x1: Math.max(...solos.map((l) => l.x + 95)), y0: Math.min(...solos.map((l) => l.y - 78)), y1: Math.max(...solos.map((l) => l.y + 62)) };
+})();
+function inSafeZone(p) {
+  if (p.x >= arenaSafe.x0 && p.x <= arenaSafe.x1 && p.y >= arenaSafe.y0 && p.y <= arenaSafe.y1) return true;
+  const pad = AR.r * 0.6; // standing partly on a log counts
+  return arenaLogs.some((l) => Math.abs(p.x - l.x) <= l.w / 2 + pad && Math.abs(p.y - l.y) <= l.h / 2 + pad);
+}
 const arenaInfo = () => ({
-  arena: { w: AR.w, h: AR.h }, radius: AR.r, hold: AR.hold,
+  arena: { w: AR.w, h: AR.h }, radius: AR.r, hold: AR.hold, safe: arenaSafe,
   logs: arenaLogs.map((l) => ({ id: l.id, game: l.game, kind: l.kind, need: l.need, x: l.x, y: l.y, w: l.w, h: l.h, title: GAMES[l.game].title, icon: GAMES[l.game].icon })),
 });
-const arenaSpawn = () => ({ x: 700 + Math.random() * 900, y: 500 + Math.random() * 500 });
+const arenaSpawn = () => ({ x: AR.w * 0.3 + Math.random() * AR.w * 0.2, y: AR.h * 0.3 + Math.random() * AR.h * 0.2 });
 
 function arenaJoin(ws) {
   if (!ws.key || !db.users[ws.key]) return;
@@ -1786,9 +1796,13 @@ function onArena(ws, msg) {
     case 'arena_bonk': {
       const p = arenaPlayers.get(ws.key);
       if (!p || p.ws !== ws || p.cooldown > 0 || p.stunned > 0) return;
+      if (inSafeZone(p)) { // no bonking from a log or from the practice corner
+        if (!p.safeAt || Date.now() - p.safeAt > 1500) { p.safeAt = Date.now(); wsSend(ws, { t: 'arena_event', type: 'safe' }); }
+        return;
+      }
       p.cooldown = AR.cooldown; p.swing = 0.2;
       for (const o of arenaPlayers.values()) {
-        if (o === p) continue;
+        if (o === p || inSafeZone(o)) continue; // nobody on a log or in the practice corner can be bonked
         const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy);
         if (d > AR.range + AR.r) continue;
         let diff = Math.abs(Math.atan2(dy, dx) - p.facing);

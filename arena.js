@@ -11,7 +11,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   const Shop = window.TungShop;
   const INTERP_DELAY = 100; // ms behind real time, so movement looks smooth
 
-  let myId = null, arena = { w: 2600, h: 1700 }, radius = 28, holdSecs = 10;
+  let myId = null, arena = { w: 4600, h: 3200 }, radius = 28, holdSecs = 10, safe = null;
   let logs = [];                 // the logs, from the server's welcome
   let logState = {};             // log id -> [id, how many on it, seconds left or -1]
   const snapshots = [], effects = [];
@@ -41,7 +41,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   function onMsg(m) {
     switch (m.t) {
       case "arena_welcome":
-        myId = m.you; arena = m.arena; radius = m.radius; holdSecs = m.hold; logs = m.logs; joined = true;
+        myId = m.you; arena = m.arena; radius = m.radius; holdSecs = m.hold; logs = m.logs; safe = m.safe; joined = true;
         $("gate").hidden = true; $("scores").hidden = false;
         loadShop();
         break;
@@ -52,6 +52,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
         break;
       case "arena_event":
         if (m.type === "bonk") { effects.push({ x: m.x, y: m.y, life: 0.7, text: "TUNG!" }); feed(`${m.from} bonked ${m.to}`); }
+        else if (m.type === "safe") feed("No bonking on logs or in the practice corner");
         else if (m.type === "join") feed(`${m.name} joined`);
         else if (m.type === "leave") feed(`${m.name} left`);
         break;
@@ -145,19 +146,17 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
       const off = (y / 60) % 2 === 0 ? 0 : 120;
       for (let x = off; x <= arena.w; x += 240) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + 60); ctx.stroke(); }
     }
-    ctx.fillStyle = "rgba(255, 140, 42, 0.08)"; ctx.font = "150px Bungee, sans-serif"; ctx.textAlign = "center";
-    ctx.fillText("TUNG ARENA", arena.w / 2 - 240, arena.h / 2 - 60);
-    // the practice corner: a rug under the solo logs
-    const solos = logs.filter((l) => l.kind === "solo");
-    if (solos.length) {
-      const x0 = Math.min(...solos.map((l) => l.x - 95)), x1 = Math.max(...solos.map((l) => l.x + 95));
-      const y0 = Math.min(...solos.map((l) => l.y - 78)), y1 = Math.max(...solos.map((l) => l.y + 62));
+    ctx.fillStyle = "rgba(255, 140, 42, 0.08)"; ctx.font = "300px Bungee, sans-serif"; ctx.textAlign = "center";
+    ctx.fillText("TUNG ARENA", arena.w * 0.3, arena.h * 0.3);
+    // the practice corner: a rug under the solo logs. Safe: nobody can be bonked here.
+    if (safe) {
+      const { x0, y0, x1, y1 } = safe;
       ctx.fillStyle = "rgba(26, 15, 7, 0.28)"; rr(x0, y0, x1 - x0, y1 - y0, 40); ctx.fill();
       ctx.strokeStyle = "rgba(255, 140, 42, 0.45)"; ctx.lineWidth = 5; ctx.setLineDash([22, 16]); rr(x0, y0, x1 - x0, y1 - y0, 40); ctx.stroke(); ctx.setLineDash([]);
       ctx.fillStyle = "#ffcf99"; ctx.font = "30px Bungee, sans-serif"; ctx.textAlign = "center";
       ctx.fillText("PRACTICE CORNER", (x0 + x1) / 2, y0 - 16);
       ctx.fillStyle = "rgba(255, 243, 224, 0.75)"; ctx.font = "700 16px Nunito, sans-serif";
-      ctx.fillText("one tung on a log plays that game alone", (x0 + x1) / 2, y1 + 28);
+      ctx.fillText("one tung on a log plays that game alone · no bonking here", (x0 + x1) / 2, y1 + 28);
     }
     ctx.strokeStyle = "#ff8c2a"; ctx.lineWidth = 10; ctx.strokeRect(0, 0, arena.w, arena.h);
   }
@@ -381,6 +380,19 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     for (let i = trailBits.length - 1; i >= 0; i--) if (trailBits[i].life <= 0) trailBits.splice(i, 1);
   }
 
+  // a small map, because the arena is big
+  const mini = $("mini"), mctx = mini.getContext("2d");
+  function drawMini(players) {
+    const W = mini.width, H = Math.round(mini.width * arena.h / arena.w); mini.height = H;
+    const k = W / arena.w;
+    mctx.clearRect(0, 0, W, H);
+    mctx.fillStyle = "rgba(26, 15, 7, 0.8)"; mctx.fillRect(0, 0, W, H);
+    mctx.strokeStyle = "#ff8c2a"; mctx.lineWidth = 2; mctx.strokeRect(1, 1, W - 2, H - 2);
+    if (safe) { mctx.fillStyle = "rgba(255, 207, 153, 0.25)"; mctx.fillRect(safe.x0 * k, safe.y0 * k, (safe.x1 - safe.x0) * k, (safe.y1 - safe.y0) * k); }
+    for (const l of logs) { if (l.kind === "solo") continue; const st = logState[l.id]; mctx.fillStyle = st ? "#ff8c2a" : "#a9733a"; mctx.fillRect((l.x - l.w / 2) * k, (l.y - l.h / 2) * k, Math.max(3, l.w * k), Math.max(3, l.h * k)); }
+    for (const p of players) { mctx.fillStyle = p.id === myId ? "#ffffff" : "#e0b07a"; mctx.beginPath(); mctx.arc(p.x * k, p.y * k, p.id === myId ? 4 : 2.5, 0, 7); mctx.fill(); }
+  }
+
   let lastScores = "";
   function updateHud(players, me) {
     const sorted = [...players].sort((a, b) => b.sc - a.sc).slice(0, 8);
@@ -423,6 +435,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     for (let i = effects.length - 1; i >= 0; i--) if (effects[i].life <= 0) effects.splice(i, 1);
     ctx.restore();
     updateHud(players, me);
+    drawMini(players);
   }
 
   // ---------- the shop and the wardrobe ----------

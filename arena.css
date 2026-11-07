@@ -77,3 +77,6 @@ canvas { display: block; width: 100vw; height: 100vh; }
 .shop__tile canvas { width: 56px; height: 56px; border-radius: 8px; }
 .shop__tile.on { border-color: #ff8c2a; background: #5a381c; }
 @media (max-width: 700px) { .ward { grid-template-columns: 1fr; } .ward__me { justify-self: center; } .bar { flex-wrap: wrap; } }
+
+#mini { position: absolute; top: 64px; left: 16px; width: 200px; height: auto; border-radius: 8px; pointer-events: none; }
+@media (max-width: 700px) { #mini { width: 130px; } }
