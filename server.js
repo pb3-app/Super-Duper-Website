@@ -271,8 +271,8 @@ const MIME = {
   '.js': 'text/javascript; charset=utf-8', '.json': 'application/json',
   '.jpg': 'image/jpeg', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
 };
-const ROOT_FILES = new Set(['index.html', 'styles.css', 'app.js', 'mp.js', 'mp.css', 'home.css']);
-const CSP = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self'; connect-src 'self' ws: wss:; frame-ancestors 'none'";
+const ROOT_FILES = new Set(['index.html', 'styles.css', 'app.js', 'mp.js', 'mp.css', 'home.css', 'favicon.svg', 'share.jpg']);
+const CSP = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'sha256-tLacyvDXM7iOBdrKicHZHGDOpIjXw5dTwO25l/lTFaI=' 'sha256-1bYHHe3SE5ji7T/2HhIPPaOd3hoICy83QpaTDL+iRYk='; connect-src 'self' ws: wss:; frame-ancestors 'none'";
 
 function json(res, status, obj) {
   const body = JSON.stringify(obj);
@@ -313,8 +313,18 @@ function saveImageAvatar(key, dataUrl) {
 
 const DUMMY_SALT = crypto.randomBytes(16);
 
+// Behind a host's proxy (Render, Caddy, nginx) every request arrives from the proxy's own address, so the visitor's
+// address comes from X-Forwarded-For. It is only believed when the connection itself came from a private or loopback
+// address, so a visitor connecting directly cannot invent one. The rate limits below are per visitor address.
+function clientIp(req) {
+  const peer = (req.socket.remoteAddress || '?').replace(/^::ffff:/, '');
+  const fromProxy = peer === '::1' || peer === '127.0.0.1' || /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|fc|fd)/i.test(peer);
+  const fwd = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  return fromProxy && fwd ? fwd.slice(0, 64) : peer;
+}
+
 async function handleApi(req, res, url) {
-  const ip = req.socket.remoteAddress || '?';
+  const ip = clientIp(req);
   const route = req.method + ' ' + url.pathname;
 
   switch (route) {

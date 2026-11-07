@@ -4,6 +4,9 @@
   "private": true,
   "description": "Tung Tung Arcade - multiplayer game site",
   "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node server.js"
   },
