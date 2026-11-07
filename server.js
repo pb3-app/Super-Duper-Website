@@ -195,20 +195,88 @@ try {
   }
 }
 let saveTimer = null;
+
+// ---------- Optional Supabase storage ----------
+// With SUPABASE_URL and SUPABASE_SERVICE_KEY set, the accounts are also kept in a Supabase table (arcade_state), so a host
+// that wipes its disk on restart (a free Render instance) loses nothing: the server reloads them when it starts.
+// Without them everything stays in data/ as before. The service key stays on the server, in the host's environment settings.
+const SB_URL = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
+const SB_KEY = process.env.SUPABASE_SERVICE_KEY || '';
+const REMOTE = !!(SB_URL && SB_KEY);
+async function sb(query, opts = {}) {
+  const r = await fetch(SB_URL + '/rest/v1/arcade_state' + query, {
+    ...opts,
+    headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', ...(opts.headers || {}) },
+  });
+  if (!r.ok) throw new Error('Supabase answered ' + r.status + ': ' + (await r.text()).slice(0, 200));
+  return r;
+}
+const sbPut = (key, value) => sb('?on_conflict=key', {
+  method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+  body: JSON.stringify([{ key, value, updated_at: new Date().toISOString() }]),
+});
+async function loadRemote() {
+  let lastErr;
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    try {
+      const rows = await (await sb('?key=eq.db&select=value')).json();
+      if (rows.length) {
+        db = rows[0].value || { users: {} };
+        if (!db.users) db.users = {};
+        console.log('   Loaded', Object.keys(db.users).length, 'accounts from Supabase');
+      } else {
+        await sbPut('db', db); // first run: start the table from whatever the local file held
+        console.log('   Supabase was empty: saved the local accounts there');
+      }
+      const avs = await (await sb('?key=like.avatar:*&select=key,value')).json();
+      for (const a of avs) fs.writeFileSync(path.join(AVATAR_DIR, a.key.slice(7) + '.jpg'), Buffer.from(a.value, 'base64'));
+      return;
+    } catch (e) {
+      lastErr = e; console.error('Supabase load failed (try ' + attempt + '):', e.message);
+      await new Promise((r) => setTimeout(r, 2000 * attempt));
+    }
+  }
+  // never start empty and then overwrite the stored accounts with nothing
+  console.error('Could not reach Supabase, so the server will not start:', lastErr && lastErr.message);
+  process.exit(1);
+}
+let pushChain = Promise.resolve(), pushDirty = false, pushTimer = null;
+function pushDb() {
+  if (!REMOTE) return pushChain;
+  pushDirty = true;
+  pushChain = pushChain.then(async () => {
+    if (!pushDirty) return;
+    pushDirty = false;
+    try { await sbPut('db', db); } catch (e) { pushDirty = true; console.error('Could not save to Supabase (will retry):', e.message); }
+  });
+  return pushChain;
+}
+function schedulePush() {
+  if (!REMOTE || pushTimer) return;
+  pushTimer = setTimeout(() => { pushTimer = null; pushDb(); }, 1500);
+}
+
 function flushDb() {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = null;
   const tmp = DB_FILE + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(db));
   fs.renameSync(tmp, DB_FILE);
+  schedulePush();
 }
 function saveDb() {
   if (saveTimer) return;
   saveTimer = setTimeout(flushDb, 200);
 }
 for (const sig of ['SIGINT', 'SIGTERM']) {
-  process.on(sig, () => {
-    try { flushDb(); } catch (_) {}
+  process.on(sig, async () => {
+    try {
+      flushDb();
+      if (REMOTE) {
+        if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; }
+        await Promise.race([pushDb(), new Promise((r) => setTimeout(r, 4000))]);
+      }
+    } catch (_) {}
     process.exit(0);
   });
 }
@@ -309,6 +377,7 @@ function saveImageAvatar(key, dataUrl) {
   if (buf.length > 80 * 1024) throw httpErr(413, 'Photo is too large');
   if (buf.length < 100 || buf[0] !== 0xff || buf[1] !== 0xd8 || buf[2] !== 0xff) throw httpErr(400, 'Photo must be a JPEG');
   fs.writeFileSync(path.join(AVATAR_DIR, key + '.jpg'), buf);
+  if (REMOTE) sbPut('avatar:' + key, buf.toString('base64')).catch((e) => console.error('Could not save the avatar to Supabase:', e.message));
 }
 
 const DUMMY_SALT = crypto.randomBytes(16);
@@ -1566,11 +1635,15 @@ setInterval(() => {
   }
 }, 25000).unref();
 
-server.listen(PORT, '0.0.0.0', () => {
+async function start() {
+  if (REMOTE) await loadRemote();
+  server.listen(PORT, '0.0.0.0', () => {
   console.log(`\n🥁 Tung Tung Arcade is running`);
   console.log(`   This computer:  http://localhost:${PORT}`);
   for (const list of Object.values(os.networkInterfaces())) {
     for (const i of list || []) if (i.family === 'IPv4' && !i.internal) console.log(`   On your network: http://${i.address}:${PORT}`);
   }
-  console.log('   Accounts are saved in ./data\n');
-});
+  console.log(REMOTE ? '   Accounts are saved in Supabase (and ./data)\n' : '   Accounts are saved in ./data\n');
+  });
+}
+start();
