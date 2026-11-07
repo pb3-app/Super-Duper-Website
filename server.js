@@ -338,7 +338,7 @@ setInterval(() => {
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8', '.json': 'application/json',
-  '.jpg': 'image/jpeg', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
+  '.mp3': 'audio/mpeg', '.jpg': 'image/jpeg', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
 };
 const ROOT_FILES = new Set(['index.html', 'styles.css', 'app.js', 'mp.js', 'mp.css', 'home.css', 'favicon.svg', 'share.jpg']);
 const CSP = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'sha256-tLacyvDXM7iOBdrKicHZHGDOpIjXw5dTwO25l/lTFaI=' 'sha256-1bYHHe3SE5ji7T/2HhIPPaOd3hoICy83QpaTDL+iRYk='; connect-src 'self' ws: wss:; frame-ancestors 'none'";
@@ -593,6 +593,7 @@ function serveStatic(req, res, url) {
 
   file = path.resolve(file);
   if (!file.startsWith(base + path.sep)) return notFound(res);
+  if (path.extname(file).toLowerCase() === '.mp3') return serveAudio(req, res, file); // audio needs Range support (Safari, seeking)
   fs.readFile(file, (err, data) => {
     if (err) return notFound(res);
     const ext = path.extname(file).toLowerCase();
@@ -604,6 +605,25 @@ function serveStatic(req, res, url) {
     if (ext === '.html') headers['Content-Security-Policy'] = CSP;
     res.writeHead(200, headers);
     res.end(req.method === 'HEAD' ? undefined : data);
+  });
+}
+function serveAudio(req, res, file) {
+  fs.stat(file, (err, st) => {
+    if (err || !st.isFile()) return notFound(res);
+    const base = { 'Content-Type': 'audio/mpeg', 'Accept-Ranges': 'bytes', 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'public, max-age=86400' };
+    const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+    let start = 0, end = st.size - 1, status = 200;
+    if (m && (m[1] || m[2])) {
+      if (m[1]) { start = Number(m[1]); if (m[2]) end = Math.min(Number(m[2]), end); }
+      else { start = Math.max(0, st.size - Number(m[2])); }
+      if (start > end || start >= st.size) { res.writeHead(416, { ...base, 'Content-Range': 'bytes */' + st.size }); return res.end(); }
+      status = 206;
+    }
+    const headers = { ...base, 'Content-Length': end - start + 1 };
+    if (status === 206) headers['Content-Range'] = `bytes ${start}-${end}/${st.size}`;
+    res.writeHead(status, headers);
+    if (req.method === 'HEAD') return res.end();
+    fs.createReadStream(file, { start, end }).on('error', () => res.destroy()).pipe(res);
   });
 }
 function notFound(res) {

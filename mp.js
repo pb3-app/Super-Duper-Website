@@ -32,6 +32,63 @@
     del(k) { try { sessionStorage.removeItem(k); } catch {} },
   };
 
+  // ---------- Background music: one looping track on every page, with a button to turn it off ----------
+  // Browsers only start sound after the visitor has clicked, tapped or pressed a key on the site, so the track starts at the
+  // first of those. Each page is a new page load, so the position is saved and the next page carries on from about there.
+  const Music = (() => {
+    const SRC = '/assets/audio/batida-funk-medley.mp3', PREF = 'tungMusic', POS = 'tungMusicPos';
+    const ls = {
+      get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+      set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+    };
+    let audio = null, on = ls.get(PREF) !== 'off', waiting = false;
+    const buttons = new Set();
+    function ensure() {
+      if (audio) return audio;
+      audio = new Audio(SRC);
+      audio.loop = true; audio.volume = 0.3; audio.preload = 'auto';
+      const pos = Number(ls.get(POS));
+      if (pos > 0) audio.addEventListener('loadedmetadata', () => { try { audio.currentTime = pos % (audio.duration || pos + 1); } catch {} }, { once: true });
+      setInterval(() => { if (!audio.paused) ls.set(POS, String(audio.currentTime)); }, 1000);
+      window.addEventListener('pagehide', () => ls.set(POS, String(audio.currentTime)));
+      return audio;
+    }
+    function waitForGesture() {
+      if (waiting) return;
+      waiting = true;
+      const go = () => { waiting = false; for (const ev of EVENTS) removeEventListener(ev, go, true); play(); };
+      const EVENTS = ['pointerdown', 'keydown', 'touchstart'];
+      for (const ev of EVENTS) addEventListener(ev, go, { capture: true, passive: true });
+    }
+    function play() {
+      if (!on) return;
+      const p = ensure().play();
+      if (p && p.catch) p.catch(() => waitForGesture());
+    }
+    function paint() {
+      for (const b of buttons) {
+        b.textContent = on ? '🔊' : '🔇';
+        b.setAttribute('aria-pressed', String(on));
+        b.setAttribute('aria-label', on ? 'Turn the music off' : 'Turn the music on');
+        b.title = on ? 'Music on' : 'Music off';
+      }
+    }
+    function toggle() {
+      on = !on;
+      ls.set(PREF, on ? 'on' : 'off');
+      if (on) play(); else if (audio) audio.pause();
+      paint();
+    }
+    return {
+      start: play,
+      button() {
+        const b = h('button', { class: 'mp-btn ghost mp-music', type: 'button', onclick: toggle });
+        buttons.add(b); paint();
+        return b;
+      },
+    };
+  })();
+
   // Deterministic RNG so both players get the same board (exposed for games).
   function hashSeed(str) {
     let x = 1779033703 ^ str.length;
@@ -204,6 +261,7 @@
     } else {
       slot.append(h('button', { class: 'mp-btn', onclick: () => openAuth() }, '🔑 Log in'));
     }
+    slot.append(Music.button());
   }
   function toggleDrawer() { if (drawer && !drawer.hidden) closeDrawer(); else { buildDrawer(); drawer.hidden = false; renderDrawer(); } }
   function closeDrawer() { if (drawer) drawer.hidden = true; }
@@ -805,6 +863,7 @@
 
   // ---------- boot ----------
   async function boot() {
+    Music.start();
     try { S.cfg = await api('/api/config'); }
     catch { S.offline = true; }
     // Game pages still need the shell elements even when offline.
