@@ -87,7 +87,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   // ---------- controls ----------
   const keyMap = { KeyW: "up", ArrowUp: "up", KeyS: "down", ArrowDown: "down", KeyA: "left", ArrowLeft: "left", KeyD: "right", ArrowRight: "right" };
   addEventListener("keydown", (e) => {
-    if (shopOpen || (e.target && /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(e.target.tagName))) return;
+    if (shopOpen || admOpen || (e.target && /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(e.target.tagName))) return;
     if (keyMap[e.code]) { input[keyMap[e.code]] = true; e.preventDefault(); sendInput(); }
     if (e.code === "Space") { bonk(); e.preventDefault(); }
   });
@@ -646,6 +646,37 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     }
     ctx.restore();
   }
+
+  // ---------- admins: remove users ----------
+  let admUsers = [], admOpen = false, admSure = null;
+  const admBtn = $("adminBtn");
+  function syncAdmin() { admBtn.hidden = !(T && T.user && T.user.admin); }
+  async function loadAdmin() {
+    try { admUsers = (await T.api("/api/admin/users")).users; renderAdmin(); } catch (e) { $("admMsg").textContent = e.message; }
+  }
+  function renderAdmin() {
+    const q = $("admFilter").value.trim().toLowerCase(), esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const rows = admUsers.filter((u) => !q || u.username.toLowerCase().includes(q));
+    $("admList").innerHTML = rows.length ? rows.map((u) => `<div class="adm__row"><span class="who"><span class="dot${u.online ? " on" : ""}" title="${u.online ? "online" : "offline"}"></span><b>${esc(u.username)}</b>${u.admin ? '<span class="tag">admin</span>' : ""}</span><span class="rec">${u.wins}W ${u.losses}L</span>${u.admin || u.id === (T.user && T.user.id) ? "" : `<button type="button" data-id="${esc(u.id)}" class="${admSure === u.id ? "sure" : ""}">${admSure === u.id ? "Really remove?" : "Remove"}</button>`}</div>`).join("") : '<p>No users match.</p>';
+  }
+  function openAdmin() { admOpen = true; $("admin").hidden = false; $("admMsg").textContent = ""; admSure = null; for (const k of ["up", "down", "left", "right"]) input[k] = false; sendInput(); loadAdmin(); }
+  function closeAdmin() { admOpen = false; $("admin").hidden = true; admSure = null; }
+  admBtn.addEventListener("click", openAdmin);
+  $("admClose").addEventListener("click", closeAdmin);
+  $("admin").addEventListener("pointerdown", (e) => { if (e.target === $("admin")) closeAdmin(); });
+  $("admFilter").addEventListener("input", renderAdmin);
+  addEventListener("keydown", (e) => { if (e.code === "Escape" && admOpen) closeAdmin(); });
+  $("admList").addEventListener("click", async (e) => {
+    const b = e.target.closest("button[data-id]"); if (!b) return;
+    const id = b.dataset.id;
+    if (admSure !== id) { admSure = id; $("admMsg").textContent = "Click again to remove them for good."; renderAdmin(); return; }
+    b.disabled = true;
+    try {
+      const r = await T.api("/api/admin/remove", { method: "POST", body: { id } });
+      $("admMsg").textContent = `Removed ${r.removed}.`; admSure = null; await loadAdmin();
+    } catch (err) { $("admMsg").textContent = err.message; admSure = null; renderAdmin(); }
+  });
+  if (T) { T.on("ready", syncAdmin); T.on("logout", syncAdmin); T.booted.then(syncAdmin); }
 
   // ---------- the shop and the wardrobe ----------
   let shopData = null, shopOpen = false, shopTab = "shop";

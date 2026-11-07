@@ -321,7 +321,7 @@ function sessionKey(token) {
   const s = sessions.get(token);
   if (!s) return null;
   if (s.exp < Date.now()) { sessions.delete(token); return null; }
-  return db.users[s.key] ? s.key : null;
+  return db.users[s.key] && !db.users[s.key].removed ? s.key : null;
 }
 const buckets = new Map();
 function rateLimit(ip, name, max, windowMs) {
@@ -407,6 +407,39 @@ function shopState(u) {
 // what a tung wears, as the numbers the arena sends (the item's place in the list + 1, 0 for nothing)
 function gearOf(u) { const eq = (u.shop && u.shop.equipped) || {}; return Shop.SLOTS.map((slot) => (eq[slot] && Shop.byId[eq[slot]] ? Shop.byId[eq[slot]].n : 0)); }
 
+// ---------- Admins: these accounts can remove users ----------
+// Names are not secret and anyone could sign up as one if it is still free, so create these accounts first.
+// Change who is an admin with the ADMIN_USERS setting on the host (names separated by commas).
+const ADMINS = new Set((process.env.ADMIN_USERS || 'JackP,pb3tung').split(',').map((n) => n.trim().toLowerCase()).filter(Boolean));
+const isAdmin = (key) => ADMINS.has(key);
+const liveUsers = () => Object.values(db.users).filter((u) => !u.removed);
+// A removed account stops working at once (no login, no sessions, off the boards, kicked from games and the arena) and is
+// deleted for good a few minutes later, once anything still winding down has finished with it.
+function removeUser(key) {
+  const u = db.users[key];
+  if (!u || u.removed) return false;
+  u.removed = Date.now();
+  arenaLeave(key, false);
+  const o = online.get(key);
+  if (o) for (const ws of [...o.socks]) { try { wsSend(ws, { t: 'removed' }); setTimeout(() => ws.terminate(), 150); } catch (_) {} }
+  for (const [t, s] of sessions) if (s.key === key) sessions.delete(t);
+  saveDb(); sdDirty = true; schedulePresence();
+  console.log('User removed by an admin:', u.username);
+  return true;
+}
+function purgeRemoved() {
+  const now = Date.now();
+  for (const [key, u] of Object.entries(db.users)) {
+    if (!u.removed || now - u.removed < (Number(process.env.REMOVE_PURGE_MS) || 3 * 60 * 1000)) continue;
+    if (online.has(key) || userMatch.has(key) || userRoom.has(key) || arenaPlayers.has(key)) continue; // still winding down
+    delete db.users[key];
+    try { fs.unlinkSync(path.join(AVATAR_DIR, key + '.jpg')); } catch (_) {}
+    if (REMOTE) sb('?key=eq.' + encodeURIComponent('avatar:' + key), { method: 'DELETE' }).catch(() => {});
+    saveDb();
+  }
+}
+setInterval(purgeRemoved, 30 * 1000).unref();
+
 async function handleApi(req, res, url) {
   const ip = clientIp(req);
   const route = req.method + ' ' + url.pathname;
@@ -443,7 +476,8 @@ async function handleApi(req, res, url) {
     case 'POST /api/login': {
       rateLimit(ip, 'login', 40, 10 * 60e3);
       const b = await readJson(req);
-      const u = db.users[String(b.username || '').trim().toLowerCase()];
+      let u = db.users[String(b.username || '').trim().toLowerCase()];
+      if (u && u.removed) u = null;
       const pin = String(b.pin || '');
       if (!u) {
         await scrypt(pin, DUMMY_SALT, 32);
@@ -484,7 +518,7 @@ async function handleApi(req, res, url) {
     case 'GET /api/leaderboard': {
       const game = url.searchParams.get('game') || 'all';
       if (game !== 'all' && !GAMES[game]) throw httpErr(400, 'Unknown game');
-      const rows = Object.values(db.users).map((u) => {
+      const rows = liveUsers().map((u) => {
         const s = statsFor(u, game);
         return { ...publicUser(u), wins: s.w, losses: s.l, draws: s.d };
       });
@@ -547,14 +581,14 @@ async function handleApi(req, res, url) {
       if (game === 'golf' && !GOLF_COURSES.includes(level)) throw httpErr(400, 'Unknown course');
       const rows = [];
       if (GAMES[game].soloWL) {
-        for (const u of Object.values(db.users)) {
+        for (const u of liveUsers()) {
           const r = u.solo && u.solo[game];
           if (r && r.w + r.l > 0) rows.push({ ...publicUser(u), value: r.w, losses: r.l });
         }
         rows.sort((a, b) => b.value - a.value || a.losses - b.losses || a.username.localeCompare(b.username));
         return json(res, 200, { game, level, rows });
       }
-      for (const u of Object.values(db.users)) {
+      for (const u of liveUsers()) {
         let v;
         if (game === 'clicker') v = u.clicker && Math.floor(u.clicker.total);
         else if (game === 'minesweeper' || game === 'f1' || game === 'tungup' || game === 'golf') v = u.solo && u.solo[game] && u.solo[game][level];
@@ -564,6 +598,24 @@ async function handleApi(req, res, url) {
       // Scores and totals: higher is better. Minesweeper: lower time is better.
       rows.sort((a, b) => (game === 'minesweeper' || game === 'f1' || game === 'tungup' || game === 'golf' ? a.value - b.value : b.value - a.value) || a.username.localeCompare(b.username));
       return json(res, 200, { game, level, rows });
+    }
+
+    case 'GET /api/admin/users': {
+      const key = sessionKey(bearer(req) || '');
+      if (!key || !isAdmin(key)) throw httpErr(403, 'Admins only');
+      return json(res, 200, { users: liveUsers().map((u) => ({ id: u.key, username: u.username, avatar: avatarOf(u), wins: statsFor(u, 'all').w, losses: statsFor(u, 'all').l, online: online.has(u.key), admin: isAdmin(u.key), joined: u.createdAt || 0 })).sort((a, b) => a.username.localeCompare(b.username)) });
+    }
+    case 'POST /api/admin/remove': {
+      rateLimit(ip, 'admin', 60, 3600e3);
+      const key = sessionKey(bearer(req) || '');
+      if (!key || !isAdmin(key)) throw httpErr(403, 'Admins only');
+      const b = await readJson(req, 1024);
+      const target = String(b.id || '').toLowerCase();
+      if (!db.users[target] || db.users[target].removed) throw httpErr(404, 'No such user');
+      if (target === key) throw httpErr(400, 'You cannot remove your own account');
+      if (isAdmin(target)) throw httpErr(400, 'You cannot remove another admin');
+      removeUser(target);
+      return json(res, 200, { ok: true, removed: db.users[target].username });
     }
 
     case 'GET /api/shop': {
@@ -1664,7 +1716,7 @@ wss.on('connection', (ws) => {
       ws.key = key;
       ws.token = msg.token;
       addOnline(ws);
-      wsSend(ws, { t: 'hello', user: publicUser(db.users[key]) });
+      wsSend(ws, { t: 'hello', user: { ...publicUser(db.users[key]), admin: isAdmin(key) } });
       onUserOnline(ws);
       return;
     }
@@ -1780,7 +1832,7 @@ const SD_COIN_CAP = 16; // tung coins per 10-streak step: 1, 2, 4, 8, 16, then 1
 let sdDirty = true, sdSentAt = 0;
 function sdBoard() {
   const cur = [...arenaPlayers.values()].filter((p) => p.z && p.streak > 0).sort((a, b) => b.streak - a.streak).slice(0, 5).map((p) => [p.name, p.streak]);
-  const all = Object.values(db.users).filter((u) => u.showdown && u.showdown.best > 0).sort((a, b) => b.showdown.best - a.showdown.best).slice(0, 5).map((u) => [u.username, u.showdown.best]);
+  const all = Object.values(db.users).filter((u) => !u.removed && u.showdown && u.showdown.best > 0).sort((a, b) => b.showdown.best - a.showdown.best).slice(0, 5).map((u) => [u.username, u.showdown.best]);
   return { cur, all };
 }
 function sdEndStreak(p) { if (p.streak) { p.streak = 0; sdDirty = true; } }

@@ -231,6 +231,9 @@
         S.user = m.user; S.retry = 0;
         renderSlot(); emit('ready');
         break;
+      case 'removed':
+        showToast({ title: 'Your account was removed by an admin.', ttl: 8000 });
+        break;
       case 'auth_failed':
         clearSession();
         break;

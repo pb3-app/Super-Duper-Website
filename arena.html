@@ -20,6 +20,7 @@
     <a class="back" href="index.html">&larr; Home</a>
     <h1>Tung Arena</h1>
     <button id="bucks" class="chip" type="button" hidden title="Your tung bucks">🪙 0</button>
+    <button id="adminBtn" class="chip" type="button" hidden>🛡 Admin</button>
     <button id="shopBtn" class="chip shopbtn" type="button" hidden>🛍 Shop</button>
     <div id="mpSlot"></div>
   </header>
@@ -49,6 +50,15 @@
   <div class="bm__panel" role="dialog" aria-modal="true" aria-labelledby="bmTitle">
     <div class="bm__head"><h2 id="bmTitle">Arena map</h2><span class="bm__hint">Click a game to put a marker on it. Orange logs have tungs on them.</span><button id="bmClear" type="button">Clear marker</button><button id="bmClose" type="button" aria-label="Close the map">✕</button></div>
     <canvas id="bmCanvas" aria-label="Map of every game in the arena"></canvas>
+  </div>
+</div>
+
+<div id="admin" hidden>
+  <div class="adm__panel" role="dialog" aria-modal="true" aria-labelledby="admTitle">
+    <div class="adm__head"><h2 id="admTitle">Admin: remove users</h2><button id="admClose" type="button" aria-label="Close">✕</button></div>
+    <input id="admFilter" type="search" placeholder="Search by name" autocomplete="off" aria-label="Search users">
+    <p id="admMsg" role="status"></p>
+    <div id="admList"></div>
   </div>
 </div>
 

@@ -123,3 +123,23 @@ canvas { display: block; width: 100vw; height: 100vh; }
 #sd li .n { opacity: 0.6; font-size: 12px; text-align: right; }
 #sd li .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #sd .none { opacity: 0.6; font-size: 12px; }
+
+/* the admin window: remove users */
+#admin { position: fixed; inset: 0; z-index: 45; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(10, 5, 2, 0.8); touch-action: auto; }
+#admin[hidden] { display: none; }
+.adm__panel { width: min(640px, 100%); max-height: 100%; overflow: auto; background: #2b1a0e; border: 3px solid #6b4423; border-radius: 18px; padding: 16px 18px 20px; display: grid; gap: 10px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6); }
+.adm__head { display: flex; align-items: center; gap: 12px; }
+.adm__head h2 { font-family: "Bungee", sans-serif; font-size: 22px; color: #ff8c2a; margin-right: auto; }
+#admClose { background: #3d2412; color: #fff3e0; border: none; width: 36px; height: 36px; border-radius: 10px; font-size: 17px; cursor: pointer; }
+#admFilter { background: #1a0f07; color: #fff3e0; border: 2px solid #5a381c; border-radius: 10px; padding: 10px 12px; font: 16px "Nunito", sans-serif; }
+#admMsg { min-height: 1.3em; color: #ffcf99; font-weight: 700; }
+#admList { display: grid; gap: 6px; }
+.adm__row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; background: #3a2412; border-radius: 10px; padding: 8px 12px; }
+.adm__row .who { display: flex; align-items: center; gap: 8px; overflow: hidden; }
+.adm__row .who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm__row .dot { width: 9px; height: 9px; border-radius: 50%; background: #5a5a5a; flex: none; }
+.adm__row .dot.on { background: #7df08f; }
+.adm__row .rec { font-size: 13px; opacity: 0.8; white-space: nowrap; }
+.adm__row button { background: #8c2a20; color: #fff; border: none; border-radius: 9px; padding: 8px 12px; font: 700 14px "Nunito", sans-serif; cursor: pointer; }
+.adm__row button.sure { background: #d62839; }
+.adm__row .tag { font-size: 12px; opacity: 0.7; padding: 0 6px; }
