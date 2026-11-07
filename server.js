@@ -28,6 +28,7 @@ const TB = { // turn-based games whose rules run on the server (see games/<id>/r
   go: require('./games/go/rules.js'),
 };
 const PicWords = require('./games/pictionary/words.js');
+const Shop = require('./assets/shop-items.js'); // the tung shop: the items, and which six are for sale today
 const GOLF_COURSES = ['meadow', 'neon'];
 const GOLF_HOLES = 6, GOLF_MAXSTROKES = 8;
 
@@ -393,6 +394,16 @@ function clientIp(req) {
   return fromProxy && fwd ? fwd.slice(0, 64) : peer;
 }
 
+// ---------- Tung shop: one tung buck for every multiplayer win, spent on cosmetics for the arena ----------
+// The balance is worked out, never stored: every multiplayer win ever recorded, less what the player has spent.
+function shopOf(u) { return u.shop || (u.shop = { owned: [], equipped: {}, spent: 0 }); }
+function shopState(u) {
+  const sh = u.shop || { owned: [], equipped: {}, spent: 0 }, wins = statsFor(u, 'all').w;
+  return { wins, spent: sh.spent, balance: wins - sh.spent, owned: sh.owned, equipped: sh.equipped, today: Shop.offerFor(Shop.todayStr()), resetsIn: Shop.msUntilReset() };
+}
+// what a tung wears, as the numbers the arena sends (the item's place in the list + 1, 0 for nothing)
+function gearOf(u) { const eq = (u.shop && u.shop.equipped) || {}; return Shop.SLOTS.map((slot) => (eq[slot] && Shop.byId[eq[slot]] ? Shop.byId[eq[slot]].n : 0)); }
+
 async function handleApi(req, res, url) {
   const ip = clientIp(req);
   const route = req.method + ' ' + url.pathname;
@@ -550,6 +561,46 @@ async function handleApi(req, res, url) {
       // Scores and totals: higher is better. Minesweeper: lower time is better.
       rows.sort((a, b) => (game === 'minesweeper' || game === 'f1' || game === 'tungup' || game === 'golf' ? a.value - b.value : b.value - a.value) || a.username.localeCompare(b.username));
       return json(res, 200, { game, level, rows });
+    }
+
+    case 'GET /api/shop': {
+      const key = sessionKey(bearer(req) || '');
+      if (!key) throw httpErr(401, 'Log in to see the shop');
+      return json(res, 200, shopState(db.users[key]));
+    }
+    case 'POST /api/shop/buy': {
+      rateLimit(ip, 'shop', 120, 3600e3);
+      const key = sessionKey(bearer(req) || '');
+      if (!key) throw httpErr(401, 'Log in to shop');
+      const b = await readJson(req, 1024);
+      const item = Shop.byId[String(b.id)];
+      if (!item) throw httpErr(400, 'No such item');
+      if (!Shop.offerFor(Shop.todayStr()).includes(item.id)) throw httpErr(400, 'That item is not in today\'s shop');
+      const u = db.users[key], sh = shopOf(u);
+      if (sh.owned.includes(item.id)) throw httpErr(409, 'You already own that');
+      if (shopState(u).balance < item.price) throw httpErr(402, 'Not enough tung bucks');
+      sh.spent += item.price; sh.owned.push(item.id);
+      saveDb();
+      return json(res, 200, shopState(u));
+    }
+    case 'POST /api/shop/equip': {
+      rateLimit(ip, 'shop', 120, 3600e3);
+      const key = sessionKey(bearer(req) || '');
+      if (!key) throw httpErr(401, 'Log in first');
+      const b = await readJson(req, 1024);
+      const slot = String(b.slot || ''), id = String(b.id || '');
+      if (!Shop.SLOTS.includes(slot)) throw httpErr(400, 'No such slot');
+      const u = db.users[key], sh = shopOf(u);
+      if (id) {
+        const item = Shop.byId[id];
+        if (!item || item.slot !== slot) throw httpErr(400, 'That does not go there');
+        if (!sh.owned.includes(id)) throw httpErr(403, 'You do not own that');
+        sh.equipped[slot] = id;
+      } else delete sh.equipped[slot];
+      saveDb();
+      const p = arenaPlayers.get(key);
+      if (p) p.q = gearOf(u); // everyone in the arena sees it straight away
+      return json(res, 200, shopState(u));
     }
 
     case 'GET /api/clicker': {
@@ -1702,7 +1753,7 @@ function arenaJoin(ws) {
     const sp = arenaSpawn(), u = db.users[ws.key];
     p = { key: ws.key, name: u.username, color: AR_COLORS[[...ws.key].reduce((a, c) => a + c.charCodeAt(0), 0) % AR_COLORS.length],
       x: sp.x, y: sp.y, vx: 0, vy: 0, facing: 0, input: { up: false, down: false, left: false, right: false, aim: 0 },
-      cooldown: 0, swing: 0, stunned: 0, score: 0, ws };
+      cooldown: 0, swing: 0, stunned: 0, score: 0, q: gearOf(u), ws };
     arenaPlayers.set(ws.key, p);
     arenaBroadcast({ t: 'arena_event', type: 'join', name: p.name });
   }
@@ -1783,7 +1834,7 @@ function arenaStep() {
   if (arenaTickNo % 3 === 2) return; // snapshots go out at 20 per second
   const players = [...arenaPlayers.values()].map((p) => ({
     id: p.key, n: p.name, c: p.color, x: Math.round(p.x), y: Math.round(p.y),
-    f: Math.round(p.facing * 100) / 100, s: p.swing > 0 ? 1 : 0, st: p.stunned > 0 ? 1 : 0, sc: p.score,
+    f: Math.round(p.facing * 100) / 100, s: p.swing > 0 ? 1 : 0, st: p.stunned > 0 ? 1 : 0, sc: p.score, q: p.q,
   }));
   const logsOn = arenaLogs.filter((l) => l.order.length).map((l) => [l.id, l.order.length, l.since === null ? -1 : Math.max(0, Math.ceil(AR.hold - (now - l.since) / 1000))]);
   arenaBroadcast({ t: 'arena_state', ts: now, players, logs: logsOn });
