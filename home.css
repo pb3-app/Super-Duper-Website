@@ -82,7 +82,7 @@
   #games.g2 > .wrap { display: block; }
   #games .group { display: contents; }
   #games .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
-  #games .group:first-child .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  #games .group:first-child .grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   #games .tile { grid-column: auto; gap: 8px; }
   #games .tile__media { --tile-ratio: 4 / 3; border-radius: var(--r-sm); }
   #games .tile__head > h3 { font-size: 13px; white-space: normal; line-height: 1.25; }
@@ -97,3 +97,5 @@
   #games .grid, #games .group:first-child .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
   #games .tile__media { --tile-ratio: 9 / 8; }
 }
+#games .group:first-child .grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+#games .group:first-child .tile { grid-column: auto; }

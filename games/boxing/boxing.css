@@ -1,0 +1,108 @@
+:root {
+  --wood-dark: #2b1a0e;
+  --wood: #6b4423;
+  --cream: #fff3e0;
+  --orange: #ff8c2a;
+  --orange-dark: #a8551a;
+  --peach: #ffcf99;
+  --red: #e5483c;
+  --green: #5fd16b;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: var(--wood-dark); color: var(--cream);
+  font-family: "Nunito", system-ui, sans-serif;
+  user-select: none; -webkit-user-select: none; touch-action: none;
+}
+
+#ring { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+
+.screen {
+  position: fixed; inset: 0; z-index: 10; overflow-y: auto;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 18px; padding: 24px 16px; text-align: center;
+  background: radial-gradient(circle at 50% 35%, rgba(107, 68, 35, 0.92) 0%, rgba(26, 15, 7, 0.97) 75%);
+}
+.screen[hidden] { display: none; }
+
+.title { font-family: "Bungee", sans-serif; font-size: clamp(40px, 10vw, 88px); line-height: 0.95; color: #e0b07a; text-shadow: 5px 5px 0 #1a0f07; }
+.title span { color: var(--orange); }
+h2 { font-family: "Bungee", sans-serif; font-size: clamp(24px, 5vw, 40px); color: var(--orange); text-shadow: 3px 3px 0 #1a0f07; }
+.sub { opacity: 0.85; }
+
+.row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+
+button { font-family: inherit; cursor: pointer; border: none; }
+button.big {
+  font-family: "Bungee", sans-serif; font-size: 20px; padding: 14px 22px; border-radius: 14px;
+  background: var(--orange); color: var(--wood-dark); box-shadow: 0 5px 0 var(--orange-dark); min-width: 220px;
+}
+button.big.alt { background: #e0b07a; box-shadow: 0 5px 0 #8b5a2b; }
+button.big:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--orange-dark); }
+button.big:disabled { opacity: 0.5; cursor: default; }
+button.back { background: none; color: var(--peach); font-size: 16px; text-decoration: underline; }
+
+input {
+  font-family: inherit; font-size: 20px; padding: 12px 16px; border-radius: 12px; border: none;
+  background: var(--cream); color: var(--wood-dark); text-align: center; width: min(300px, 90vw);
+}
+#room-code { width: 140px; text-transform: uppercase; font-family: "Bungee", sans-serif; letter-spacing: 4px; }
+.status { min-height: 1.4em; color: var(--peach); font-weight: 700; }
+.status b { font-family: "Bungee", sans-serif; font-size: 28px; letter-spacing: 4px; color: var(--orange); }
+
+.howto { max-width: 640px; background: rgba(26, 15, 7, 0.6); border-radius: 14px; padding: 16px 20px; text-align: left; }
+.howto h3 { font-family: "Bungee", sans-serif; color: var(--orange); margin-bottom: 8px; font-weight: 400; }
+.howto .keys { display: grid; gap: 4px; margin-bottom: 10px; font-size: 15px; }
+.howto small { opacity: 0.7; }
+.howto p { font-size: 14px; line-height: 1.5; opacity: 0.9; }
+kbd { background: var(--cream); color: var(--wood-dark); border-radius: 5px; padding: 1px 7px; font-weight: 800; font-size: 13px; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; width: min(900px, 100%); }
+.card {
+  background: rgba(26, 15, 7, 0.75); border: 3px solid transparent; border-radius: 16px; padding: 12px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--cream); text-align: center;
+  transition: transform 0.1s, border-color 0.1s;
+}
+.card:hover, .card:focus-visible { transform: translateY(-3px); border-color: var(--orange); outline: none; }
+.card canvas { width: 110px; height: 110px; }
+.card .nm { font-family: "Bungee", sans-serif; font-size: 17px; }
+.card ul { list-style: none; font-size: 13px; line-height: 1.35; opacity: 0.9; }
+.card ul li::before { content: "• "; color: var(--orange); }
+.card .lvl { font-size: 12px; font-weight: 800; color: var(--peach); letter-spacing: 1px; }
+.stars { color: var(--orange); letter-spacing: 2px; }
+
+/* ===== HUD ===== */
+#hud { position: fixed; inset: 0; z-index: 5; pointer-events: none; }
+#hud[hidden] { display: none; }
+.bars { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; align-items: center; gap: 10px; }
+.bar { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.bar.foe { align-items: flex-end; }
+.bar .nm { font-family: "Bungee", sans-serif; font-size: 15px; text-shadow: 2px 2px 0 #000; }
+.bar .track { width: 100%; height: 20px; background: rgba(0, 0, 0, 0.55); border-radius: 10px; overflow: hidden; border: 2px solid rgba(255, 243, 224, 0.6); }
+.bar.foe .track { display: flex; justify-content: flex-end; }
+.bar .fill { height: 100%; width: 100%; background: linear-gradient(#7be38a, #3fae55); transition: width 0.15s; }
+.bar .fill.low { background: linear-gradient(#ff7a6b, #c9372c); }
+.bar .num { font-weight: 800; font-size: 14px; text-shadow: 1px 1px 0 #000; }
+.vs { font-family: "Bungee", sans-serif; color: var(--orange); font-size: 18px; text-shadow: 2px 2px 0 #000; }
+
+#center-text {
+  position: absolute; top: 40%; left: 0; right: 0; text-align: center; transform: translateY(-50%);
+  font-family: "Bungee", sans-serif; font-size: clamp(40px, 9vw, 96px); color: var(--orange); text-shadow: 5px 5px 0 #1a0f07;
+  white-space: pre-line;
+}
+#center-text small { display: block; font-size: 0.3em; color: var(--cream); margin-top: 10px; }
+
+#quit { position: absolute; bottom: 12px; right: 12px; pointer-events: auto; background: rgba(0, 0, 0, 0.5); color: var(--cream); border-radius: 10px; padding: 6px 12px; font-size: 14px; }
+
+#touch { position: absolute; bottom: 14px; left: 0; right: 0; display: none; justify-content: center; gap: 10px; pointer-events: auto; padding: 0 10px; }
+#touch button { width: 64px; height: 64px; border-radius: 50%; background: rgba(255, 243, 224, 0.2); color: var(--cream); font-size: 22px; font-weight: 800; border: 2px solid rgba(255, 243, 224, 0.5); display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; }
+#touch button.p { background: rgba(255, 140, 42, 0.35); }
+#touch button small { font-size: 10px; font-weight: 700; }
+#touch button[hidden] { display: none; }
+@media (pointer: coarse) { #touch { display: flex; } #quit { top: 60px; bottom: auto; } }
+
+.arcade-back { position: fixed; top: 10px; left: 10px; z-index: 20; color: #ffcf99; background: rgba(26,15,7,0.7); padding: 6px 12px; border-radius: 10px; font-weight: 700; text-decoration: none; font-size: 14px; }
+body:has(#hud:not([hidden])) .arcade-back { display: none; }

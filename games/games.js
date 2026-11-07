@@ -70,5 +70,7 @@ window.TUNG_GAMES = [
   { id: "pictionary", title: "Tung Tung Pictionary", description: "Draw the secret word, guess the others'. Practice sketchpad when alone.", icon: "🎨", players: "Sketchpad, or rooms of 2 to 8", url: "games/pictionary/index.html" },
   { id: "archery", title: "Tung Tung Archery", description: "Read the wind, steady your breath and hit the gold.", icon: "🏹", players: "1 or 2 players", url: "games/archery/index.html" },
   { id: "cuppong", title: "Tung Tung Cup Pong", description: "Arc the ball into the cups. Sink two and throw again.", icon: "🥤", players: "1 or 2 players", url: "games/cuppong/index.html" },
+  { id: "boxing", title: "Tung Boxing", description: "First-person boxing: dodge, counter, parry. 6 tungs, 5 opponents, or online 1v1.", icon: "🥊", players: "1 player or 2 online", url: "games/boxing/index.html" },
+  { id: "dizzy", title: "Dizzy Tungs", description: "One button! Your tung never stops spinning. Throw bats, last tung standing wins.", icon: "🌀", players: "1-4 players, same screen or online", url: "games/dizzy/index.html" },
   // Add more games here
 ];

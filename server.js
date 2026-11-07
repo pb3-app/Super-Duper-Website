@@ -707,6 +707,7 @@ server.on('upgrade', (req, socket, head) => {
   const origin = req.headers.origin;
   let okOrigin = true;
   if (origin) { try { okOrigin = new URL(origin).host === req.headers.host; } catch { okOrigin = false; } }
+  if (url.pathname.startsWith('/socket.io/')) return; // handled by Socket.IO (Tung Boxing and Dizzy Tungs)
   if (url.pathname !== '/ws' || !okOrigin) { socket.destroy(); return; }
   wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
 });
@@ -1708,6 +1709,15 @@ setInterval(() => {
   }
 }, 25000).unref();
 
+// ---------- Real-time games on Socket.IO: Tung Boxing and Dizzy Tungs (see realtime/) ----------
+// They bring their own lobbies (quick match and room codes) and run on their own Socket.IO namespaces.
+{
+  const { Server: IOServer } = require('socket.io');
+  const io = new IOServer(server, { serveClient: true, cors: { origin: false } });
+  import('./realtime/boxing.mjs').then((m) => m.setupBoxing(io)).catch((e) => console.error('Tung Boxing failed to start', e));
+  import('./realtime/dizzy.mjs').then((m) => m.setupDizzy(io)).catch((e) => console.error('Dizzy Tungs failed to start', e));
+}
+
 // ---------- Tung Arena: the lobby where tungs run around, bonk each other and pick a game ----------
 // Players are the logged-in accounts on the arena page. The server runs the world and the clients send inputs. A game is
 // started by standing on its log: 2 tungs on the same log for 10 seconds start the 1v1 match, and 1 tung alone on a
@@ -1716,6 +1726,8 @@ const AR = { w: 4600, h: 3200, r: 28, tick: 30, speed: 320, range: 85, cooldown:
 const AR_COLORS = ['#c8874a', '#a86b35', '#d9a066', '#8b5a2b', '#e0b07a', '#b5793f'];
 const arenaPlayers = new Map(); // key -> player
 let arenaTimer = null, arenaTickNo = 0;
+const ARENA_EXTRA = { dizzy: { title: 'Dizzy Tungs', icon: '🌀' }, boxing: { title: 'Tung Boxing', icon: '🥊' } }; // played from their own pages
+const arenaGameMeta = (g) => (GAMES[g] ? { title: GAMES[g].title, icon: GAMES[g].icon } : ARENA_EXTRA[g]);
 const arenaLogs = (() => {
   const logs = [];
   const mp = Object.keys(GAMES).filter((g) => !GAMES[g].soloOnly && !(GAMES[g].rooms && !GAMES[g].challenge));
@@ -1733,7 +1745,7 @@ const arenaLogs = (() => {
     logs.push({ id: 'mp:' + g, game: g, kind: 'mp', need: 2, x: p.x, y: p.y, w: p.v ? 92 : 210, h: p.v ? 210 : 92 });
   });
   // practice corner: one small log per game, in a grid well inside the map (about 600 pixels from the logs on the edge)
-  const all = Object.keys(GAMES), cols = 6, cw = 190, ch = 130, gx = Math.round(AR.w * 0.58), gy = Math.round(AR.h * 0.55);
+  const all = [...Object.keys(GAMES), ...Object.keys(ARENA_EXTRA)], cols = 6, cw = 190, ch = 130, gx = Math.round(AR.w * 0.58), gy = Math.round(AR.h * 0.55);
   all.forEach((g, i) => logs.push({ id: 'solo:' + g, game: g, kind: 'solo', need: 1, x: gx + (i % cols) * cw + cw / 2, y: gy + Math.floor(i / cols) * ch + ch / 2, w: 140, h: 60 }));
   for (const l of logs) { l.order = []; l.since = null; }
   return logs;
@@ -1750,7 +1762,7 @@ function inSafeZone(p) {
 }
 const arenaInfo = () => ({
   arena: { w: AR.w, h: AR.h }, radius: AR.r, hold: AR.hold, safe: arenaSafe,
-  logs: arenaLogs.map((l) => ({ id: l.id, game: l.game, kind: l.kind, need: l.need, x: l.x, y: l.y, w: l.w, h: l.h, title: GAMES[l.game].title, icon: GAMES[l.game].icon })),
+  logs: arenaLogs.map((l) => ({ id: l.id, game: l.game, kind: l.kind, need: l.need, x: l.x, y: l.y, w: l.w, h: l.h, title: arenaGameMeta(l.game).title, icon: arenaGameMeta(l.game).icon })),
 });
 const arenaSpawn = () => ({ x: AR.w * 0.3 + Math.random() * AR.w * 0.2, y: AR.h * 0.3 + Math.random() * AR.h * 0.2 });
 

@@ -434,8 +434,130 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     }
     for (let i = effects.length - 1; i >= 0; i--) if (effects[i].life <= 0) effects.splice(i, 1);
     ctx.restore();
+    drawWaypoint(me, W, H);
     updateHud(players, me);
     drawMini(players);
+    if (mapOpen) drawMap();
+  }
+
+  // ---------- the big map: click the little one (or press M) to see where every game is, and put a marker on one ----------
+  let mapOpen = false, waypoint = null, mapHits = [], mapHover = null, mapK = 1;
+  const bmc = $("bmCanvas"), bctx = bmc.getContext("2d");
+  function sizeMap() {
+    const maxW = Math.min(innerWidth - 36, 1240), maxH = Math.max(240, innerHeight - 150);
+    const k = Math.min(maxW / arena.w, maxH / arena.h), w = Math.round(arena.w * k), h = Math.round(arena.h * k), d = devicePixelRatio || 1;
+    bmc.style.width = w + "px"; bmc.style.height = h + "px"; bmc.width = Math.round(w * d); bmc.height = Math.round(h * d); mapK = k;
+  }
+  function drawMap() {
+    if (!mapOpen) return;
+    const d = devicePixelRatio || 1, k = mapK, c = bctx;
+    c.setTransform(d, 0, 0, d, 0, 0);
+    const W = arena.w * k, H = arena.h * k;
+    c.fillStyle = "#5a381c"; c.fillRect(0, 0, W, H);
+    c.strokeStyle = "rgba(0, 0, 0, 0.12)"; c.lineWidth = 1;
+    for (let y = 0; y < H; y += 24) { c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
+    c.strokeStyle = "#ff8c2a"; c.lineWidth = 4; c.strokeRect(2, 2, W - 4, H - 4);
+    mapHits = [];
+    // practice corner
+    if (safe) {
+      const x0 = safe.x0 * k, y0 = safe.y0 * k, w = (safe.x1 - safe.x0) * k, h = (safe.y1 - safe.y0) * k;
+      c.fillStyle = "rgba(26, 15, 7, 0.35)"; c.fillRect(x0, y0, w, h);
+      c.strokeStyle = "rgba(255, 140, 42, 0.6)"; c.lineWidth = 2; c.setLineDash([8, 6]); c.strokeRect(x0, y0, w, h); c.setLineDash([]);
+      c.fillStyle = "#ffcf99"; c.font = "800 13px Nunito, sans-serif"; c.textAlign = "center"; c.fillText("PRACTICE CORNER (play alone)", x0 + w / 2, y0 - 8);
+    }
+    c.textBaseline = "middle";
+    for (const l of logs) {
+      const x = l.x * k, y = l.y * k;
+      if (l.kind === "solo") {
+        c.font = "16px sans-serif"; c.textAlign = "center"; c.fillText(l.icon || "•", x, y);
+        mapHits.push({ x, y, r: 13, l });
+        continue;
+      }
+      const horiz = l.w >= l.h, w = Math.max(10, l.w * k), h = Math.max(10, l.h * k);
+      c.fillStyle = logState[l.id] ? "#ff8c2a" : "#b07a40"; c.strokeStyle = "#3d2412"; c.lineWidth = 2;
+      c.fillRect(x - w / 2, y - h / 2, w, h); c.strokeRect(x - w / 2, y - h / 2, w, h);
+      const label = (l.icon ? l.icon + " " : "") + shortTitle(l.title);
+      c.font = "700 12px Nunito, sans-serif"; c.fillStyle = "#fff3e0";
+      let lx = x, ly = y;
+      if (horiz) { ly = y + (l.y < arena.h / 2 ? 1 : -1) * (h / 2 + 12); c.textAlign = "center"; }
+      else if (l.x < arena.w / 2) { lx = x + w / 2 + 8; c.textAlign = "left"; } else { lx = x - w / 2 - 8; c.textAlign = "right"; }
+      c.fillText(label, lx, ly);
+      mapHits.push({ x, y, r: 30, l });
+    }
+    c.textBaseline = "alphabetic";
+    // the center sign
+    c.fillStyle = "rgba(255, 207, 153, 0.18)"; c.font = "800 40px Bungee, sans-serif"; c.textAlign = "center"; c.fillText("TUNG ARENA", W * 0.34, H * 0.36);
+    // players
+    const players = rendered();
+    for (const p of players) {
+      c.beginPath(); c.fillStyle = p.id === myId ? "#fff" : "#e0b07a"; c.arc(p.x * k, p.y * k, p.id === myId ? 6 : 4, 0, 7); c.fill();
+      if (p.id === myId) { c.strokeStyle = "#ff8c2a"; c.lineWidth = 2; c.stroke(); c.fillStyle = "#fff"; c.font = "800 12px Nunito, sans-serif"; c.textAlign = "center"; c.fillText("You", p.x * k, p.y * k - 12); }
+    }
+    // the marker
+    if (waypoint) { drawPin(c, waypoint.x * k, waypoint.y * k, 1); }
+    // hover tooltip
+    if (mapHover) {
+      const l = mapHover.l, text = (l.icon ? l.icon + " " : "") + l.title + (l.kind === "solo" ? " · play alone" : " · stand here with another tung");
+      c.font = "700 13px Nunito, sans-serif"; const tw = c.measureText(text).width + 18;
+      let tx = Math.min(Math.max(mapHover.x - tw / 2, 6), W - tw - 6), ty = mapHover.y - 38; if (ty < 6) ty = mapHover.y + 20;
+      c.fillStyle = "rgba(26, 15, 7, 0.95)"; c.fillRect(tx, ty, tw, 26); c.strokeStyle = "#ff8c2a"; c.lineWidth = 1.5; c.strokeRect(tx, ty, tw, 26);
+      c.fillStyle = "#fff3e0"; c.textAlign = "left"; c.fillText(text, tx + 9, ty + 17);
+    }
+  }
+  function drawPin(c, x, y, s) {
+    c.save(); c.translate(x, y); c.scale(s, s);
+    c.fillStyle = "#ff3b30"; c.strokeStyle = "#fff"; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(0, 0); c.bezierCurveTo(-14, -16, -10, -34, 0, -34); c.bezierCurveTo(10, -34, 14, -16, 0, 0); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = "#fff"; c.beginPath(); c.arc(0, -22, 4.5, 0, 7); c.fill(); c.restore();
+  }
+  function openMap() { if (!joined) return; mapOpen = true; $("bigmap").hidden = false; sizeMap(); drawMap(); }
+  function closeMap() { mapOpen = false; $("bigmap").hidden = true; mapHover = null; }
+  function mapPoint(e) { const r = bmc.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+  function mapPick(e) {
+    const p = mapPoint(e); let best = null, bd = 1e9;
+    for (const h of mapHits) { const d = Math.hypot(h.x - p.x, h.y - p.y); if (d < h.r && d < bd) { best = h; bd = d; } }
+    return best;
+  }
+  bmc.addEventListener("pointermove", (e) => { mapHover = mapPick(e); bmc.style.cursor = mapHover ? "pointer" : "default"; drawMap(); });
+  bmc.addEventListener("click", (e) => {
+    const h = mapPick(e); if (!h) return;
+    waypoint = { x: h.l.x, y: h.l.y, title: shortTitle(h.l.title), icon: h.l.icon, kind: h.l.kind };
+    feed(`Marker set on ${waypoint.title}${h.l.kind === "solo" ? " (practice corner)" : ""}`);
+    closeMap();
+  });
+  $("mini").addEventListener("click", openMap);
+  $("mini").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openMap(); } });
+  $("bmClose").addEventListener("click", closeMap);
+  $("bmClear").addEventListener("click", () => { waypoint = null; drawMap(); });
+  $("bigmap").addEventListener("pointerdown", (e) => { if (e.target === $("bigmap")) closeMap(); });
+  addEventListener("resize", () => { if (mapOpen) { sizeMap(); drawMap(); } });
+  addEventListener("keydown", (e) => {
+    if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+    if (e.code === "KeyM" && !shopOpen) { e.preventDefault(); mapOpen ? closeMap() : openMap(); }
+    if (e.code === "Escape" && mapOpen) closeMap();
+  });
+  // the marker, in the arena: a pin over the game when it is on screen, an arrow at the edge of the screen when it is not
+  function drawWaypoint(me, W, H) {
+    if (!waypoint || !me) return;
+    const dx = waypoint.x - me.x, dy = waypoint.y - me.y, dist = Math.hypot(dx, dy);
+    if (dist < 140) { waypoint = null; feed("You made it"); return; }
+    const sx = waypoint.x - camera.x, sy = waypoint.y - camera.y, label = `${waypoint.icon ? waypoint.icon + " " : ""}${waypoint.title} · ${Math.round(dist / 10) * 10}`;
+    ctx.save(); ctx.font = "800 14px Nunito, sans-serif"; ctx.textAlign = "center";
+    if (sx > 40 && sx < W - 40 && sy > 90 && sy < H - 60) {
+      const bob = Math.sin(performance.now() / 250) * 5;
+      ctx.translate(sx, sy - 34 + bob); drawPin(ctx, 0, 0, 1.2); ctx.restore();
+      ctx.save(); ctx.font = "800 14px Nunito, sans-serif"; ctx.textAlign = "center"; ctx.fillStyle = "rgba(26, 15, 7, 0.85)";
+      const tw = ctx.measureText(label).width + 16; ctx.fillRect(sx - tw / 2, sy - 108 + bob, tw, 24); ctx.fillStyle = "#fff3e0"; ctx.fillText(label, sx, sy - 91 + bob);
+    } else {
+      const ang = Math.atan2(sy - H / 2, sx - W / 2), mx = W / 2 - 60, my = H / 2 - 80, t = Math.min(Math.abs(mx / Math.cos(ang || 1e-6)), Math.abs(my / Math.sin(ang || 1e-6)));
+      const ex = W / 2 + Math.cos(ang) * t, ey = H / 2 + Math.sin(ang) * t;
+      ctx.translate(ex, ey); ctx.rotate(ang);
+      ctx.fillStyle = "#ff3b30"; ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(22, 0); ctx.lineTo(-12, -16); ctx.lineTo(-4, 0); ctx.lineTo(-12, 16); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.rotate(-ang);
+      ctx.fillStyle = "rgba(26, 15, 7, 0.85)"; const tw = ctx.measureText(label).width + 16, ox = Math.cos(ang) * -50 - Math.cos(ang) * tw / 3, oy = Math.sin(ang) * -34;
+      ctx.fillRect(ox - tw / 2, oy - 12, tw, 24); ctx.fillStyle = "#fff3e0"; ctx.fillText(label, ox, oy + 5);
+    }
+    ctx.restore();
   }
 
   // ---------- the shop and the wardrobe ----------

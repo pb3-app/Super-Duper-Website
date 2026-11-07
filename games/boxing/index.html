@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <title>Tung Boxing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="boxing.css" />
+</head>
+<body>
+  <a class="arcade-back" href="../../arena.html">← Arena</a>
+  <canvas id="ring"></canvas>
+
+  <!-- ===== Screens ===== -->
+  <section class="screen" id="scr-mode">
+    <h1 class="title">TUNG<br /><span>BOXING</span></h1>
+    <input id="name" maxlength="16" placeholder="Your name" autocomplete="off" />
+    <div class="row">
+      <button class="big" data-mode="single">SINGLE PLAYER</button>
+      <button class="big alt" data-mode="online">ONLINE 1v1</button>
+    </div>
+    <div class="howto">
+      <h3>How to fight</h3>
+      <div class="keys">
+        <div><kbd>A</kbd> / <kbd>←</kbd> Dodge left <small>(dodges punches coming from your right)</small></div>
+        <div><kbd>D</kbd> / <kbd>→</kbd> Dodge right <small>(dodges punches coming from your left)</small></div>
+        <div><kbd>S</kbd> / <kbd>↓</kbd> Dodge down <small>(Yellow Tung only, dodges both)</small></div>
+        <div><kbd>J</kbd> / Left click: Left punch</div>
+        <div><kbd>K</kbd> / Right click: Right punch</div>
+      </div>
+      <p>Tap a punch for a quick 1-damage jab. <b>Hold</b> it to wind up a harder punch, then let go to throw.
+        Watch the opponent's gloves: when one flies at you, dodge away from it.
+        Dodge something and punch right away for a <b>COUNTER</b>: it's faster and does <b>+2 damage</b>,
+        and whoever missed is <b>off balance</b> (can't dodge for a moment), so counters almost always land.
+        Mashing punches makes you <b>tired</b>: each punch in a row takes longer to recover. Pause to reset.
+        Throw your punch just as theirs is about to land for a <b>PARRY</b> (they're stunned for 1.5s).
+        Getting hit while winding up resets your wind-up.</p>
+    </div>
+  </section>
+
+  <section class="screen" id="scr-char" hidden>
+    <h2>CHOOSE YOUR TUNG</h2>
+    <div class="cards" id="char-cards"></div>
+    <button class="back">← Back</button>
+  </section>
+
+  <section class="screen" id="scr-opp" hidden>
+    <h2>CHOOSE YOUR OPPONENT</h2>
+    <div class="cards" id="opp-cards"></div>
+    <button class="back">← Back</button>
+  </section>
+
+  <section class="screen" id="scr-online" hidden>
+    <h2>ONLINE 1v1</h2>
+    <p class="sub" id="online-you"></p>
+    <div class="row">
+      <button class="big" id="btn-quick">QUICK MATCH</button>
+      <button class="big alt" id="btn-create">CREATE ROOM</button>
+    </div>
+    <div class="row">
+      <input id="room-code" maxlength="4" placeholder="CODE" autocomplete="off" />
+      <button class="big alt" id="btn-join">JOIN ROOM</button>
+    </div>
+    <p class="status" id="online-status"></p>
+    <button class="back">← Back</button>
+  </section>
+
+  <!-- ===== In-fight HUD ===== -->
+  <div id="hud" hidden>
+    <div class="bars">
+      <div class="bar me"><span class="nm" id="hud-me-name"></span><div class="track"><div class="fill" id="hud-me-hp"></div></div><span class="num" id="hud-me-num"></span></div>
+      <div class="vs">VS</div>
+      <div class="bar foe"><span class="nm" id="hud-foe-name"></span><div class="track"><div class="fill" id="hud-foe-hp"></div></div><span class="num" id="hud-foe-num"></span></div>
+    </div>
+    <div id="center-text"></div>
+    <div id="touch">
+      <button data-act="dodge-L">⟵<small>dodge</small></button>
+      <button data-act="dodge-D" id="touch-down" hidden>⟱<small>down</small></button>
+      <button data-act="dodge-R">⟶<small>dodge</small></button>
+      <button data-act="punch-L" class="p">L<small>punch</small></button>
+      <button data-act="punch-R" class="p">R<small>punch</small></button>
+    </div>
+    <button id="quit">✕ Quit</button>
+  </div>
+
+  <script src="/socket.io/socket.io.min.js"></script>
+  <script type="module" src="boxing.js"></script>
+</body>
+</html>

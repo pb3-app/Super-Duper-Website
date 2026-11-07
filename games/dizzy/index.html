@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <title>Dizzy Tungs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="dizzy.css" />
+</head>
+<body>
+  <a class="arcade-back" href="../../arena.html">← Arena</a>
+  <canvas id="arena"></canvas>
+
+  <section class="screen" id="scr-main">
+    <h1 class="title">DIZZY<br /><span>TUNGS</span></h1>
+    <input id="name" maxlength="16" placeholder="Your name" autocomplete="off" />
+    <div class="col">
+      <button class="big" data-go="scr-single">SINGLE PLAYER</button>
+      <button class="big alt" data-go="scr-local">SAME SCREEN (2–4)</button>
+      <button class="big alt" data-go="scr-online">ONLINE</button>
+    </div>
+    <div class="howto">
+      <h3>One button!</h3>
+      <p>Your tung <b>never stops spinning</b>.
+        <b>Every press throws a bat</b>. <b>Hold</b> to run the way you're facing.
+        Each time you let go, your spin <b>flips direction</b> (clockwise ⇄ counter-clockwise).
+        Bats bounce off walls once. Your own bats can't hit you.
+        Lose all your lives and you're out. <b>Last tung standing wins!</b> (You pick how many lives everyone starts with.)</p>
+      <p class="crates-key"><span class="ck grow">⬆</span> Grow: bigger, +1 health, slower
+        <span class="ck shrink">⬇</span> Shrink: smaller and faster
+        <span class="ck shield">◯</span> Shield: blocks one hit
+        <span class="ck double">✕2</span> Double bats</p>
+      <p class="sub">Run over a crate or hit it with a bat to get it.</p>
+    </div>
+  </section>
+
+  <section class="screen" id="scr-single" hidden>
+    <h2>YOU vs 3 BOTS</h2>
+    <p class="sub">Pick your tung (bots pick at random):</p>
+    <div class="types" id="type-cards"></div>
+    <p class="sub">Controls: <kbd>SPACE</kbd>, click, or tap the screen</p>
+    <div class="row"><span class="lbl">Lives:</span><select id="single-lives"><option value="1">1 life</option><option value="2">2 lives</option><option value="3" selected>3 lives</option><option value="4">4 lives</option><option value="5">5 lives</option><option value="6">6 lives</option><option value="7">7 lives</option><option value="8">8 lives</option><option value="9">9 lives</option><option value="10">10 lives</option></select></div>
+    <div class="col">
+      <button class="big" data-single="easy">EASY BOTS</button>
+      <button class="big" data-single="medium">MEDIUM BOTS</button>
+      <button class="big" data-single="hard">HARD BOTS</button>
+    </div>
+    <button class="back">← Back</button>
+  </section>
+
+  <section class="screen" id="scr-local" hidden>
+    <h2>SAME SCREEN</h2>
+    <p class="sub">Everyone shares this keyboard (or this touchscreen: each player taps their own corner).</p>
+    <div class="seats" id="local-seats"></div>
+    <div class="row">
+      <span class="lbl">Fill empty spots with:</span>
+      <select id="local-bots"><option value="none">No bots</option><option value="easy">Easy bots</option><option value="medium" selected>Medium bots</option><option value="hard">Hard bots</option></select>
+      <span class="lbl">Lives:</span><select id="local-lives"><option value="1">1 life</option><option value="2">2 lives</option><option value="3" selected>3 lives</option><option value="4">4 lives</option><option value="5">5 lives</option><option value="6">6 lives</option><option value="7">7 lives</option><option value="8">8 lives</option><option value="9">9 lives</option><option value="10">10 lives</option></select>
+    </div>
+    <button class="big" id="local-start">START</button>
+    <p class="status" id="local-status"></p>
+    <button class="back">← Back</button>
+  </section>
+
+  <section class="screen" id="scr-online" hidden>
+    <h2>ONLINE</h2>
+    <div id="online-menu" class="col">
+      <button class="big" id="btn-quick">QUICK MATCH</button>
+      <button class="big alt" id="btn-create">CREATE ROOM</button>
+      <div class="row">
+        <input id="room-code" maxlength="4" placeholder="CODE" autocomplete="off" />
+        <button class="big alt small" id="btn-join">JOIN</button>
+      </div>
+    </div>
+    <div id="lobby" hidden>
+      <p class="status" id="lobby-title"></p>
+      <div class="seats" id="lobby-seats"></div>
+      <div class="row" id="lobby-host">
+        <span class="lbl">Fill empty spots with:</span>
+        <select id="lobby-bots"><option value="none">No bots</option><option value="easy">Easy bots</option><option value="medium" selected>Medium bots</option><option value="hard">Hard bots</option></select>
+        <span class="lbl">Lives:</span><select id="lobby-lives"><option value="1">1 life</option><option value="2">2 lives</option><option value="3" selected>3 lives</option><option value="4">4 lives</option><option value="5">5 lives</option><option value="6">6 lives</option><option value="7">7 lives</option><option value="8">8 lives</option><option value="9">9 lives</option><option value="10">10 lives</option></select>
+        <button class="big small" id="lobby-start">START</button>
+      </div>
+      <p class="sub" id="lobby-info"></p>
+      <p class="sub" id="lobby-wait"></p>
+    </div>
+    <p class="status" id="online-status"></p>
+    <button class="back">← Back</button>
+  </section>
+
+  <div id="hud" hidden>
+    <div id="scoreboard"></div>
+    <div id="banner"></div>
+    <div id="end-buttons" hidden>
+      <button class="big" id="btn-again">PLAY AGAIN</button>
+      <button class="big alt" id="btn-menu">MENU</button>
+    </div>
+    <div id="touch-zones"></div>
+    <button id="quit">✕ Quit</button>
+  </div>
+
+  <script src="/socket.io/socket.io.min.js"></script>
+  <script type="module" src="dizzy.js"></script>
+</body>
+</html>
