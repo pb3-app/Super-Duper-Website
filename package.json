@@ -1,0 +1,13 @@
+{
+  "name": "tung-tung-arcade",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tung Tung Arcade - multiplayer game site",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

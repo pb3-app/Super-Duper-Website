@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tung Clicker</title>
+  <link rel="stylesheet" href="../game.css" />
+  <link rel="stylesheet" href="../../mp.css" />
+  <style>
+    .cl { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 1.5rem; text-align: left; max-width: 980px; margin: 0 auto; }
+    @media (max-width: 760px) { .cl { grid-template-columns: 1fr; } }
+    .cl-main { text-align: center; }
+    .cl-count { font-size: clamp(2rem, 8vw, 3.4rem); font-weight: 900; color: var(--accent); text-shadow: 0 3px 0 var(--wood-dark); line-height: 1.1; }
+    .cl-rates { opacity: .85; font-weight: 700; margin: .3rem 0 1rem; }
+    #log { width: min(300px, 70vw); aspect-ratio: 1; margin: 0 auto; border: none; background: radial-gradient(circle at 50% 55%, rgba(224,168,104,.18), transparent 65%); cursor: pointer; border-radius: 50%; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; transition: transform .06s; }
+    #log:active, #log.hit { transform: scale(.94); }
+    #log svg { width: 100%; height: 100%; display: block; pointer-events: none; }
+    .pop { position: fixed; pointer-events: none; font-weight: 900; font-size: 1.6rem; color: var(--accent); text-shadow: 0 2px 0 var(--wood-dark); animation: popup .9s ease-out forwards; z-index: 30; }
+    @keyframes popup { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, -70px); } }
+    .shop { display: grid; gap: .55rem; }
+    .shop h2 { color: var(--wood-light); margin-bottom: .2rem; }
+    .item { display: flex; align-items: center; gap: .8rem; width: 100%; font: inherit; color: var(--text); text-align: left; padding: .65rem .8rem; border-radius: 14px; border: 2px solid var(--wood-dark); background: rgba(0,0,0,.28); cursor: pointer; }
+    .item:hover:not(:disabled) { border-color: var(--wood-light); }
+    .item:disabled { opacity: .5; cursor: not-allowed; }
+    .item.can { border-color: var(--accent); }
+    .item .ic { font-size: 1.8rem; width: 2.2rem; text-align: center; }
+    .item .tx { flex: 1; min-width: 0; font-weight: 800; }
+    .item .tx small { display: block; font-weight: 600; opacity: .75; }
+    .item .own { font-weight: 900; font-size: 1.3rem; min-width: 2rem; text-align: right; }
+    .item .cost { font-weight: 800; color: var(--accent); white-space: nowrap; }
+    .cl-tools { display: flex; justify-content: center; gap: .6rem; flex-wrap: wrap; margin: 1rem 0; }
+    .save-note { opacity: .75; font-size: .9rem; min-height: 1.3rem; margin-top: .6rem; }
+  </style>
+</head>
+<body data-noprompt="1" data-fs="plain">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="game-page">
+    <div class="game-top">
+      <a class="back" href="../../index.html#games">← Games</a>
+      <h1>🖱️ Tung Clicker</h1>
+      <div id="mpSlot"></div>
+    </div>
+
+    <div id="gameArea">
+    <div class="cl">
+      <div class="cl-main">
+        <div class="cl-count"><span id="tungs">0</span> tungs</div>
+        <div class="cl-rates"><span id="perClick">1</span> per click · <span id="perSec">0</span> per second</div>
+        <button id="log" aria-label="Hit the Tung log">
+          <svg viewBox="0 0 300 300" aria-hidden="true">
+            <ellipse cx="150" cy="276" rx="92" ry="12" fill="#000" fill-opacity=".4"/>
+            <g transform="rotate(18 215 220)"><rect x="205" y="70" width="20" height="190" rx="10" fill="#c58a4e" stroke="#3a2208" stroke-width="3"/></g>
+            <defs><linearGradient id="w" x1="0" x2="1"><stop offset="0" stop-color="#7a4a1f"/><stop offset=".4" stop-color="#b5763c"/><stop offset=".62" stop-color="#e0a868"/><stop offset="1" stop-color="#7a4a1f"/></linearGradient></defs>
+            <path d="M85 272V105a65 65 0 0 1 130 0V262q0 10-10 10H95q-10 0-10-10Z" fill="url(#w)" stroke="#3a2208" stroke-width="3"/>
+            <g stroke="#000" stroke-opacity=".13" stroke-width="3"><path d="M105 80v190M128 60v210M150 55v220M172 60v210M195 80v190"/></g>
+            <circle cx="125" cy="140" r="15" fill="#fff"/><circle cx="175" cy="140" r="15" fill="#fff"/>
+            <circle cx="131" cy="143" r="7" fill="#111"/><circle cx="181" cy="143" r="7" fill="#111"/>
+            <path d="M134 196h32a16 16 0 0 1-32 0Z" fill="#2a1408"/>
+          </svg>
+        </button>
+        <div class="cl-tools">
+          <button class="btn secondary" id="resetBtn">Reset progress</button>
+        </div>
+        <div class="save-note" id="saveNote"></div>
+      </div>
+
+      <div class="shop" id="shop">
+        <h2>Upgrades</h2>
+      </div>
+    </div>
+    </div>
+
+    <div id="gameLeaderboard"></div>
+  </div>
+
+  <script src="../../mp.js"></script>
+  <script src="clicker.js"></script>
+</body>
+</html>

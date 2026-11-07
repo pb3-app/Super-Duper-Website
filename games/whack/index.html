@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Whack-a-Tung</title>
+  <link rel="stylesheet" href="../game.css" />
+  <link rel="stylesheet" href="../../mp.css" />
+  <style>
+    #view { width: 100%; max-width: 640px; aspect-ratio: 640 / 520; border-radius: 14px; border: 4px solid var(--wood-light); box-shadow: 0 8px 0 #4a2a10, 0 14px 30px rgba(0,0,0,.5); background: #3f8a3f; touch-action: manipulation; display: block; margin: 0 auto; cursor: none; }
+    .bar { max-width: 640px; height: 12px; border-radius: 999px; background: rgba(0,0,0,.35); margin: 0 auto .6rem; overflow: hidden; border: 2px solid var(--wood-dark); }
+    .bar > i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #ffc933, #ff6b3d); transition: width .1s linear; }
+    .legend { display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap; font-weight: 700; margin-top: .6rem; font-size: .92rem; }
+  </style>
+</head>
+<body data-game="whack">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="game-page">
+    <div class="game-top">
+      <a class="back" href="../../index.html#games">← Games</a>
+      <h1>🔨 Whack-a-Tung</h1>
+      <div id="mpSlot"></div>
+    </div>
+
+    <div class="mode-switch" id="modeSwitch">
+      <button class="btn secondary active" data-mode="single">🎮 Single Player</button>
+      <button class="btn secondary" data-mode="multi">👥 Multiplayer</button>
+    </div>
+    <div class="mp-lobby" id="mpLobby" hidden></div>
+    <div class="mp-matchbar" id="mpMatchBar" hidden></div>
+
+    <div id="gameArea">
+      <div class="hud">
+        <span class="chip">🔨 Score: <b id="score">0</b></span>
+        <span class="chip">⏱ <b id="time">45</b>s</span>
+        <span class="chip">🔥 Combo: <b id="combo">x1</b></span>
+        <span class="chip">🏆 Best: <b id="best">0</b></span>
+        <button class="btn" id="startBtn">Start</button>
+      </div>
+      <div class="bar"><i id="bar"></i></div>
+      <section class="controls" aria-label="Controls">
+        <h2>🎮 Controls</h2>
+        <div class="ctl-grid">
+          <div class="ctl"><span class="keys"><kbd class="mouse">Click</kbd></span><span class="act">Whack a Tung with the mouse</span></div><div class="ctl"><span class="keys"><kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><kbd>Z</kbd><kbd>X</kbd><kbd>C</kbd></span><span class="act">Whack the hole in that spot of the 3x3 grid</span></div><div class="ctl"><span class="keys"><kbd>Space</kbd></span><span class="act">Start / restart</span></div>
+        </div>
+        <p class="ctl-extra">📱 <b>Touch:</b> tap the Tungs.</p>
+      </section>
+      <div class="overlay-msg" id="msg">Press Start - whack every brown Tung that pops up!</div>
+      <canvas id="view" width="640" height="520"></canvas>
+      <div class="legend"><span>🟤 Tung +10</span><span>⛑️ Helmet Tung (2 hits) +20</span><span>🟡 Golden Tung +30</span><span>🟢 Green Tung = decoy! -2s &amp; breaks your combo</span></div>
+      <p class="help">Click / tap the Tungs, or use the keys Q W E / A S D / Z X C for the 3x3 holes · Hit streaks raise your multiplier (x2 at 5, x3 at 10, x4 at 15) · Missing breaks the streak · Both players get the same Tungs in multiplayer</p>
+    </div>
+    <div id="gameLeaderboard"></div>
+  </div>
+  <script src="../../mp.js"></script>
+  <script src="../../assets/tung.js"></script>
+  <script src="whack.js"></script>
+</body>
+</html>

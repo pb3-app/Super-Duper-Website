@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Tung Slope</title>
+  <link rel="stylesheet" href="../game.css" />
+  <link rel="stylesheet" href="../../mp.css" />
+  <style>
+    #view { width: 100%; max-width: 720px; aspect-ratio: 720 / 440; border-radius: 14px; border: 4px solid var(--wood-light); box-shadow: 0 8px 0 #4a2a10, 0 14px 30px rgba(0,0,0,.5); background: #070a0d; touch-action: none; display: block; margin: 0 auto; }
+    .steer { display: flex; justify-content: center; gap: 1rem; margin-top: 1rem; }
+    .steer button { width: 120px; height: 60px; font-size: 1.6rem; padding: 0; }
+  </style>
+</head>
+<body data-game="slope">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="game-page">
+    <div class="game-top">
+      <a class="back" href="../../index.html#games">← Games</a>
+      <h1>🛷 Tung Slope</h1>
+      <div id="mpSlot"></div>
+    </div>
+
+    <div class="mode-switch" id="modeSwitch">
+      <button class="btn secondary active" data-mode="single">🎮 Single Player</button>
+      <button class="btn secondary" data-mode="multi">👥 Multiplayer</button>
+    </div>
+    <div class="mp-lobby" id="mpLobby" hidden></div>
+    <div class="mp-matchbar" id="mpMatchBar" hidden></div>
+
+    <div id="gameArea">
+      <div class="hud">
+        <span class="chip">📏 Distance: <b id="score">0</b> m</span>
+        <span class="chip">🏆 Best: <b id="best">0</b> m</span>
+        <button class="btn" id="startBtn">Start</button>
+      </div>
+      <section class="controls" aria-label="Controls">
+        <h2>🎮 Controls</h2>
+        <div class="ctl-grid">
+          <div class="ctl"><span class="keys"><kbd>←</kbd><kbd>→</kbd> or <kbd>A</kbd><kbd>D</kbd></span><span class="act">Steer left / right</span></div><div class="ctl"><span class="keys"><kbd>Space</kbd></span><span class="act">Start / restart</span></div>
+        </div>
+        <p class="ctl-extra">📱 <b>Touch:</b> press and hold the ◀ ▶ buttons, or the left / right half of the screen.</p>
+      </section>
+      <div class="overlay-msg" id="msg">Press Start or Space</div>
+      <canvas id="view" width="720" height="440"></canvas>
+      <div class="steer">
+        <button class="btn secondary" id="leftBtn">◀</button>
+        <button class="btn secondary" id="rightBtn">▶</button>
+      </div>
+      <p class="help">← → or A / D to steer · Dodge the red blocks · Don’t fall into the gaps or off the edge · It gets faster</p>
+    </div>
+
+    <div id="gameLeaderboard"></div>
+  </div>
+
+  <script src="../../mp.js"></script>
+  <script src="slope.js"></script>
+</body>
+</html>

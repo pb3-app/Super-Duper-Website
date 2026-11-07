@@ -1,0 +1,107 @@
+/* Home page only. The design system lives in assets/system.css; this file holds
+   what sits inside a visual, plus a re-skin of the shared multiplayer UI (mp.css)
+   so accounts, challenges and leaderboards match the page. Game pages never load it. */
+
+/* ---- multiplayer UI mapped to the page's tokens ---- */
+:root {
+  --night: var(--p-bg); --night-2: var(--p-surface);
+  --wood: #2a2a2a; --wood-dark: #383838; --wood-light: #f1f1f1;
+  --accent: var(--p-accent); --text: var(--p-ink);
+}
+.mp-btn { border-radius: var(--r-btn); box-shadow: none; background: var(--action); color: var(--action-ink); font-family: var(--font-text); font-weight: 500; padding: .55rem 1rem; }
+.mp-btn:active { transform: translateY(1px); box-shadow: none; }
+.mp-btn.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.mp-btn.danger { background: #d4574b; color: #fff; box-shadow: none; }
+.mp-chip { border: 1px solid var(--line-strong); background: transparent; }
+.mp-avatar { background: var(--surface); border: 1px solid var(--line-strong); }
+.mp-drawer, .mp-modal, .mp-toast { background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-lg); box-shadow: 0 24px 60px -20px rgb(0 0 0 / .7); }
+.mp-toast { border-radius: var(--r-md); }
+.mp-drawer h3, .mp-modal h2, .mp-lobby h2 { color: var(--ink); font-family: var(--font-display); font-weight: var(--display-weight); }
+.mp-toast .bar { background: var(--accent); }
+.mp-backdrop { background: rgb(0 0 0 / .72); }
+.mp-me { border-bottom: 1px solid var(--line); }
+.mp-player { background: var(--bg); }
+.mp-field input[type=text], .mp-field input[type=password], .mp-field select { background: var(--bg); border: 1px solid var(--line-strong); border-radius: var(--r-sm); color: var(--ink); font-family: var(--font-text); }
+.mp-field input:focus, .mp-field select:focus { border-color: var(--accent); }
+.mp-emoji-grid button { background: var(--bg); border: 1px solid transparent; border-radius: var(--r-sm); }
+.mp-emoji-grid button.sel, .mp-choice button.sel { border-color: var(--accent); background: var(--bg); }
+.mp-choice button { border: 1px solid var(--line-strong); border-radius: var(--r-sm); background: transparent; color: var(--ink); font-family: var(--font-text); font-weight: 500; }
+.mp-error { color: #ff8f84; }
+.mp-slot { gap: 8px; }
+.nav__actions { display: flex; align-items: center; gap: 12px; }
+.nav__actions .mp-btn { height: var(--btn-h); }
+
+/* ---- leaderboard card ---- */
+.board { background: var(--surface); border-radius: var(--r-lg); padding: 24px; min-height: 380px; max-height: 480px; overflow: auto; }
+#leaderboards .rows .link { white-space: nowrap; }
+.board .mp-lb { max-width: none; margin: 0; }
+.board .mp-lb > h2 { display: none; }
+.board .mp-lb table { background: transparent; border-radius: 0; }
+.board .mp-lb th { background: transparent; color: var(--muted); font-size: var(--t-label); font-weight: 500; border-bottom: 1px solid var(--line); text-align: center; padding: 8px 12px; }
+.board .mp-lb th:nth-child(2) { text-align: left; }
+.board .mp-lb td { padding: 12px; font-size: var(--t-body); }
+.board .mp-lb tr + tr td { border-top: 1px solid var(--line); }
+.board .mp-lb tr.me td { background: color-mix(in oklab, var(--accent) 10%, transparent); }
+.board .mp-lb .win { color: var(--accent); font-weight: 500; }
+.board .mp-lb .loss { color: #ff8f84; font-weight: 500; }
+.board .mp-lb td.who > div { font-weight: 500; }
+.board .mp-empty { text-align: center; color: var(--muted); padding: 32px 0; }
+
+/* ---- game cards ---- */
+#games .panel, #more .panel , #board .panel , #action .panel { --p-h: 220px; padding: 0; overflow: hidden; }
+#games .panel .frame__img, #more .panel .frame__img , #board .panel .frame__img , #action .panel .frame__img { width: 100%; height: 100%; object-fit: cover; display: block; }
+#games .card, #more .card , #board .card , #action .card { text-decoration: none; color: inherit; }
+#games .card .link, #more .card .link , #board .card .link , #action .card .link { margin-top: auto; }
+#games .card p:not(.t-label), #more .card p:not(.t-label) , #board .card p:not(.t-label) , #action .card p:not(.t-label) { color: var(--ink); }
+
+/* ---- the "how it works" list and its UI mock ---- */
+.mock { background: var(--surface); border-radius: var(--r-lg); padding: 24px; display: grid; gap: 24px; align-content: start; }
+.mock__head { display: flex; justify-content: space-between; align-items: baseline; font-family: var(--font-display); font-size: var(--t-card); }
+.mock__count { color: var(--muted); font-family: var(--font-text); font-size: var(--t-small); }
+.mock__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.mock__list li { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: var(--r-md); background: var(--bg); }
+.mock .av { width: 40px; height: 40px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line-strong); font-size: 20px; flex: none; }
+.mock .who { flex: 1; display: grid; font-weight: 500; }
+.mock .who small { color: var(--muted); font-weight: 400; font-size: var(--t-small); }
+.mock__btn { display: inline-flex; align-items: center; height: 36px; padding: 0 16px; border-radius: var(--r-btn); background: var(--action); color: var(--action-ink); font-weight: 500; font-size: var(--t-small); }
+.mock__btn.is-off { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); }
+.mock__btn.is-ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.mock__toast { background: var(--bg); border-radius: var(--r-md); padding: 16px; display: grid; gap: 16px; box-shadow: inset 0 0 0 1px var(--line-strong); }
+.mock__toast-top { display: flex; gap: 12px; align-items: center; font-weight: 500; }
+.mock__toast-row { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* ---- hero stage ---- */
+.hero__stage > img { cursor: pointer; }
+.tung-pop { position: fixed; pointer-events: none; z-index: 40; font-family: var(--font-display); font-size: 28px; color: var(--accent); animation: tungpop .8s ease-out forwards; }
+@keyframes tungpop { from { opacity: 1; transform: translate(-50%, 0) scale(.8); } to { opacity: 0; transform: translate(-50%, -60px) scale(1.2); } }
+@media (prefers-reduced-motion: reduce) { .tung-pop { animation: none; opacity: 0; } }
+
+/* ---- phones ---- */
+@media (max-width: 639px) {
+  #games, #more, #board, #action, #play, #leaderboards { --hm: 2; }
+  #games .card p:not(.t-label), #more .card p:not(.t-label) , #board .card p:not(.t-label) , #action .card p:not(.t-label) { display: none; }
+  #games .panel, #more .panel , #board .panel , #action .panel { --p-h: 150px; }
+  .nav__actions .btn--primary { display: none; }
+  .nav__logo { font-size: 17px; }
+  .mp-slot .mp-btn { padding: .4rem .65rem; font-size: 14px; }
+  .ly-spot { display: none; }
+  .board { padding: 12px; }
+  .board .mp-lb th, .board .mp-lb td { padding: 8px 6px; font-size: 14px; }
+  .board .mp-lb :is(th, td):nth-child(5) { display: none; }
+  .mock { padding: 16px; }
+}
+
+/* tablet: the games section is longer than one screen when stacked */
+@media (min-width: 640px) and (max-width: 1023px) { #games, #more, #board, #action, #play { --h: 2; } .closing__links .grid > * { grid-column: 1 / -1; } .closing__links .footer__lede { display: none; } }
+
+/* ---- one big grid of every game: a screenshot and a name, nothing else ---- */
+.gamegrid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 20px 18px; }
+.gtile { display: flex; flex-direction: column; gap: 10px; text-decoration: none; color: var(--ink); }
+.gtile img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--r-lg); background: #17102a; border: 1px solid var(--line); transition: transform .2s ease, border-color .2s ease; }
+.gtile span { font-family: var(--font-display); font-weight: var(--display-weight); font-size: 1.05rem; line-height: 1.2; }
+.gtile:hover img, .gtile:focus-visible img { transform: translateY(-2px); border-color: var(--line-strong); }
+@media (prefers-reduced-motion: reduce) { .gtile img { transition: none; } .gtile:hover img { transform: none; } }
+/* the games grid is as tall as it needs to be (all other sections keep their fixed screens) */
+main > #games.section { height: auto; min-height: 100svh; }
+main > #games.section > .wrap { height: auto; }
+@media (max-width: 639px) { .gamegrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; } .gtile span { font-size: .9rem; } }

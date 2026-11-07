@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tung Tung Go</title>
+  <link rel="stylesheet" href="../game.css" />
+  <link rel="stylesheet" href="../../mp.css" />
+  <style>
+    body .game-page { max-width: 980px; }
+    .goplay { display: flex; gap: 1.2rem; justify-content: center; align-items: flex-start; flex-wrap: wrap; }
+    #board { width: min(94vw, 640px); aspect-ratio: 1; display: block; border-radius: 10px; box-shadow: 0 10px 0 #3a2208, 0 18px 40px rgba(0,0,0,.55); cursor: pointer; touch-action: manipulation; }
+    .side { flex: 1 1 230px; max-width: 280px; text-align: left; display: grid; gap: .7rem; }
+    .pl { display: flex; align-items: center; gap: .7rem; padding: .6rem .8rem; background: rgba(0,0,0,.3); border: 2px solid var(--wood-dark); border-radius: 14px; }
+    .pl.turn { border-color: var(--accent); box-shadow: 0 0 14px rgba(255,201,51,.4); }
+    .pl .st { width: 34px; height: 34px; border-radius: 50%; flex: none; box-shadow: inset -4px -5px 8px rgba(0,0,0,.35), 0 2px 4px rgba(0,0,0,.5); }
+    .pl .st.b { background: radial-gradient(circle at 32% 28%, #6a6a72, #17171c 62%, #050507); }
+    .pl .st.w { background: radial-gradient(circle at 32% 28%, #fff, #e8e1d2 60%, #b9ae98); }
+    .pl b { display: block; } .pl small { opacity: .8; }
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+    .actions .btn { padding: .55rem .6rem; }
+    .actions .wide { grid-column: 1 / -1; }
+    .score { padding: .6rem .8rem; background: rgba(0,0,0,.3); border-radius: 14px; font-size: .92rem; min-height: 3.2rem; }
+  </style>
+</head>
+<body data-game="go">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="game-page">
+    <div class="game-top">
+      <a class="back" href="../../index.html#games">← Games</a>
+      <h1>⚫ Tung Tung Go</h1>
+      <div id="mpSlot"></div>
+    </div>
+
+    <div class="mode-switch" id="modeSwitch">
+      <button class="btn secondary active" data-mode="single">🎮 Single Player</button>
+      <button class="btn secondary" data-mode="multi">👥 Multiplayer</button>
+    </div>
+    <div class="mp-lobby" id="mpLobby" hidden></div>
+    <div class="mp-matchbar" id="mpMatchBar" hidden></div>
+
+    <div id="gameArea">
+      <div class="opts solo-only">
+        <label>Board <select id="size"><option value="9" selected>9x9 (quick)</option><option value="13">13x13</option><option value="19">19x19 (full)</option></select></label>
+        <label>Computer <select id="level"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option></select></label>
+        <label>You play <select id="side"><option value="0">Black (first)</option><option value="1">White</option></select></label>
+        <button class="btn secondary" id="newBtn">New game</button>
+      </div>
+      <div class="status-line" id="status"></div>
+      <div class="goplay">
+        <canvas id="board" width="640" height="640"></canvas>
+        <div class="side">
+          <div class="pl" id="plB"><span class="st b"></span><div><b id="nameB">Black</b><small id="capB">0 captured</small></div></div>
+          <div class="pl" id="plW"><span class="st w"></span><div><b id="nameW">White</b><small id="capW">0 captured</small></div></div>
+          <div class="actions">
+            <button class="btn secondary" id="passBtn">Pass</button>
+            <button class="btn secondary" id="resignBtn">Resign</button>
+            <button class="btn wide" id="acceptBtn" hidden>✅ Accept the count</button>
+            <button class="btn secondary wide" id="resumeBtn" hidden>▶ We disagree: play on</button>
+          </div>
+          <div class="score" id="scoreBox"></div>
+        </div>
+      </div>
+      <p class="help">Click an intersection to place a stone · Surround stones to capture them · The player with more area (stones + surrounded points) wins; White gets 7.5 komi · Pass when you have nothing useful left; after two passes click groups to mark dead stones, then both accept the count</p>
+    </div>
+    <div id="gameLeaderboard"></div>
+  </div>
+  <script src="../../mp.js"></script>
+  <script src="rules.js"></script>
+  <script src="go.js"></script>
+</body>
+</html>

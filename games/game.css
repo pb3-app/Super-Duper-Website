@@ -1,0 +1,131 @@
+/* Shared styles for individual game pages */
+@import url("../styles.css");
+
+.game-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 3rem;
+  text-align: center;
+}
+.game-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.back {
+  color: var(--wood-light);
+  text-decoration: none;
+  font-weight: 700;
+  padding: .45rem 1rem;
+  border: 2px solid var(--wood-dark);
+  border-radius: 999px;
+}
+.back:hover { background: var(--wood-dark); }
+.game-page h1 {
+  font-size: clamp(1.6rem, 6vw, 2.6rem);
+  color: var(--wood-light);
+  text-shadow: 0 3px 0 var(--wood-dark);
+}
+.hud {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: .75rem;
+  margin: 1rem 0;
+}
+.hud .chip {
+  background: rgba(0,0,0,.3);
+  border: 2px solid var(--wood-dark);
+  border-radius: 999px;
+  padding: .35rem .9rem;
+  font-weight: 700;
+}
+.btn {
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  border: none;
+  border-radius: 999px;
+  padding: .55rem 1.2rem;
+  background: var(--accent);
+  color: #3a2208;
+  box-shadow: 0 4px 0 #b38600;
+}
+.btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #b38600; }
+.btn.secondary {
+  background: var(--wood);
+  color: var(--text);
+  box-shadow: 0 4px 0 var(--wood-dark);
+}
+.btn.secondary.active { background: var(--wood-light); color: #3a2208; }
+.help { opacity: .7; font-size: .9rem; margin-top: 1rem; }
+.overlay-msg {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: var(--accent);
+  min-height: 2rem;
+  margin: .5rem 0;
+}
+
+/* ---- shared bits for the newer game pages ---- */
+.status-line { font-size: 1.15rem; font-weight: 800; color: var(--accent); min-height: 1.7rem; margin: .5rem 0; }
+.status-line.bad { color: #ff8a80; }
+.opts { display: flex; gap: .8rem 1.2rem; justify-content: center; flex-wrap: wrap; margin: .6rem 0 1rem; }
+.opts label { display: flex; align-items: center; gap: .45rem; font-weight: 800; }
+.opts select, .opts input[type=text] {
+  font: inherit; font-weight: 700; padding: .35rem .6rem; border-radius: 10px;
+  border: 2px solid var(--wood-dark); background: rgba(0,0,0,.35); color: var(--text);
+}
+.btn-row { display: flex; gap: .7rem; justify-content: center; flex-wrap: wrap; margin: .8rem 0; }
+.wide .game-page { max-width: 1040px; }
+.panel { background: rgba(0,0,0,.28); border: 2px solid var(--wood-dark); border-radius: 16px; padding: .8rem 1rem; }
+
+/* ---- explicit controls panel (shown on every game you steer yourself) ---- */
+.controls { max-width: 760px; margin: .4rem auto 1rem; text-align: left; background: rgba(0,0,0,.32); border: 2px solid var(--wood-dark); border-radius: 16px; padding: .7rem 1rem .8rem; }
+.controls h2 { margin: 0 0 .5rem; font-size: 1.05rem; color: var(--accent); letter-spacing: .02em; }
+.ctl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 430px), 1fr)); gap: .45rem 1.2rem; }
+.ctl { display: flex; align-items: center; gap: .6rem; font-weight: 700; }
+.ctl .keys { display: inline-flex; gap: .25rem; flex-wrap: wrap; align-items: center; min-width: 9.5rem; flex: 0 0 auto; }
+.ctl .act { opacity: .95; flex: 1; }
+kbd.mouse { background: linear-gradient(#e3f1ff, #b9d8f5); border-color: #3b6a96; color: #10304f; }
+kbd { display: inline-block; min-width: 1.9rem; padding: .22rem .5rem; text-align: center; font: 800 .85rem/1.1 ui-monospace, Menlo, Consolas, monospace; color: #3a2208; background: linear-gradient(#fff3d6, #f0d9a0); border: 2px solid #8c5a2a; border-bottom-width: 4px; border-radius: 7px; }
+.ctl-extra { margin: .55rem 0 0; font-size: .92rem; opacity: .85; }
+.ctl-extra b { color: var(--accent); }
+
+/* ---- shared multiplayer panel (challenges + rooms) used by the newer real-time games ---- */
+.np-sec { text-align: left; margin: 1rem 0; background: rgba(0,0,0,.28); border: 2px solid var(--wood-dark); border-radius: 16px; padding: .8rem 1rem; }
+.np-sec h2 { margin: 0 0 .5rem; font-size: 1.1rem; color: var(--accent); }
+.np-hint { font-size: .85rem; opacity: .75; margin: .3rem 0; }
+.np-row { display: flex; align-items: center; gap: .7rem; padding: .5rem .7rem; background: rgba(0,0,0,.25); border-radius: 12px; margin: .35rem 0; }
+.np-row .grow { flex: 1; }
+.np-members { display: flex; gap: .6rem; flex-wrap: wrap; margin: .4rem 0; }
+.np-member { display: flex; align-items: center; gap: .5rem; padding: .35rem .7rem; background: rgba(0,0,0,.3); border-radius: 99px; font-weight: 800; }
+.np-member.host { outline: 2px solid var(--accent); }
+.np-seg { display: inline-flex; gap: .3rem; flex-wrap: wrap; margin: .2rem 0 .5rem; }
+.np-seg button { font: inherit; font-weight: 800; padding: .4rem .9rem; border-radius: 99px; cursor: pointer; border: 2px solid var(--wood-dark); background: rgba(0,0,0,.3); color: var(--text); }
+.np-seg button.sel { border-color: var(--accent); background: var(--wood-dark); }
+.np-seg button:disabled { opacity: .6; cursor: default; }
+.np-label { font-weight: 800; margin: .5rem 0 .1rem; }
+.np-result { position: absolute; inset: 0; z-index: 40; background: rgba(8,10,20,.84); border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5rem; padding: 1rem; }
+.np-result h2 { margin: 0; font-size: 1.9rem; color: var(--accent); }
+.np-result table { border-collapse: collapse; min-width: 260px; }
+.np-result td { padding: .3rem .7rem; text-align: left; }
+.np-result tr.win td { color: #ffd23f; font-weight: 900; }
+
+/* ---- on-screen joystick + buttons for touch play (see games/touchpad.js) ---- */
+.tp { display: flex; justify-content: center; align-items: center; gap: 1.2rem; margin-top: .8rem; flex-wrap: wrap; }
+.tp .joy { width: 140px; height: 140px; border-radius: 50%; background: rgba(0,0,0,.35); border: 3px solid var(--wood-dark); position: relative; touch-action: none; }
+.tp .joy i { position: absolute; width: 54px; height: 54px; border-radius: 50%; background: var(--accent); left: 40px; top: 40px; box-shadow: 0 3px 8px rgba(0,0,0,.5); }
+.tp .btns { display: flex; gap: .6rem; }
+.tp .btns button { min-width: 96px; height: 68px; font-size: 1.05rem; touch-action: none; user-select: none; }
+
+/* ---- narrow phones: keep headers and the controls panel inside the screen ---- */
+@media (max-width: 520px) {
+  .game-top { flex-wrap: wrap; justify-content: center; row-gap: .5rem; }
+  .game-top h1 { order: 3; flex: 1 1 100%; text-align: center; margin: 0; }
+  .ctl { flex-direction: column; align-items: flex-start; gap: .25rem; }
+  .ctl .keys { min-width: 0; }
+  .controls { padding-left: .7rem; padding-right: .7rem; }
+}

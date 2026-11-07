@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Brainrot Merge</title>
+  <link rel="stylesheet" href="../game.css" />
+  <link rel="stylesheet" href="../../mp.css" />
+  <style>
+    #board { width: 100%; max-width: 400px; aspect-ratio: 400 / 640; border-radius: 14px; border: 4px solid var(--wood-light); box-shadow: 0 8px 0 #4a2a10, 0 14px 30px rgba(0,0,0,.5); background: #14101c; touch-action: none; display: block; margin: 0 auto; cursor: crosshair; }
+    .ladder { display: flex; flex-wrap: wrap; justify-content: center; gap: .35rem; margin: 1rem auto 0; max-width: 460px; }
+    .ladder span { background: rgba(0,0,0,.3); border: 2px solid var(--wood-dark); border-radius: 999px; padding: .15rem .55rem; font-size: 1.15rem; }
+    .ladder small { display: block; text-align: center; opacity: .7; margin-top: .4rem; width: 100%; }
+  </style>
+</head>
+<body data-game="brainrot">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="game-page">
+    <div class="game-top">
+      <a class="back" href="../../index.html#games">← Games</a>
+      <h1>🧠 Brainrot Merge</h1>
+      <div id="mpSlot"></div>
+    </div>
+
+    <div class="mode-switch" id="modeSwitch">
+      <button class="btn secondary active" data-mode="single">🎮 Single Player</button>
+      <button class="btn secondary" data-mode="multi">👥 Multiplayer</button>
+    </div>
+    <div class="mp-lobby" id="mpLobby" hidden></div>
+    <div class="mp-matchbar" id="mpMatchBar" hidden></div>
+
+    <div id="gameArea">
+      <div class="hud">
+        <span class="chip">🧠 Score: <b id="score">0</b></span>
+        <span class="chip">🏆 Best: <b id="best">0</b></span>
+        <button class="btn" id="startBtn">Start</button>
+      </div>
+      <section class="controls" aria-label="Controls">
+        <h2>🎮 Controls</h2>
+        <div class="ctl-grid">
+          <div class="ctl"><span class="keys"><kbd class="mouse">Mouse</kbd></span><span class="act">Move to aim the next drop</span></div><div class="ctl"><span class="keys"><kbd class="mouse">Click</kbd> or <kbd>Space</kbd></span><span class="act">Drop the character</span></div><div class="ctl"><span class="keys"><kbd>←</kbd><kbd>→</kbd></span><span class="act">Nudge the aim</span></div>
+        </div>
+        <p class="ctl-extra">📱 <b>Touch:</b> drag to aim, tap to drop.</p>
+      </section>
+      <div class="overlay-msg" id="msg">Press Start or Space</div>
+      <canvas id="board" width="400" height="640"></canvas>
+      <div class="ladder" id="ladder"></div>
+      <p class="help">Move to aim · Click, tap or Space to drop · Two of the same brainrot merge into the next one · Don’t let the pile reach the line</p>
+    </div>
+
+    <div id="gameLeaderboard"></div>
+  </div>
+
+  <script src="../../mp.js"></script>
+  <script src="brainrot.js"></script>
+</body>
+</html>

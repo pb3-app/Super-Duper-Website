@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Tung Up!</title>
+  <link rel="stylesheet" href="../game.css" />
+  <link rel="stylesheet" href="../../mp.css" />
+  <style>
+    body .game-page { max-width: 1020px; }
+    #view { width: 100%; max-width: 960px; aspect-ratio: 960 / 600; border-radius: 14px; border: 4px solid var(--wood-light); box-shadow: 0 8px 0 #4a2a10, 0 14px 30px rgba(0,0,0,.5); background: #10141c; touch-action: none; display: block; margin: 0 auto; cursor: crosshair; }
+    .playwrap { position: relative; max-width: 960px; margin: 0 auto; }
+    .tu-sec { text-align: left; margin: 1rem 0; }
+    .tu-sec h2 { margin: 0 0 .5rem; font-size: 1.1rem; color: var(--accent); }
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: .6rem; }
+    .pcard { position: relative; text-align: left; font: inherit; color: var(--text); background: rgba(0,0,0,.3); border: 3px solid var(--wood-dark); border-radius: 14px; padding: .55rem .65rem; cursor: pointer; overflow: hidden; }
+    .pcard:hover { border-color: var(--wood-light); }
+    .pcard.sel { border-color: var(--accent); background: rgba(255,201,51,.12); box-shadow: 0 0 14px rgba(255,201,51,.35); }
+    .pcard h3 { margin: 0 0 .15rem; font-size: .98rem; }
+    .pcard p { margin: 0 0 .35rem; font-size: .8rem; opacity: .8; min-height: 2.1em; }
+    .pcard .row { display: flex; gap: .55rem; align-items: center; }
+    .pcard img { width: 52px; height: 62px; flex: none; image-rendering: auto; }
+    .stats { flex: 1; display: grid; gap: 3px; }
+    .stat { display: grid; grid-template-columns: 56px 1fr; gap: 6px; align-items: center; font-size: .7rem; font-weight: 800; opacity: .9; }
+    .stat i { display: block; height: 7px; border-radius: 99px; background: rgba(255,255,255,.12); position: relative; overflow: hidden; }
+    .stat i b { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #ffc933, #ff8a3d); border-radius: 99px; }
+    .mapcard { padding: 0; }
+    .mapcard .sky { height: 84px; position: relative; }
+    .mapcard .sky span { position: absolute; right: 8px; bottom: 6px; background: rgba(0,0,0,.55); border-radius: 99px; padding: 1px 8px; font-size: .75rem; font-weight: 800; }
+    .mapcard .info { padding: .5rem .65rem .6rem; }
+    .seg { display: inline-flex; gap: .3rem; flex-wrap: wrap; }
+    .seg button { font: inherit; font-weight: 800; padding: .4rem .9rem; border-radius: 99px; cursor: pointer; border: 2px solid var(--wood-dark); background: rgba(0,0,0,.3); color: var(--text); }
+    .seg button.sel { border-color: var(--accent); background: var(--wood-dark); }
+    .hintline { font-size: .85rem; opacity: .75; margin: .3rem 0 0; }
+    #tuResult { position: absolute; inset: 0; background: rgba(8,10,20,.82); border-radius: 14px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: .5rem; padding: 1rem; z-index: 5; }
+    #tuResult h2 { margin: 0; font-size: 1.9rem; color: var(--accent); }
+    #tuResult table { border-collapse: collapse; margin: .4rem 0; min-width: 260px; }
+    #tuResult td { padding: .3rem .7rem; text-align: left; }
+    #tuResult tr.win td { color: #ffd23f; font-weight: 900; }
+    .pad2 { display: flex; justify-content: center; gap: .6rem; margin-top: .8rem; flex-wrap: wrap; }
+    .pad2 button { min-width: 68px; height: 58px; font-size: 1.2rem; padding: 0 .8rem; touch-action: none; user-select: none; }
+    .roomrow { display: flex; align-items: center; gap: .7rem; padding: .5rem .7rem; background: rgba(0,0,0,.25); border-radius: 12px; margin: .35rem 0; text-align: left; }
+    .roomrow .grow { flex: 1; }
+    .members { display: flex; gap: .6rem; flex-wrap: wrap; margin: .4rem 0; }
+    .member { display: flex; align-items: center; gap: .5rem; padding: .35rem .7rem; background: rgba(0,0,0,.3); border-radius: 99px; font-weight: 800; }
+    .member.host { outline: 2px solid var(--accent); }
+    .hud .chip b { font-variant-numeric: tabular-nums; }
+    #play .controls { max-width: 960px; padding: .45rem .8rem .55rem; }
+    #play .controls h2 { display: none; }
+    #play .ctl-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); gap: .25rem 1rem; }
+    #play .ctl .keys { min-width: 7.2rem; }
+    #play .ctl { font-size: .82rem; }
+    #play kbd { font-size: .74rem; padding: .12rem .38rem; min-width: 1.5rem; }
+    #play .ctl-extra { font-size: .8rem; margin-top: .3rem; }
+  </style>
+</head>
+<body data-game="tungup" data-custom="1">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="game-page">
+    <div class="game-top">
+      <a class="back" href="../../index.html#games">← Games</a>
+      <h1>🧗 Tung Up!</h1>
+      <div id="mpSlot"></div>
+    </div>
+
+    <div class="mode-switch" id="modeSwitch">
+      <button class="btn secondary active" data-mode="single">🎮 Single Player</button>
+      <button class="btn secondary" data-mode="multi">👥 Multiplayer</button>
+    </div>
+    <div class="mp-lobby" id="mpLobby" hidden></div>
+    <div class="mp-matchbar" id="mpMatchBar" hidden></div>
+
+    <div id="gameArea">
+      <!-- multiplayer lobby: challenges and rooms -->
+      <div id="mpPanel" hidden>
+        <div class="tu-sec panel">
+          <h2>⚔️ Challenge a racer (1 v 1)</h2>
+          <p class="hintline">Pick someone who is online. You both climb the same map; the first to the top wins. You choose the map and chaos level in the challenge window.</p>
+          <div id="tuPlayers"></div>
+        </div>
+        <div class="tu-sec panel">
+          <h2>🏠 Open rooms (2 to 4 racers)</h2>
+          <div id="tuRooms"></div>
+        </div>
+      </div>
+
+      <!-- loadout: shown before a run -->
+      <div id="loadout">
+        <div class="tu-sec" id="secMap"><h2>1. Pick a map</h2><div class="cards" id="mapCards"></div></div>
+        <div class="tu-sec"><h2 id="h2Tung">2. Pick your Tung</h2><div class="cards" id="tungCards"></div></div>
+        <div class="tu-sec"><h2 id="h2Bat">3. Pick your bat</h2><div class="cards" id="batCards"></div></div>
+        <div class="tu-sec" id="secChaos"><h2>4. Chaos level</h2>
+          <div class="seg" id="chaosSeg"><button data-v="off">😌 Off</button><button data-v="normal">🌪️ Normal (ranked)</button><button data-v="wild">🤪 Wild</button></div>
+          <p class="hintline">Chaos adds natural disasters and silly events: earthquakes, meteors, lightning, wind, tornadoes, inverted controls, ink on the screen, blackouts, banana rain and more. Only Normal runs go on the solo time board.</p>
+        </div>
+        <div class="btn-row" id="startRow"><button class="btn" id="startBtn" style="font-size:1.2rem;padding:.8rem 2rem">🧗 Start climbing</button></div>
+      </div>
+
+      <!-- the game -->
+      <div id="play" hidden>
+        <div class="hud">
+          <span class="chip">⏱ <b id="timeEl">0:00.0</b></span>
+          <span class="chip">🏔 <b id="heightEl">0</b>%</span>
+          <span class="chip">🏆 Best <b id="bestEl">-</b></span>
+          <button class="btn secondary" id="againBtn">↻ Restart (R)</button>
+          <button class="btn secondary" id="quitBtn">☰ Loadout (Esc)</button>
+        </div>
+        <section class="controls" aria-label="Controls">
+          <h2>🎮 Controls</h2>
+          <div class="ctl-grid">
+            <div class="ctl"><span class="keys"><kbd>A</kbd><kbd>D</kbd> or <kbd>←</kbd><kbd>→</kbd></span><span class="act">Run left / right</span></div>
+            <div class="ctl"><span class="keys"><kbd>Space</kbd> <kbd>W</kbd> <kbd>↑</kbd></span><span class="act">Jump (hold for a higher jump; golden Tung can jump twice)</span></div>
+            <div class="ctl"><span class="keys"><kbd>J</kbd> <kbd>X</kbd> <kbd class="mouse">Click</kbd></span><span class="act">Swing your bat: hit other racers off ledges</span></div>
+            <div class="ctl"><span class="keys"><kbd>K</kbd> <kbd>E</kbd></span><span class="act">Use your power-up (pick them up from the gold ? boxes)</span></div>
+            <div class="ctl"><span class="keys"><kbd>S</kbd> <kbd>↓</kbd></span><span class="act">Drop down through a ledge</span></div>
+            <div class="ctl"><span class="keys"><kbd>R</kbd> / <kbd>Esc</kbd></span><span class="act">Restart a solo run / back to the loadout</span></div>
+          </div>
+          <p class="ctl-extra">📱 <b>Touch:</b> use the ◀ ▶ ⤴ 🏏 🎁 buttons under the game. <b>Goal:</b> reach the golden Tung at the top. Falling has no checkpoints, and if your health hits zero you go back to the bottom!</p>
+        </section>
+        <div class="playwrap">
+          <canvas id="view" width="960" height="600"></canvas>
+          <div id="tuResult" hidden></div>
+        </div>
+        <div class="pad2">
+          <button class="btn secondary" id="bL">◀</button><button class="btn secondary" id="bR">▶</button>
+          <button class="btn" id="bJ">⤴ Jump</button><button class="btn secondary" id="bS">🏏 Swing</button>
+          <button class="btn secondary" id="bI">🎁 Item</button><button class="btn secondary" id="bD">⤓ Drop</button>
+        </div>
+      </div>
+    </div>
+    <div id="gameLeaderboard"></div>
+  </div>
+  <script src="../../mp.js"></script>
+  <script src="../../assets/tung.js"></script>
+  <script src="maps.js"></script>
+  <script src="loadout.js"></script>
+  <script src="engine.js"></script>
+  <script src="ui.js"></script>
+</body>
+</html>

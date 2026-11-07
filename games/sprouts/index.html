@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tung Sprouts</title>
+  <link rel="stylesheet" href="../game.css" />
+  <link rel="stylesheet" href="../../mp.css" />
+  <style>
+    #board {
+      width: 100%;
+      max-width: 640px;
+      aspect-ratio: 640 / 420;
+      border-radius: 14px;
+      border: 4px solid var(--wood-light);
+      box-shadow: 0 8px 0 #4a2a10, 0 14px 30px rgba(0,0,0,.5);
+      background: #1b1030;
+      touch-action: none;
+      display: block;
+      margin: 0 auto;
+      cursor: pointer;
+    }
+    .sp-controls { display: flex; justify-content: center; gap: .6rem; flex-wrap: wrap; align-items: center; margin: .6rem 0; }
+    .sp-controls select { font: inherit; font-weight: 700; padding: .45rem .8rem; border-radius: 999px; border: 2px solid var(--wood-dark); background: #1a1030; color: var(--text); }
+    .sp-status { font-size: 1.2rem; font-weight: 800; color: var(--accent); min-height: 1.8rem; margin: .5rem 0; }
+    .sp-status.bad { color: #ff8a80; }
+    .sp-status .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 50%; margin-right: .5rem; vertical-align: -1px; }
+    .rules { max-width: 640px; margin: 1rem auto 0; text-align: left; opacity: .85; font-size: .95rem; }
+    .rules summary { cursor: pointer; font-weight: 800; color: var(--wood-light); }
+    .rules li { margin: .25rem 0 .25rem 1.2rem; }
+  </style>
+</head>
+<body data-game="sprouts">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="game-page">
+    <div class="game-top">
+      <a class="back" href="../../index.html#games">← Games</a>
+      <h1>🌱 Tung Sprouts</h1>
+      <div id="mpSlot"></div>
+    </div>
+
+    <div class="mode-switch" id="modeSwitch">
+      <button class="btn secondary active" data-mode="single">🎮 Single Player</button>
+      <button class="btn secondary" data-mode="multi">👥 Multiplayer</button>
+    </div>
+    <div class="mp-lobby" id="mpLobby" hidden></div>
+    <div class="mp-matchbar" id="mpMatchBar" hidden></div>
+
+    <div id="gameArea">
+      <div class="sp-controls solo-only">
+        <label>Dots <select id="dotCount"><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select></label>
+        <label>Mode <select id="modeSel"><option value="normal" selected>Normal (last move wins)</option><option value="misere">Misère (last move loses)</option></select></label>
+        <button class="btn" id="newBtn">New game</button>
+      </div>
+      <div class="sp-status" id="status">Your turn: click a dot, then the dot to join it to.</div>
+      <canvas id="board" width="640" height="420"></canvas>
+      <p class="help">Click a dot, then click the dot you want to join it to. Click the same dot twice to make a loop. Lines can’t cross, and a dot can only hold 3 lines.</p>
+      <details class="rules">
+        <summary>How to play</summary>
+        <ul>
+          <li>Take turns joining two dots with a line: click one dot, then the other. The game draws the line for you. Each player’s lines have their own colour.</li>
+          <li>Clicking one dot twice joins it to itself with a loop. A line can’t cross any line or pass through a dot. If a line could go two ways round, click the one you want.</li>
+          <li>Every new line gets a new dot in its middle, automatically.</li>
+          <li>No dot may have more than 3 lines. Full dots turn grey and act as walls.</li>
+          <li>Normal play: if you can’t move on your turn, you lose. Misère: if you can’t move, you win.</li>
+        </ul>
+      </details>
+    </div>
+
+    <div id="gameLeaderboard"></div>
+  </div>
+
+  <script src="../../mp.js"></script>
+  <script src="rules.js"></script>
+  <script src="sprouts.js"></script>
+</body>
+</html>

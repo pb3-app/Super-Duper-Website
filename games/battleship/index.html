@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tung Battleship</title>
+  <link rel="stylesheet" href="../game.css" />
+  <link rel="stylesheet" href="../../mp.css" />
+  <style>
+    .wide .game-page, body .game-page { max-width: 1040px; }
+    .seas { display: flex; gap: 1.2rem; justify-content: center; flex-wrap: wrap; }
+    .sea { flex: 1 1 300px; max-width: 460px; }
+    .sea h3 { margin: .2rem 0 .4rem; color: var(--wood-light); }
+    .sea canvas { width: 100%; aspect-ratio: 1; display: block; border-radius: 14px; box-shadow: 0 6px 0 #0a2a40, 0 12px 26px rgba(0,0,0,.5); touch-action: none; }
+    .sea.dim { opacity: .55; }
+    .sea.active canvas { box-shadow: 0 0 0 3px var(--accent), 0 0 24px rgba(255,201,51,.5); cursor: crosshair; }
+    .fleet { display: flex; gap: .5rem; justify-content: center; flex-wrap: wrap; margin: .6rem 0; min-height: 2rem; }
+    .fleet .ship { background: rgba(0,0,0,.3); border: 2px solid var(--wood-dark); border-radius: 999px; padding: .2rem .7rem; font-weight: 800; font-size: .9rem; }
+    .fleet .ship.sunk { text-decoration: line-through; opacity: .5; border-color: #8b2a22; }
+  </style>
+</head>
+<body data-game="battleship">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="game-page">
+    <div class="game-top">
+      <a class="back" href="../../index.html#games">← Games</a>
+      <h1>🚢 Tung Battleship</h1>
+      <div id="mpSlot"></div>
+    </div>
+
+    <div class="mode-switch" id="modeSwitch">
+      <button class="btn secondary active" data-mode="single">🎮 Single Player</button>
+      <button class="btn secondary" data-mode="multi">👥 Multiplayer</button>
+    </div>
+    <div class="mp-lobby" id="mpLobby" hidden></div>
+    <div class="mp-matchbar" id="mpMatchBar" hidden></div>
+
+    <div id="gameArea">
+      <div class="opts solo-only" id="soloOpts">
+        <label>Computer <select id="level"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option></select></label>
+        <label>Rules <select id="rule"><option value="classic">Classic - one shot</option><option value="streak">Hit again - a hit gives another shot</option></select></label>
+        <button class="btn secondary" id="newBtn">New game</button>
+      </div>
+      <div class="status-line" id="status"></div>
+      <div class="btn-row" id="placeBtns">
+        <button class="btn secondary" id="randBtn">🎲 Shuffle fleet</button>
+        <button class="btn" id="readyBtn">⚓ Ready!</button>
+      </div>
+      <div class="seas">
+        <div class="sea" id="seaEnemy"><h3>🎯 Enemy waters <small id="enemyInfo"></small></h3><canvas id="enemy" width="440" height="440"></canvas><div class="fleet" id="enemyFleet"></div></div>
+        <div class="sea" id="seaMine"><h3>🪵 Your waters <small id="mineInfo"></small></h3><canvas id="mine" width="440" height="440"></canvas><div class="fleet" id="mineFleet"></div></div>
+      </div>
+      <p class="help" id="help">Drag your Tung logs to arrange them, click a log to turn it, then press Ready · Then click enemy waters to drop a green Tung bomb · Sink all five logs to win</p>
+    </div>
+    <div id="gameLeaderboard"></div>
+  </div>
+  <script src="../../mp.js"></script>
+  <script src="../../assets/tung.js"></script>
+  <script src="rules.js"></script>
+  <script src="battleship.js"></script>
+</body>
+</html>

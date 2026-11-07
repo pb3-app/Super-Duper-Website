@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tung Dots &amp; Boxes</title>
+  <link rel="stylesheet" href="../game.css" />
+  <link rel="stylesheet" href="../../mp.css" />
+  <style>
+    #board { width: min(94vw, 600px); aspect-ratio: 1; display: block; margin: 0 auto; border-radius: 18px; background: #2a1809; box-shadow: 0 8px 0 #4a2a10, 0 14px 30px rgba(0,0,0,.5); touch-action: manipulation; cursor: pointer; }
+    .scores { display: flex; justify-content: center; gap: 1rem; margin: .6rem 0; font-weight: 900; flex-wrap: wrap; }
+    .scores .chip { font-size: 1.1rem; }
+    .scores .chip.turn { border-color: var(--accent); box-shadow: 0 0 12px rgba(255,201,51,.6); }
+    .p0 { color: #ffcc33; } .p1 { color: #4cc9f0; }
+  </style>
+</head>
+<body data-game="boxes">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="game-page">
+    <div class="game-top">
+      <a class="back" href="../../index.html#games">← Games</a>
+      <h1>🔲 Dots &amp; Boxes</h1>
+      <div id="mpSlot"></div>
+    </div>
+
+    <div class="mode-switch" id="modeSwitch">
+      <button class="btn secondary active" data-mode="single">🎮 Single Player</button>
+      <button class="btn secondary" data-mode="multi">👥 Multiplayer</button>
+    </div>
+    <div class="mp-lobby" id="mpLobby" hidden></div>
+    <div class="mp-matchbar" id="mpMatchBar" hidden></div>
+
+    <div id="gameArea">
+      <div class="opts solo-only">
+        <label>Board <select id="size"><option value="3">3x3</option><option value="4" selected>4x4</option><option value="5">5x5</option><option value="6">6x6</option></select></label>
+        <label>Computer <select id="level"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option></select></label>
+        <label>You go <select id="side"><option value="0">first</option><option value="1">second</option></select></label>
+        <button class="btn secondary" id="newBtn">New game</button>
+      </div>
+      <div class="status-line" id="status"></div>
+      <div class="scores"><span class="chip p0" id="s0">You: 0</span><span class="chip p1" id="s1">Them: 0</span></div>
+      <canvas id="board" width="720" height="720"></canvas>
+      <p class="help">Click between two dots to draw a line · Close the 4th side of a box to claim it and go again · Most boxes wins · Each claimed box gets a Tung: brown for the first player, green for the second</p>
+    </div>
+    <div id="gameLeaderboard"></div>
+  </div>
+  <script src="../../mp.js"></script>
+  <script src="../../assets/tung.js"></script>
+  <script src="rules.js"></script>
+  <script src="boxes.js"></script>
+</body>
+</html>

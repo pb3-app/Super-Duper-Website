@@ -1,0 +1,57 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: #2b1a0e;
+  color: #fff3e0;
+  font-family: "Nunito", system-ui, sans-serif;
+}
+
+canvas { display: block; width: 100vw; height: 100vh; }
+
+#menu {
+  position: fixed; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 16px; padding: 16px; text-align: center;
+  background: radial-gradient(circle at 50% 40%, #6b4423 0%, #2b1a0e 70%);
+  z-index: 10;
+}
+
+#menu h1 {
+  font-family: "Bungee", sans-serif;
+  font-size: clamp(32px, 8vw, 72px);
+  line-height: 1;
+  color: #e0b07a;
+  text-shadow: 4px 4px 0 #1a0f07;
+}
+#menu h1 span { color: #ff8c2a; font-size: 1.3em; }
+.tag { opacity: 0.85; font-size: 18px; }
+
+#name, #play {
+  font-size: 20px; padding: 12px 18px; border-radius: 12px; border: none;
+  width: min(320px, 90vw);
+}
+#name { background: #fff3e0; color: #2b1a0e; text-align: center; font-family: inherit; }
+#play {
+  font-family: "Bungee", sans-serif; background: #ff8c2a; color: #2b1a0e; cursor: pointer;
+  box-shadow: 0 5px 0 #a8551a;
+}
+#play:active { transform: translateY(3px); box-shadow: 0 2px 0 #a8551a; }
+#play:disabled { opacity: 0.6; cursor: wait; }
+#status { min-height: 1.4em; color: #ffcf99; }
+.controls { opacity: 0.6; font-size: 14px; }
+
+#hud { position: fixed; inset: 0; pointer-events: none; }
+#scores {
+  position: absolute; top: 12px; right: 12px;
+  background: rgba(26, 15, 7, 0.75); border-radius: 10px; padding: 10px 14px;
+  font-size: 15px; min-width: 160px;
+}
+#scores b { font-family: "Bungee", sans-serif; color: #ff8c2a; display: block; margin-bottom: 4px; }
+#scores .me { color: #ffcf99; font-weight: 700; }
+#feed {
+  position: absolute; bottom: 12px; left: 12px;
+  font-size: 14px; display: flex; flex-direction: column; gap: 4px;
+}
+#feed div { background: rgba(26, 15, 7, 0.7); padding: 4px 10px; border-radius: 8px; }

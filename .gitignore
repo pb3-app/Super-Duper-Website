@@ -1,0 +1,12 @@
+node_modules/
+.DS_Store
+.env
+*.log
+*.pem
+
+# Player accounts saved by the arcade server - never upload these
+data/
+
+# Old/extra files
+Archive.zip
+Super Duper Website/

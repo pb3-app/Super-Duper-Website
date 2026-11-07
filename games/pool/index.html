@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tung Pool</title>
+  <link rel="stylesheet" href="../game.css" />
+  <link rel="stylesheet" href="../../mp.css" />
+  <style>
+    #table { width: 100%; max-width: 880px; aspect-ratio: 880 / 480; display: block; margin: 0 auto; border-radius: 18px; touch-action: none; cursor: crosshair; box-shadow: 0 8px 0 #4a2a10, 0 14px 30px rgba(0,0,0,.5); }
+    .pl-controls { display: flex; justify-content: center; align-items: center; gap: 1rem; flex-wrap: wrap; margin: .9rem 0; }
+    .pl-controls label { display: flex; align-items: center; gap: .6rem; font-weight: 800; }
+    .pl-controls input[type=range] { width: min(240px, 50vw); accent-color: var(--accent); }
+    .pl-status { font-size: 1.15rem; font-weight: 800; color: var(--accent); min-height: 1.7rem; margin: .5rem 0; }
+    .pl-status.bad { color: #ff8a80; }
+    .pl-groups { opacity: .85; font-weight: 700; min-height: 1.4rem; }
+  </style>
+</head>
+<body data-game="pool">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="game-page">
+    <div class="game-top">
+      <a class="back" href="../../index.html#games">← Games</a>
+      <h1>🎱 Tung Pool</h1>
+      <div id="mpSlot"></div>
+    </div>
+
+    <div class="mode-switch" id="modeSwitch">
+      <button class="btn secondary active" data-mode="single">🎮 Single Player</button>
+      <button class="btn secondary" data-mode="multi">👥 Multiplayer</button>
+    </div>
+    <div class="mp-lobby" id="mpLobby" hidden></div>
+    <div class="mp-matchbar" id="mpMatchBar" hidden></div>
+
+    <div id="gameArea">
+      <section class="controls" aria-label="Controls">
+        <h2>🎮 Controls</h2>
+        <div class="ctl-grid">
+          <div class="ctl"><span class="keys"><kbd class="mouse">Mouse</kbd> drag</span><span class="act">Click the table, drag <b>back</b> (like pulling a cue) and release to shoot - further = harder</span></div><div class="ctl"><span class="keys"><kbd class="mouse">Mouse</kbd> click</span><span class="act">Place the cue ball after a foul</span></div>
+        </div>
+        <p class="ctl-extra">📱 <b>Touch:</b> touch and drag back, then lift your finger to shoot.</p>
+      </section>
+      <div class="pl-status" id="status">Your break. Click and drag back from the table, then let go to shoot.</div>
+      <canvas id="table" width="880" height="480"></canvas>
+      <div class="pl-groups" id="groups"></div>
+      <div class="pl-controls"><button class="btn secondary solo-only" id="newBtn">New game</button></div>
+      <p class="help">Click and drag back like pulling a cue (the further, the harder), then let go to shoot · After a foul, click the table to place the cue ball · 8-ball rules: pot your group, then the 8</p>
+    </div>
+
+    <div id="gameLeaderboard"></div>
+  </div>
+
+  <script src="../../mp.js"></script>
+  <script src="pool.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

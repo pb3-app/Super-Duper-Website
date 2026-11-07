@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tung Minesweeper</title>
+  <link rel="stylesheet" href="../game.css" />
+  <link rel="stylesheet" href="../../mp.css" />
+  <style>
+    .difficulty { display: flex; justify-content: center; gap: .5rem; flex-wrap: wrap; }
+    .board-wrap { overflow-x: auto; padding: 4px 0 12px; }
+    #board {
+      display: inline-grid;
+      gap: 3px;
+      padding: 8px;
+      border-radius: 14px;
+      background: var(--wood-dark);
+      border: 4px solid var(--wood-light);
+      box-shadow: 0 8px 0 #4a2a10, 0 14px 30px rgba(0,0,0,.5);
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .cell {
+      width: var(--size, 32px);
+      height: var(--size, 32px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: calc(var(--size, 32px) * 0.55);
+      border-radius: 6px;
+      cursor: pointer;
+      background: linear-gradient(160deg, var(--wood-light), var(--wood));
+      box-shadow: inset 0 -3px 0 rgba(0,0,0,.25);
+      transition: transform .05s;
+    }
+    .cell:hover:not(.open) { filter: brightness(1.1); }
+    .cell:active:not(.open) { transform: scale(.94); }
+    .cell.open {
+      background: #2a1a40;
+      box-shadow: none;
+      cursor: default;
+    }
+    .cell.mine { background: #8b1e1e; }
+    .cell.mine.boom { background: #ff3b3b; animation: boom .4s; }
+    @keyframes boom { 50% { transform: scale(1.3); } }
+    .n1 { color: #6ec6ff; } .n2 { color: #7ddc7a; } .n3 { color: #ff7a7a; }
+    .n4 { color: #c39bff; } .n5 { color: #ffb347; } .n6 { color: #4fe3d0; }
+    .n7 { color: #fff; }    .n8 { color: #aaa; }
+    #face { font-size: 1.6rem; background: none; border: none; cursor: pointer; }
+  </style>
+</head>
+<body data-game="minesweeper">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="game-page">
+    <div class="game-top">
+      <a class="back" href="../../index.html#games">← Games</a>
+      <h1>💣 Tung Minesweeper</h1>
+      <div id="mpSlot"></div>
+    </div>
+
+    <div class="mode-switch" id="modeSwitch">
+      <button class="btn secondary active" data-mode="single">🎮 Single Player</button>
+      <button class="btn secondary" data-mode="multi">👥 Multiplayer</button>
+    </div>
+    <div class="mp-lobby" id="mpLobby" hidden></div>
+    <div class="mp-matchbar" id="mpMatchBar" hidden></div>
+
+    <div id="gameArea">
+    <div class="difficulty">
+      <button class="btn secondary" data-level="easy">Easy</button>
+      <button class="btn secondary" data-level="medium">Medium</button>
+      <button class="btn secondary" data-level="hard">Hard</button>
+    </div>
+
+    <section class="controls" aria-label="Controls">
+        <h2>🎮 Controls</h2>
+        <div class="ctl-grid">
+          <div class="ctl"><span class="keys"><kbd class="mouse">Left click</kbd></span><span class="act">Reveal a tile</span></div><div class="ctl"><span class="keys"><kbd class="mouse">Right click</kbd></span><span class="act">Flag a Tung 🚩</span></div><div class="ctl"><span class="keys"><kbd class="mouse">Click a number</kbd></span><span class="act">Chord - reveal around it once it is satisfied</span></div>
+        </div>
+        <p class="ctl-extra">📱 <b>Touch:</b> tap to reveal; switch on <b>Flag mode</b> to tap-flag.</p>
+      </section>
+    <div class="hud">
+      <span class="chip">🪵 Tungs left: <b id="minesLeft">0</b></span>
+      <button id="face" title="New game">🙂</button>
+      <span class="chip">⏱️ <b id="time">0</b>s</span>
+      <button class="btn secondary" id="flagMode" title="Toggle flag mode (for touch)">🚩 Flag mode: Off</button>
+    </div>
+    <div class="overlay-msg" id="msg"></div>
+
+    <div class="board-wrap"><div id="board"></div></div>
+
+    <p class="help">Click to reveal · Right‑click (or Flag mode) to flag a Tung 🚩 · Click a number to chord</p>
+    </div>
+
+    <div id="gameLeaderboard"></div>
+  </div>
+
+  <script src="../../mp.js"></script>
+  <script src="minesweeper.js"></script>
+</body>
+</html>

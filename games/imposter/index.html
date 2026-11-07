@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Imposter</title>
+  <link rel="stylesheet" href="../game.css" />
+  <link rel="stylesheet" href="../../mp.css" />
+  <style>
+    #impRoot { text-align: left; max-width: 640px; margin: 0 auto; }
+    .imp-card { background: rgba(0,0,0,.28); border: 3px solid var(--wood-dark); border-radius: 18px; padding: 1rem 1.1rem; margin-bottom: 1rem; }
+    .imp-card h2 { color: var(--wood-light); font-size: 1.25rem; margin-bottom: .5rem; }
+    .imp-top { display: flex; justify-content: space-between; align-items: center; gap: .6rem; flex-wrap: wrap; font-weight: 900; font-size: 1.15rem; color: var(--accent); }
+    .imp-timer { background: rgba(0,0,0,.35); border: 2px solid var(--accent); border-radius: 999px; padding: .15rem .8rem; min-width: 4.2rem; text-align: center; }
+    .imp-role { text-align: center; font-size: 1.1rem; }
+    .imp-role b { display: block; font-size: 2rem; letter-spacing: .06em; color: var(--accent); text-transform: uppercase; }
+    .imp-role.imposter b { color: #ff8a80; }
+    .imp-players { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: .5rem; }
+    .imp-p { display: flex; align-items: center; gap: .5rem; padding: .4rem .5rem; border-radius: 12px; background: rgba(0,0,0,.25); border: 2px solid transparent; min-width: 0; }
+    .imp-p.turn { border-color: var(--accent); background: rgba(255,204,51,.12); }
+    .imp-p.off { opacity: .45; }
+    .imp-p .nm { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+    .imp-p .tag { font-size: .8rem; }
+    .imp-clues { display: grid; gap: .35rem; }
+    .imp-clues .rd { font-size: .8rem; opacity: .7; font-weight: 800; margin-top: .3rem; }
+    .imp-clue { display: inline-block; margin: 0 .35rem .35rem 0; padding: .25rem .7rem; border-radius: 999px; background: var(--wood-dark); font-weight: 700; }
+    .imp-clue em { opacity: .75; font-style: normal; margin-right: .3rem; }
+    .imp-form { display: flex; gap: .5rem; margin-top: .6rem; }
+    .imp-form input { flex: 1; min-width: 0; font: inherit; padding: .55rem .8rem; border-radius: 10px; border: 2px solid var(--wood-dark); background: #1a1030; color: var(--text); }
+    .imp-form input:focus { outline: none; border-color: var(--accent); }
+    .imp-chat { max-height: 190px; overflow: auto; display: grid; gap: .25rem; padding: .3rem 0; }
+    .imp-chat div b { color: var(--wood-light); }
+    .imp-votes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .5rem; margin-top: .6rem; }
+    .imp-votes button { font: inherit; font-weight: 800; padding: .6rem; border-radius: 12px; cursor: pointer; border: 2px solid var(--wood-dark); background: rgba(0,0,0,.3); color: var(--text); display: flex; align-items: center; gap: .5rem; justify-content: center; }
+    .imp-votes button.sel { border-color: var(--accent); background: var(--wood-dark); }
+    .imp-result { text-align: center; }
+    .imp-result .big { font-size: 3rem; }
+    .imp-row { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; justify-content: center; margin-top: .8rem; }
+    .imp-setup label { display: flex; align-items: center; gap: .6rem; font-weight: 800; margin: .6rem 0; }
+    .imp-setup select { font: inherit; font-weight: 700; padding: .45rem .8rem; border-radius: 999px; border: 2px solid var(--wood-dark); background: #1a1030; color: var(--text); }
+    .imp-rooms { list-style: none; display: grid; gap: .5rem; margin-top: .6rem; }
+    .imp-muted { opacity: .75; }
+    .imp-hint { font-size: .9rem; opacity: .75; margin-top: .4rem; }
+  </style>
+</head>
+<body data-fs="plain" data-game="imposter" data-custom="1">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="game-page">
+    <div class="game-top">
+      <a class="back" href="../../index.html#games">← Games</a>
+      <h1>🕵️ The Imposter</h1>
+      <div id="mpSlot"></div>
+    </div>
+
+    <div class="mode-switch" id="modeSwitch">
+      <button class="btn secondary active" data-mode="single">🎮 Single Player</button>
+      <button class="btn secondary" data-mode="multi">👥 Multiplayer</button>
+    </div>
+    <div class="mp-lobby" id="mpLobby" hidden></div>
+    <div class="mp-matchbar" id="mpMatchBar" hidden></div>
+
+    <div id="gameArea">
+      <div id="impRoot"></div>
+    </div>
+
+    <div id="gameLeaderboard"></div>
+  </div>
+
+  <script src="../../mp.js"></script>
+  <script src="words.js"></script>
+  <script src="engine.js"></script>
+  <script src="imposter.js"></script>
+</body>
+</html>

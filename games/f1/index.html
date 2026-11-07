@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Tung F1 Racing</title>
+  <link rel="stylesheet" href="../game.css" />
+  <link rel="stylesheet" href="../../mp.css" />
+  <style>
+    body .game-page { max-width: 980px; }
+    #view { width: 100%; max-width: 920px; aspect-ratio: 920 / 560; border-radius: 14px; border: 4px solid var(--wood-light); box-shadow: 0 8px 0 #4a2a10, 0 14px 30px rgba(0,0,0,.5); background: #2a7a3a; touch-action: none; display: block; margin: 0 auto; }
+    .pad { display: flex; justify-content: center; gap: .7rem; margin-top: .8rem; }
+    .pad button { width: 84px; height: 56px; font-size: 1.4rem; padding: 0; user-select: none; touch-action: none; }
+    .tinfo { font-weight: 700; opacity: .9; min-height: 1.3rem; }
+  </style>
+</head>
+<body data-game="f1">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="game-page">
+    <div class="game-top">
+      <a class="back" href="../../index.html#games">← Games</a>
+      <h1>🏎️ Tung F1 Racing</h1>
+      <div id="mpSlot"></div>
+    </div>
+
+    <div class="mode-switch" id="modeSwitch">
+      <button class="btn secondary active" data-mode="single">🎮 Single Player</button>
+      <button class="btn secondary" data-mode="multi">👥 Multiplayer</button>
+    </div>
+    <div class="mp-lobby" id="mpLobby" hidden></div>
+    <div class="mp-matchbar" id="mpMatchBar" hidden></div>
+
+    <div id="gameArea">
+      <div class="opts solo-only">
+        <label>Track <select id="track"></select></label>
+        <label>Laps <select id="laps"><option value="2">2</option><option value="3" selected>3 (counts for the board)</option><option value="5">5</option></select></label>
+        <label>Rivals <select id="skill"><option value="0.88">Rookie</option><option value="0.95" selected>Pro</option><option value="1.02">Legend</option></select></label>
+        <button class="btn" id="startBtn">Start race</button>
+      </div>
+      <div class="tinfo" id="tinfo"></div>
+      <div class="hud">
+        <span class="chip">🏁 Lap <b id="lapEl">-</b></span>
+        <span class="chip">🥇 Position <b id="posEl">-</b></span>
+        <span class="chip">⏱ <b id="timeEl">0:00.000</b></span>
+        <span class="chip">⚡ Best lap <b id="bestEl">-</b></span>
+      </div>
+      <section class="controls" aria-label="Controls">
+        <h2>🎮 Controls</h2>
+        <div class="ctl-grid">
+          <div class="ctl"><span class="keys"><kbd>W</kbd> or <kbd>↑</kbd></span><span class="act">Accelerate</span></div><div class="ctl"><span class="keys"><kbd>S</kbd> or <kbd>↓</kbd></span><span class="act">Brake / reverse</span></div><div class="ctl"><span class="keys"><kbd>A</kbd><kbd>D</kbd> or <kbd>←</kbd><kbd>→</kbd></span><span class="act">Steer</span></div><div class="ctl"><span class="keys"><kbd>R</kbd></span><span class="act">Put the car back on the road</span></div>
+        </div>
+        <p class="ctl-extra">📱 <b>Touch:</b> hold the ◀ ▶ 🛑 ⛽ buttons below the track.</p><p class="ctl-extra">Pass all 8 gates each lap. The grass slows you down and walls hurt.</p>
+      </section>
+      <div class="overlay-msg" id="msg">Pick a track and press Start race</div>
+      <canvas id="view" width="920" height="560"></canvas>
+      <div class="pad">
+        <button class="btn secondary" id="bL">◀</button>
+        <button class="btn secondary" id="bB">🛑</button>
+        <button class="btn" id="bG">⛽</button>
+        <button class="btn secondary" id="bR">▶</button>
+      </div>
+      <p class="help">↑ / W gas · ↓ / S brake &amp; reverse · ← → / A D steer · R puts you back on the road · Pass all 8 gates each lap (the grass slows you, walls hurt) · Multiplayer: first to finish the laps wins</p>
+    </div>
+    <div id="gameLeaderboard"></div>
+  </div>
+  <script src="../../mp.js"></script>
+  <script src="tracks.js"></script>
+  <script src="f1.js"></script>
+</body>
+</html>

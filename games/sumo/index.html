@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Tung Tung Sumo</title>
+  <link rel="stylesheet" href="../game.css" />
+  <link rel="stylesheet" href="../../mp.css" />
+  <style>
+    body .game-page { max-width: 1000px; }
+    #view { width: 100%; max-width: 900px; aspect-ratio: 900 / 640; display: block; margin: 0 auto; border-radius: 18px; background: #14101c; box-shadow: 0 10px 0 #0a0810, 0 20px 40px rgba(0,0,0,.55); touch-action: none; }
+    .playwrap { position: relative; max-width: 900px; margin: 0 auto; }
+    .menu-card { max-width: 640px; margin: 1rem auto; text-align: left; } .menu-card h2 { margin: 0 0 .6rem; color: var(--accent); }
+  </style>
+</head>
+<body data-game="sumo" data-custom="1">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="game-page">
+    <div class="game-top">
+      <a class="back" href="../../index.html#games">← Games</a>
+      <h1>🤼 Tung Tung Sumo</h1>
+      <div id="mpSlot"></div>
+    </div>
+    <div class="mode-switch" id="modeSwitch">
+      <button class="btn secondary active" data-mode="single">🎮 Single Player</button>
+      <button class="btn secondary" data-mode="multi">👥 Multiplayer</button>
+    </div>
+    <div class="mp-lobby" id="mpLobby" hidden></div>
+    <div class="mp-matchbar" id="mpMatchBar" hidden></div>
+
+    <div id="gameArea">
+      <div id="menu" class="np-sec menu-card">
+        <h2>Fight the computer</h2>
+        <div class="opts">
+          <label>Opponents <select id="bots"><option value="1" selected>1</option><option value="2">2</option><option value="3">3</option></select></label>
+          <label>Difficulty <select id="level"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option></select></label>
+          <label>Rounds to win <select id="rounds"><option value="2">2</option><option value="3" selected>3</option><option value="5">5</option></select></label>
+        </div>
+        <div class="btn-row"><button class="btn" id="startBtn" style="font-size:1.15rem;padding:.7rem 1.8rem">🤼 Enter the ring</button></div>
+        <p class="np-hint">Playing the computer never counts toward the leaderboard (solo wins and losses have their own board).</p>
+      </div>
+      <div id="mpPanel" hidden></div>
+      <div id="play" hidden>
+        <div class="hud"><span class="chip" id="roundChip">Round 1</span><span class="chip" id="scoreChip">0 - 0</span><button class="btn secondary" id="quitBtn">☰ Menu (Esc)</button></div>
+        <section class="controls" aria-label="Controls">
+          <h2>🎮 Controls</h2>
+          <div class="ctl-grid">
+            <div class="ctl"><span class="keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></span><span class="act">Run around the ring</span></div>
+            <div class="ctl"><span class="keys"><kbd>Space</kbd> <kbd>Shift</kbd></span><span class="act">Dash-shove (a short burst; it takes a moment to recharge)</span></div>
+            <div class="ctl"><span class="keys"><kbd>Esc</kbd></span><span class="act">Back to the menu (solo)</span></div>
+          </div>
+          <p class="ctl-extra">📱 <b>Touch:</b> use the joystick and the Shove button. <b>Goal:</b> push every other Tung out of the ring. The ring shrinks as the round goes on. First to the target number of round wins takes the match.</p>
+        </section>
+        <div class="playwrap"><canvas id="view" width="900" height="640"></canvas><div id="result" class="np-result" hidden></div></div>
+        <div id="pad"></div>
+      </div>
+    </div>
+    <div id="gameLeaderboard"></div>
+  </div>
+  <script src="../../mp.js"></script>
+  <script src="../../assets/tung.js"></script>
+  <script src="../netplay.js"></script>
+  <script src="../touchpad.js"></script>
+  <script src="sumo.js"></script>
+</body>
+</html>

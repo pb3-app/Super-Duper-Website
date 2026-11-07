@@ -1,0 +1,10 @@
+# Tells AWS Amplify to publish only the client/ folder as the website.
+version: 1
+frontend:
+  phases:
+    build:
+      commands: []
+  artifacts:
+    baseDirectory: client
+    files:
+      - '**/*'

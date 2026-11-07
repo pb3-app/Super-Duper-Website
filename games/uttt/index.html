@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tung Super Tic-Tac-Toe</title>
+  <link rel="stylesheet" href="../game.css" />
+  <link rel="stylesheet" href="../../mp.css" />
+  <style>
+    #big { --s: min(92vw, 560px); width: var(--s); height: var(--s); margin: 0 auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 8px; background: #3a1f0b; box-sizing: border-box; border-radius: 18px; box-shadow: 0 8px 0 #4a2a10, 0 14px 30px rgba(0,0,0,.5); }
+    .sb { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); min-width: 0; min-height: 0; gap: 3px; padding: 4px; border-radius: 10px; background: #5a3517; transition: box-shadow .15s, background .15s; }
+    .sb.live { background: #7a4a1f; box-shadow: 0 0 0 3px var(--accent), 0 0 18px rgba(255,201,51,.55); }
+    .sb.dead { background: #2c1a0b; }
+    .sb .c { font: inherit; font-weight: 900; font-size: clamp(1rem, 4.4vw, 1.9rem); line-height: 1; border: 0; border-radius: 6px; background: #f3e0bd; color: #3a2208; cursor: pointer; padding: 0; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+    .sb .c:disabled { cursor: default; }
+    .sb:not(.live) .c, .sb.dead .c { opacity: .75; }
+    .sb .c.x { color: #d6382b; background: #f7d9c8; }
+    .sb .c.o { color: #1f6fd0; background: #cfe3fb; }
+    .sb .c.last { outline: 3px solid var(--accent); outline-offset: -3px; }
+    .sb .c.can:hover { background: #fff3cf; }
+    .sb .win { position: absolute; inset: 0; border-radius: 10px; display: none; align-items: center; justify-content: center; font-size: clamp(3rem, 16vw, 7rem); font-weight: 900; background: rgba(20,10,4,.78); }
+    .sb.wx .win, .sb.wo .win, .sb.wd .win { display: flex; }
+    .sb.wx .win { color: #ff6b5e; } .sb.wo .win { color: #5aa8ff; } .sb.wd .win { color: #aaa; font-size: clamp(1.4rem, 5vw, 2.4rem); }
+    .legend { display: flex; justify-content: center; gap: 1.2rem; flex-wrap: wrap; margin: .6rem 0; font-weight: 800; }
+    .x-c { color: #ff6b5e; } .o-c { color: #5aa8ff; }
+    .rules { max-width: 560px; margin: 1rem auto 0; text-align: left; opacity: .9; }
+    .rules summary { cursor: pointer; font-weight: 800; }
+  </style>
+</head>
+<body data-game="uttt">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="game-page">
+    <div class="game-top">
+      <a class="back" href="../../index.html#games">← Games</a>
+      <h1>❌ Super Tic-Tac-Toe</h1>
+      <div id="mpSlot"></div>
+    </div>
+
+    <div class="mode-switch" id="modeSwitch">
+      <button class="btn secondary active" data-mode="single">🎮 Single Player</button>
+      <button class="btn secondary" data-mode="multi">👥 Multiplayer</button>
+    </div>
+    <div class="mp-lobby" id="mpLobby" hidden></div>
+    <div class="mp-matchbar" id="mpMatchBar" hidden></div>
+
+    <div id="gameArea">
+      <div class="opts solo-only" id="soloOpts">
+        <label>Computer <select id="level"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option></select></label>
+        <label>You play <select id="side"><option value="0">❌ first</option><option value="1">⭕ second</option></select></label>
+        <button class="btn secondary" id="newBtn">New game</button>
+      </div>
+      <div class="status-line" id="status"></div>
+      <div class="legend"><span class="x-c">❌ <span id="nx">0</span> boards</span><span class="o-c">⭕ <span id="no">0</span> boards</span></div>
+      <div id="big"></div>
+      <details class="rules" open>
+        <summary>How to play</summary>
+        <p class="help" style="text-align:left">Win three small boards in a row on the big board. Wherever you play inside a small board decides which small board your opponent must play in next. If that board is already won or full, they may play anywhere. A small board that fills up with no winner counts for nobody. The glowing board(s) show where you can play.</p>
+      </details>
+    </div>
+    <div id="gameLeaderboard"></div>
+  </div>
+  <script src="../../mp.js"></script>
+  <script src="rules.js"></script>
+  <script src="uttt.js"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+# Put this file at /etc/caddy/Caddyfile on the EC2 server.
+# Replace the address with your own DuckDNS subdomain.
+# Caddy gets the HTTPS certificate automatically.
+tungtung.duckdns.org {
+    reverse_proxy localhost:3000
+}

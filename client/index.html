@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tung Tung Sahur Arena</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="menu">
+    <h1>TUNG TUNG TUNG<br /><span>SAHUR</span></h1>
+    <p class="tag">Grab your bat. Bonk everyone.</p>
+    <input id="name" maxlength="16" placeholder="Your name" autocomplete="off" />
+    <button id="play">PLAY</button>
+    <p id="status"></p>
+    <p class="controls">WASD / arrows to move · mouse to aim · click or SPACE to bonk</p>
+  </div>
+
+  <canvas id="game"></canvas>
+  <div id="hud" hidden>
+    <div id="scores"></div>
+    <div id="feed"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.8.4/dist/socket.io.min.js"></script>
+  <script src="config.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

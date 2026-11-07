@@ -1,0 +1,62 @@
+/* Secret words and related clue words. The computer players use the clue lists. */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.ImposterWords = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  const RAW = {
+    pizza: 'cheese slice italian oven crust pepperoni delivery dough sauce topping',
+    banana: 'yellow peel monkey potassium split fruit bunch smoothie slip curved',
+    elephant: 'trunk tusk gray big zoo africa memory peanuts huge herd',
+    guitar: 'strings strum music band acoustic pick rock chord amp electric',
+    volcano: 'lava eruption mountain magma ash hot crater island explode smoke',
+    pirate: 'ship treasure parrot eyepatch sea captain plank sword flag ahoy',
+    snowman: 'carrot winter cold scarf frosty snowball coal hat melt build',
+    hospital: 'doctor nurse patient sick bed surgery ambulance medicine emergency clinic',
+    library: 'books quiet shelves reading borrow librarian study cards novel silence',
+    castle: 'king queen tower moat knight drawbridge stone fortress royal walls',
+    dragon: 'fire wings scales breath knight cave treasure fantasy flying beast',
+    rainbow: 'colors rain arch sky pot gold unicorn spectrum seven bright',
+    bicycle: 'pedal wheels ride helmet chain handlebars two seat gears race',
+    camera: 'photo lens flash picture click zoom film shutter snap tripod',
+    umbrella: 'rain wet handle open shade storm dry drizzle canopy poncho',
+    pancake: 'syrup breakfast flip batter stack fluffy butter flat griddle maple',
+    robot: 'machine metal circuit android beep artificial future wires automatic bot',
+    mountain: 'peak climb snow high hike summit rocky tall valley slope',
+    ocean: 'waves salt blue deep fish water tide shark beach vast',
+    desert: 'sand camel dry cactus hot dune oasis sun arid mirage',
+    football: 'touchdown helmet quarterback field tackle goal stadium throw team nfl',
+    circus: 'clown tent acrobat trapeze juggler ringmaster elephant tickets show lion',
+    wizard: 'magic wand spell hat beard potion staff robe merlin cast',
+    astronaut: 'space rocket moon suit nasa orbit float helmet stars mission',
+    dinosaur: 'extinct fossil jurassic bones giant reptile trex prehistoric roar museum',
+    birthday: 'cake candles party gift balloons age wish song celebrate present',
+    chocolate: 'sweet cocoa candy dark bar melt brown dessert truffle milk',
+    lighthouse: 'beacon coast light tower ships rocks sea keeper warning shore',
+    penguin: 'ice antarctica waddle tuxedo black cold fish flightless colony egg',
+    spider: 'web eight legs insect crawl silk fly venom arachnid itsy',
+    train: 'tracks station engine conductor railway locomotive cars whistle passenger rails',
+    jungle: 'trees vines monkey tropical wild rainforest leaves tiger humid dense',
+    museum: 'art exhibit history gallery paintings tour artifacts ticket display quiet',
+    beach: 'sand sunscreen waves towel shells vacation swim tan surf shore',
+    hamburger: 'bun patty cheeseburger fries beef grill ketchup fast lettuce burger',
+    snowboard: 'slope winter ride board boots snow powder jump resort carve',
+    tornado: 'twister funnel wind storm spin destruction cloud warning kansas siren',
+    vampire: 'fangs blood bat garlic coffin night cape dracula undead bite',
+    mermaid: 'tail ocean scales siren fish ariel shell sea fantasy swim',
+    scarecrow: 'straw field crow farm hat corn stuffed pole harvest overalls',
+    campfire: 'marshmallow smores flames wood camping logs night tent stories burn',
+    sandwich: 'bread lunch ham slice cheese lettuce deli bite filling toast',
+    kangaroo: 'pouch hop australia joey jump marsupial outback boxing tail bounce',
+    helicopter: 'propeller blades fly rotor hover pilot landing chopper airborne rescue',
+    piano: 'keys black white grand notes music pedal concert pianist keyboard',
+    laundry: 'washer dryer clothes detergent socks fold basket dirty machine soap',
+    treasure: 'chest gold map pirate buried jewels coins hidden riches island',
+    skeleton: 'bones skull halloween spooky ribs dead body scary dance grave',
+    rocket: 'launch space fuel blast orbit nasa fire countdown moon booster',
+    popcorn: 'movie butter kernel salty theater corn snack pop microwave bucket',
+    snowflake: 'winter cold ice unique flake crystal falling frozen six melt',
+  };
+  const WORDS = {};
+  for (const k of Object.keys(RAW)) WORDS[k] = RAW[k].split(' ');
+  return WORDS;
+});

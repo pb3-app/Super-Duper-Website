@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tung Hangman</title>
+  <link rel="stylesheet" href="../game.css" />
+  <link rel="stylesheet" href="../../mp.css" />
+  <style>
+    .hm { display: flex; gap: 1.2rem; justify-content: center; flex-wrap: wrap; align-items: flex-start; }
+    #scene { width: min(92vw, 360px); aspect-ratio: 1; border-radius: 16px; background: linear-gradient(#27406b, #14243f); box-shadow: 0 8px 0 #0b1830, 0 14px 30px rgba(0,0,0,.5); }
+    .side { flex: 1 1 340px; max-width: 460px; }
+    .word { display: flex; gap: .35rem; justify-content: center; flex-wrap: wrap; margin: .4rem 0 .6rem; }
+    .word span { width: 2.1rem; height: 2.7rem; display: flex; align-items: center; justify-content: center; font-size: 1.7rem; font-weight: 900; border-bottom: 4px solid var(--wood-light); color: #fff; }
+    .word span.new { animation: pop .35s; }
+    @keyframes pop { 0% { transform: scale(.4); } 70% { transform: scale(1.3); } 100% { transform: scale(1); } }
+    .hint { opacity: .9; font-weight: 700; min-height: 1.4rem; }
+    .kb { display: grid; grid-template-columns: repeat(9, 1fr); gap: .35rem; margin: .6rem 0; }
+    .kb button { font: inherit; font-weight: 900; padding: .5rem 0; border-radius: 10px; border: 2px solid var(--wood-dark); background: var(--wood); color: var(--text); cursor: pointer; }
+    .kb button:hover:not(:disabled) { background: var(--wood-light); color: #3a2208; }
+    .kb button.hit { background: #2e8b4f; border-color: #1c6a38; }
+    .kb button.miss { background: #8b2a22; border-color: #5e1b16; opacity: .7; }
+    .kb button:disabled { cursor: default; }
+    .solve { display: flex; gap: .5rem; justify-content: center; margin: .4rem 0; }
+    .solve input, .setup input { font: inherit; font-weight: 800; padding: .5rem .8rem; border-radius: 10px; border: 2px solid var(--wood-dark); background: rgba(0,0,0,.35); color: var(--text); text-transform: uppercase; letter-spacing: .08rem; width: 12rem; }
+    .setup { display: grid; gap: .6rem; justify-items: center; margin: .6rem 0; }
+    .lives { font-weight: 800; margin: .3rem 0; }
+    .rounds { text-align: left; margin-top: .6rem; font-size: .95rem; }
+    .rounds div { padding: .25rem .6rem; border-radius: 8px; background: rgba(0,0,0,.25); margin: .25rem 0; }
+  </style>
+</head>
+<body data-game="hangman">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="game-page">
+    <div class="game-top">
+      <a class="back" href="../../index.html#games">← Games</a>
+      <h1>🪢 Tung Hangman</h1>
+      <div id="mpSlot"></div>
+    </div>
+
+    <div class="mode-switch" id="modeSwitch">
+      <button class="btn secondary active" data-mode="single">🎮 Single Player</button>
+      <button class="btn secondary" data-mode="multi">👥 Multiplayer</button>
+    </div>
+    <div class="mp-lobby" id="mpLobby" hidden></div>
+    <div class="mp-matchbar" id="mpMatchBar" hidden></div>
+
+    <div id="gameArea">
+      <div class="opts solo-only">
+        <label>Category <select id="cat"><option value="any">Anything</option><option value="brainrot">Brainrot</option><option value="animals">Animals</option><option value="food">Food</option><option value="places">Places</option><option value="tech">Tech</option><option value="games">Games</option></select></label>
+        <label>Wrong guesses <select id="lives"><option value="6">6</option><option value="8" selected>8</option><option value="10">10</option></select></label>
+        <button class="btn secondary" id="newBtn">New word</button>
+      </div>
+      <div class="status-line" id="status"></div>
+      <div class="hm">
+        <canvas id="scene" width="360" height="360"></canvas>
+        <div class="side">
+          <div class="lives" id="lives2"></div>
+          <div class="word" id="word"></div>
+          <div class="hint" id="hint"></div>
+          <div id="setup" class="setup" hidden>
+            <input id="wordIn" maxlength="14" placeholder="Secret word" autocomplete="off" spellcheck="false" />
+            <input id="hintIn" maxlength="30" placeholder="Hint (optional)" autocomplete="off" style="text-transform:none;letter-spacing:0" />
+            <button class="btn" id="setBtn">Lock in word</button>
+          </div>
+          <div id="play">
+            <div class="kb" id="kb"></div>
+            <div class="solve"><input id="solveIn" maxlength="14" placeholder="Guess the whole word" autocomplete="off" spellcheck="false" /><button class="btn secondary" id="solveBtn">Guess</button></div>
+          </div>
+          <div class="rounds" id="rounds"></div>
+        </div>
+      </div>
+      <p class="help">Guess letters before Tung Tung Tung Sahur is fully hanged · Multiplayer: you each pick a secret word for the other, then compare who needed fewer wrong guesses · A wrong whole-word guess costs a life</p>
+    </div>
+    <div id="gameLeaderboard"></div>
+  </div>
+  <script src="../../mp.js"></script>
+  <script src="../../assets/tung.js"></script>
+  <script src="rules.js"></script>
+  <script src="hangman.js"></script>
+</body>
+</html>

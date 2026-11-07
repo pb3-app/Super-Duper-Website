@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tung Tung Chess</title>
+  <link rel="stylesheet" href="../game.css" />
+  <link rel="stylesheet" href="../../mp.css" />
+  <style>
+    body .game-page { max-width: 1000px; }
+    .layout { display: flex; gap: 1.2rem; justify-content: center; align-items: flex-start; flex-wrap: wrap; }
+    .boardwrap { --sq: min(11.2vw, 64px); }
+    #board { display: grid; grid-template-columns: repeat(8, var(--sq)); grid-template-rows: repeat(8, var(--sq)); border-radius: 10px; overflow: hidden; box-shadow: 0 8px 0 #4a2a10, 0 14px 30px rgba(0,0,0,.5); user-select: none; touch-action: none; margin: 0 auto; width: calc(var(--sq) * 8); }
+    .sq { position: relative; display: flex; align-items: center; justify-content: center; }
+    .sq.l { background: #f0d9b5; } .sq.d { background: #b58863; }
+    .sq.last { box-shadow: inset 0 0 0 100px rgba(255, 220, 60, .38); }
+    .sq.sel { box-shadow: inset 0 0 0 100px rgba(80, 200, 255, .45); }
+    .sq.check::after { content: ""; position: absolute; inset: 0; background: radial-gradient(circle, rgba(255,40,40,.75), rgba(255,40,40,0) 70%); }
+    .sq.target::before { content: ""; position: absolute; width: 30%; height: 30%; border-radius: 50%; background: rgba(20, 90, 40, .55); z-index: 2; pointer-events: none; }
+    .sq.target.cap::before { width: 86%; height: 86%; background: transparent; border: 5px solid rgba(20, 90, 40, .6); }
+    .sq .coord { position: absolute; font-size: calc(var(--sq) * .2); font-weight: 800; opacity: .55; pointer-events: none; }
+    .sq .coord.f { right: 3px; bottom: 1px; } .sq .coord.r { left: 3px; top: 1px; }
+    .sq.l .coord { color: #8a6a43; } .sq.d .coord { color: #f0d9b5; }
+    .piece { width: 86%; height: 86%; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: calc(var(--sq) * .56); line-height: 1; cursor: pointer; position: relative; z-index: 3; box-shadow: 0 3px 4px rgba(0,0,0,.45); }
+    .piece.w { background: radial-gradient(circle at 35% 30%, #fffdf3, #f1dfb0); border: 3px solid #d4a017; }
+    .piece.b { background: radial-gradient(circle at 35% 30%, #5a5a5a, #1e1e1e); border: 3px solid #8e8e8e; }
+    .piece.prom::after { content: "★"; position: absolute; right: -2px; top: -4px; font-size: calc(var(--sq) * .26); color: #ff9d00; }
+    .piece.drag { position: fixed; pointer-events: none; z-index: 50; width: calc(var(--sq) * 1.1); height: calc(var(--sq) * 1.1); transform: translate(-50%, -50%); font-size: calc(var(--sq) * .62); }
+    .hand { display: flex; gap: .4rem; justify-content: center; align-items: center; min-height: calc(var(--sq) * .95); padding: .2rem .4rem; flex-wrap: wrap; }
+    .hand .tag { font-weight: 800; opacity: .85; margin-right: .3rem; }
+    .hand .hp { position: relative; cursor: default; }
+    .hand .hp .piece { width: calc(var(--sq) * .78); height: calc(var(--sq) * .78); font-size: calc(var(--sq) * .44); }
+    .hand .hp.mine { cursor: pointer; }
+    .hand .hp.sel .piece { outline: 4px solid #4cc9f0; }
+    .hand .hp .n { position: absolute; right: -4px; bottom: -4px; background: var(--accent); color: #3a2208; border-radius: 999px; font-size: .75rem; font-weight: 900; padding: 0 .35rem; }
+    .info { flex: 1 1 250px; max-width: 320px; text-align: left; }
+    .info h3 { margin: .2rem 0 .4rem; color: var(--wood-light); }
+    #moves { max-height: 250px; overflow: auto; font-weight: 700; display: grid; grid-template-columns: 2.2rem 1fr 1fr; gap: .1rem .4rem; font-size: .95rem; }
+    #moves .n { opacity: .55; }
+    .crew { display: grid; grid-template-columns: auto 1fr; gap: .15rem .6rem; align-items: center; font-size: .9rem; margin-top: .4rem; }
+    .crew .piece { width: 30px; height: 30px; font-size: 17px; cursor: default; box-shadow: none; }
+    .promo { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 60; }
+    .promo .box { background: var(--wood); border: 3px solid var(--accent); border-radius: 16px; padding: 1rem; display: flex; gap: .8rem; }
+    .promo .piece { width: 64px; height: 64px; font-size: 36px; }
+    .taken { min-height: 1.6rem; font-size: 1.1rem; }
+  </style>
+</head>
+<body data-game="chess">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="game-page">
+    <div class="game-top">
+      <a class="back" href="../../index.html#games">← Games</a>
+      <h1>♟️ Tung Tung Chess</h1>
+      <div id="mpSlot"></div>
+    </div>
+
+    <div class="mode-switch" id="modeSwitch">
+      <button class="btn secondary active" data-mode="single">🎮 Single Player</button>
+      <button class="btn secondary" data-mode="multi">👥 Multiplayer</button>
+    </div>
+    <div class="mp-lobby" id="mpLobby" hidden></div>
+    <div class="mp-matchbar" id="mpMatchBar" hidden></div>
+
+    <div id="gameArea">
+      <div class="opts solo-only">
+        <label>Variant <select id="variant"><option value="standard">Standard chess</option><option value="crazyhouse">Crazyhouse (crazy house)</option></select></label>
+        <label>Computer <select id="level"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option></select></label>
+        <label>You play <select id="side"><option value="0">White</option><option value="1">Black</option></select></label>
+        <button class="btn secondary" id="newBtn">New game</button>
+        <button class="btn secondary" id="resignBtn">Resign</button>
+      </div>
+      <div class="status-line" id="status"></div>
+      <div class="layout">
+        <div class="boardwrap">
+          <div class="hand" id="handTop"></div>
+          <div id="board"></div>
+          <div class="hand" id="handBot"></div>
+        </div>
+        <div class="info">
+          <div class="panel">
+            <h3>Moves</h3>
+            <div id="moves"></div>
+          </div>
+          <div class="panel" style="margin-top:.7rem">
+            <h3>The crew</h3>
+            <div class="crew" id="crew"></div>
+          </div>
+          <div class="btn-row mp-only"><button class="btn secondary" id="mpResign">🏳️ Resign</button></div>
+        </div>
+      </div>
+      <p class="help" id="help">Click a piece (or drag it) then its destination · Crazyhouse: pieces you capture go to your hand - click one in your hand, then an empty square to drop it · A starred piece was promoted and goes back to a pawn if captured</p>
+    </div>
+    <div id="gameLeaderboard"></div>
+  </div>
+  <script src="../../mp.js"></script>
+  <script src="rules.js"></script>
+  <script src="chess.js"></script>
+</body>
+</html>
