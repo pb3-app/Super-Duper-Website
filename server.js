@@ -206,7 +206,8 @@ const REMOTE = !!(SB_URL && SB_KEY);
 async function sb(query, opts = {}) {
   const r = await fetch(SB_URL + '/rest/v1/arcade_state' + query, {
     ...opts,
-    headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', ...(opts.headers || {}) },
+    // a new-style key (sb_secret_...) goes in apikey only; an old-style service_role key is a JWT and also goes in Authorization
+    headers: { apikey: SB_KEY, ...(SB_KEY.startsWith('eyJ') ? { Authorization: 'Bearer ' + SB_KEY } : {}), 'Content-Type': 'application/json', ...(opts.headers || {}) },
   });
   if (!r.ok) throw new Error('Supabase answered ' + r.status + ': ' + (await r.text()).slice(0, 200));
   return r;
