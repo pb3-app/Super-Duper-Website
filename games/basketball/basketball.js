@@ -331,8 +331,8 @@
     if (e.key in K) { e.preventDefault(); keys[K[e.key]] = true; recalc(); }
     if (e.code === "Space") { e.preventDefault(); if (!e.repeat) startCharge(); }
     if (e.repeat) return;
-    if (e.key === "x" || e.key === "X") inp.pass++;
-    if (e.key === "z" || e.key === "Z") inp.steal++;
+    if (e.key === "j" || e.key === "J") inp.pass++;
+    if (e.key === "k" || e.key === "K") inp.steal++;
     if (e.key === "e" || e.key === "E" || e.key === "Shift") inp.sw++;
   });
   document.addEventListener("keyup", (e) => { if (e.key in K) { keys[K[e.key]] = false; recalc(); } if (e.code === "Space") releaseShot(); });
