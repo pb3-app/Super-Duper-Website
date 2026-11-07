@@ -7,8 +7,16 @@ const TICK_MS = 1000 / 60;     // fight simulation steps per second
 const SEND_EVERY = 2;          // send the fight state every 2nd step (30 times a second)
 const COUNTDOWN_MS = 2400;
 
-export function setupBoxing(io) {
+export function setupBoxing(io, hooks = {}) {
   const nsp = io.of("/boxing");
+  // only logged-in accounts play: the page sends its session token, and the site says who it belongs to
+  nsp.use((socket, next) => {
+    const user = hooks.auth ? hooks.auth(socket.handshake.auth && socket.handshake.auth.token) : null;
+    if (hooks.auth && !user) return next(new Error("login"));
+    socket.data.user = user;
+    next();
+  });
+  const nameFor = (socket, d) => (socket.data.user ? socket.data.user.name : cleanName(d?.name));
   let waiting = null;          // socket waiting for a quick match
   const rooms = new Map();     // code -> socket waiting in a private room
   const arenaWaiting = new Map(); // key -> socket waiting for the other tung from the same log in Tung Arena
@@ -66,6 +74,12 @@ export function setupBoxing(io) {
     fight.over = true;
     clearInterval(fight.timer);
     fights.delete(fight);
+    // an online win and a loss for the two accounts (a forfeit counts too)
+    const w = fight.players[winner], l = fight.players[1 - winner];
+    if (hooks.record && w && l && w.data.user && l.data.user && w.data.user.key !== l.data.user.key) {
+      hooks.record(w.data.user.key, "boxing", "w");
+      hooks.record(l.data.user.key, "boxing", "l");
+    }
     for (const p of fight.players) {
       if (p.connected) p.emit("end", { winner, forfeit });
       p.data.fight = null;
@@ -83,7 +97,7 @@ export function setupBoxing(io) {
     const setup = (d) => {
       leaveFight(socket);
       stopWaiting(socket);
-      socket.data.name = cleanName(d?.name);
+      socket.data.name = nameFor(socket, d);
       socket.data.char = validChar(d?.char);
     };
 

@@ -7,6 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="boxing.css" />
+  <link rel="stylesheet" href="../../mp.css" />
+  <link rel="stylesheet" href="../gate.css" />
 </head>
 <body>
   <a class="arcade-back" href="../../arena.html">← Arena</a>
@@ -84,6 +86,16 @@
     <button id="quit">✕ Quit</button>
   </div>
 
+  <div id="gate" hidden>
+    <div class="gate__box">
+      <h2 id="gateTitle">Log in to play</h2>
+      <p id="gateText">Your account keeps your online wins and losses.</p>
+      <button id="gateBtn" type="button">Log in or sign up</button>
+    </div>
+  </div>
+
+  <script src="../../mp.js"></script>
+  <script src="../gate.js"></script>
   <script src="/socket.io/socket.io.min.js"></script>
   <script type="module" src="boxing.js"></script>
 </body>

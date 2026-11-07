@@ -140,6 +140,9 @@ const GAMES = {
     title: 'Tung Tung Cup Pong', icon: '🥤', progressLabel: 'Cups sunk', judge: 'score', realtime: true, soloWL: true,
     options: { cups: { label: 'Cups each', values: [6, 10], default: 6 } },
   },
+  // played on their own pages with their own lobbies (Socket.IO, see realtime/); only their online wins and losses are kept here
+  boxing: { title: 'Tung Boxing', icon: '🥊', progressLabel: 'Wins', external: true },
+  dizzy: { title: 'Dizzy Tungs', icon: '🌀', progressLabel: 'Wins', external: true },
   pictionary: { title: 'Tung Tung Pictionary', icon: '🎨', progressLabel: 'Points', rooms: true, picRooms: true },
   paper: {
     title: 'Tung Paper.io', icon: '📄', progressLabel: 'Peak land', judge: 'score', realtime: true,
@@ -777,6 +780,7 @@ function onChallenge(ws, msg) {
   const game = String(msg.game || '');
   if (!GAMES[game]) return wsSend(ws, { t: 'error', message: 'Unknown game' });
   if (GAMES[game].rooms && !GAMES[game].challenge) return wsSend(ws, { t: 'error', message: 'That game is played in rooms, not 1-on-1 challenges' });
+  if (GAMES[game].external) return wsSend(ws, { t: 'error', message: 'Start that game from its page or from its log in Tung Arena' });
   if (!db.users[to] || to === ws.key) return wsSend(ws, { t: 'error', message: 'Unknown player' });
   if (!online.has(to)) return wsSend(ws, { t: 'error', message: `${db.users[to].username} is offline` });
   if (userMatch.has(to)) return wsSend(ws, { t: 'error', message: `${db.users[to].username} is in a match` });
@@ -1714,8 +1718,13 @@ setInterval(() => {
 {
   const { Server: IOServer } = require('socket.io');
   const io = new IOServer(server, { serveClient: true, cors: { origin: false } });
-  import('./realtime/boxing.mjs').then((m) => m.setupBoxing(io)).catch((e) => console.error('Tung Boxing failed to start', e));
-  import('./realtime/dizzy.mjs').then((m) => m.setupDizzy(io)).catch((e) => console.error('Dizzy Tungs failed to start', e));
+  // the games ask the site who a socket is (the session token the page sends) and hand back each online win and loss
+  const hooks = {
+    auth: (token) => { const key = sessionKey(String(token || '')); return key && db.users[key] ? { key, name: db.users[key].username } : null; },
+    record: (key, game, result) => { if (GAMES[game] && (result === 'w' || result === 'l')) { recordResult(key, game, result); saveDb(); } },
+  };
+  import('./realtime/boxing.mjs').then((m) => m.setupBoxing(io, hooks)).catch((e) => console.error('Tung Boxing failed to start', e));
+  import('./realtime/dizzy.mjs').then((m) => m.setupDizzy(io, hooks)).catch((e) => console.error('Dizzy Tungs failed to start', e));
 }
 
 // ---------- Tung Arena: the lobby where tungs run around, bonk each other and pick a game ----------
@@ -1726,11 +1735,10 @@ const AR = { w: 4600, h: 3200, r: 28, tick: 30, speed: 320, range: 85, cooldown:
 const AR_COLORS = ['#c8874a', '#a86b35', '#d9a066', '#8b5a2b', '#e0b07a', '#b5793f'];
 const arenaPlayers = new Map(); // key -> player
 let arenaTimer = null, arenaTickNo = 0;
-const ARENA_EXTRA = { dizzy: { title: 'Dizzy Tungs', icon: '🌀' }, boxing: { title: 'Tung Boxing', icon: '🥊' } }; // played from their own pages
-const arenaGameMeta = (g) => (GAMES[g] ? { title: GAMES[g].title, icon: GAMES[g].icon } : ARENA_EXTRA[g]);
+const arenaGameMeta = (g) => ({ title: GAMES[g].title, icon: GAMES[g].icon });
 const arenaLogs = (() => {
   const logs = [];
-  const mp = Object.keys(GAMES).filter((g) => !GAMES[g].soloOnly && !(GAMES[g].rooms && !GAMES[g].challenge));
+  const mp = Object.keys(GAMES).filter((g) => !GAMES[g].soloOnly && !GAMES[g].external && !(GAMES[g].rooms && !GAMES[g].challenge));
   mp.push('dizzy', 'boxing'); // they run their own rooms, so a log sends the tungs on it to the same room (see arenaLaunch)
   // multiplayer logs: evenly around the edge of the map, long side along the wall
   const inset = 120, W = AR.w - inset * 2, H = AR.h - inset * 2, P = 2 * (W + H), step = P / mp.length;
@@ -1743,11 +1751,11 @@ const arenaLogs = (() => {
   };
   mp.forEach((g, i) => {
     const p = at(step * (i + 0.5));
-    const pair = !GAMES[g]; // true for the games that bring their own lobby
+    const pair = !!GAMES[g].external; // true for the games that bring their own lobby
     logs.push({ id: 'mp:' + g, game: g, kind: 'mp', need: 2, max: g === 'dizzy' ? 4 : 2, pair, x: p.x, y: p.y, w: p.v ? 92 : 210, h: p.v ? 210 : 92 });
   });
   // practice corner: one small log per game, in a grid well inside the map (about 600 pixels from the logs on the edge)
-  const all = [...Object.keys(GAMES), ...Object.keys(ARENA_EXTRA)], cols = 6, cw = 190, ch = 130, gx = Math.round(AR.w * 0.58), gy = Math.round(AR.h * 0.55);
+  const all = Object.keys(GAMES), cols = 6, cw = 190, ch = 130, gx = Math.round(AR.w * 0.58), gy = Math.round(AR.h * 0.55);
   all.forEach((g, i) => logs.push({ id: 'solo:' + g, game: g, kind: 'solo', need: 1, x: gx + (i % cols) * cw + cw / 2, y: gy + Math.floor(i / cols) * ch + ch / 2, w: 140, h: 60 }));
   for (const l of logs) { l.order = []; l.since = null; }
   return logs;

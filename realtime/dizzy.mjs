@@ -6,8 +6,15 @@ const TICK_MS = 1000 / 60;
 const SEND_EVERY = 2;              // 30 updates per second
 const QUICK_AUTOSTART_MS = 8000;   // quick-match lobbies start 8s after a 2nd player joins
 
-export function setupDizzy(io) {
+export function setupDizzy(io, hooks = {}) {
   const nsp = io.of("/dizzy");
+  // only logged-in accounts play: the page sends its session token, and the site says who it belongs to
+  nsp.use((socket, next) => {
+    const user = hooks.auth ? hooks.auth(socket.handshake.auth && socket.handshake.auth.token) : null;
+    if (hooks.auth && !user) return next(new Error("login"));
+    socket.data.user = user;
+    next();
+  });
   const rooms = new Map();         // code -> room
   const arenaRooms = new Map();    // key -> room, for the tungs sent here from one log in Tung Arena
 
@@ -45,6 +52,7 @@ export function setupDizzy(io) {
     socket.data.room = null;
     const idx = room.members.indexOf(socket);
     if (idx >= 0) room.members.splice(idx, 1);
+    if (room.game && socket.data.seat !== undefined && room.game.phase !== "matchEnd") recordDizzyLeave(room, socket.data.seat);
     if (room.game && socket.data.seat !== undefined) room.game.removePlayer(socket.data.seat);
     socket.data.seat = undefined;
     if (room.members.length === 0) { stopGame(room); clearTimeout(room.autoTimer); rooms.delete(room.code); if (room.key) arenaRooms.delete(room.key); return; }
@@ -74,6 +82,21 @@ export function setupDizzy(io) {
     }
   }
 
+  const countable = (room) => room.seatKeys && room.seatKeys.filter(Boolean).length >= 2 && new Set(room.seatKeys.filter(Boolean)).size === room.seatKeys.filter(Boolean).length;
+  function recordDizzy(room, winnerSeat) {
+    if (!hooks.record || !countable(room)) return;
+    room.seatKeys.forEach((key, seat) => {
+      if (!key || room.recorded.has(seat)) return;
+      room.recorded.add(seat);
+      hooks.record(key, "dizzy", seat === winnerSeat ? "w" : "l");
+    });
+  }
+  function recordDizzyLeave(room, seat) {
+    if (!hooks.record || !countable(room) || room.recorded.has(seat) || !room.seatKeys[seat]) return;
+    room.recorded.add(seat);
+    hooks.record(room.seatKeys[seat], "dizzy", "l");
+  }
+
   function startGame(room) {
     if (room.game || room.members.length === 0) return;
     clearTimeout(room.autoTimer); room.autoStartAt = 0;
@@ -85,6 +108,9 @@ export function setupDizzy(io) {
     }
     if (players.length < 2) { room.members[0].emit("joinError", { msg: "Need at least 2 players, or turn on bots." }); return; }
     room.game = new Game(players, { lives: room.lives });
+    // results count when at least 2 accounts played: the last tung standing wins, everyone else loses (leaving early is a loss)
+    room.seatKeys = room.members.map((m) => (m.data.user ? m.data.user.key : null));
+    room.recorded = new Set();
     room.members.forEach((s, i) => { s.data.seat = i; s.emit("start", { you: i, host: room.public ? i === 0 : i === 0 }); });
     let ticks = 0;
     room.timer = setInterval(() => {
@@ -98,6 +124,7 @@ export function setupDizzy(io) {
       if (ticks % SEND_EVERY === 0 || ev.length) { const snap = g.snapshot(); for (const m of room.members) m.volatile.emit("state", snap); }
       if (g.phase === "matchEnd" && !room.endAt) {
         room.endAt = Date.now();
+        recordDizzy(room, g.matchWinner);
         // remember wins for the next game in this room
         g.tungs.forEach((t, i) => { if (room.members[i] && !t.bot) room.members[i].data.wins = t.wins; else if (t.bot) room.botWins[t.colorIndex] = t.wins; });
       }
@@ -113,7 +140,7 @@ export function setupDizzy(io) {
     socket.data.room = null;
 
     socket.on("create", (d) => {
-      socket.data.name = cleanName(d?.name);
+      socket.data.name = socket.data.user ? socket.data.user.name : cleanName(d?.name);
       const room = newRoom(false);
       joinRoom(socket, room);
     });
@@ -121,21 +148,21 @@ export function setupDizzy(io) {
     socket.on("arena", (d) => {
       const key = String(d?.key || "").slice(0, 32);
       if (!key) return;
-      socket.data.name = cleanName(d?.name);
+      socket.data.name = socket.data.user ? socket.data.user.name : cleanName(d?.name);
       let room = arenaRooms.get(key);
       if (!room || room.game || !rooms.has(room.code) || room.members.length >= 4) { room = newRoom(true); room.key = key; arenaRooms.set(key, room); }
       joinRoom(socket, room);
     });
 
     socket.on("join", (d) => {
-      socket.data.name = cleanName(d?.name);
+      socket.data.name = socket.data.user ? socket.data.user.name : cleanName(d?.name);
       const room = rooms.get(String(d?.code || "").toUpperCase());
       if (!room || room.public) { socket.emit("joinError", { msg: "Room not found. Check the code." }); return; }
       joinRoom(socket, room);
     });
 
     socket.on("quick", (d) => {
-      socket.data.name = cleanName(d?.name);
+      socket.data.name = socket.data.user ? socket.data.user.name : cleanName(d?.name);
       let room = [...rooms.values()].find((r) => r.public && !r.game && !r.key && r.members.length < 4);
       if (!room) room = newRoom(true);
       joinRoom(socket, room);

@@ -13,7 +13,8 @@ canvas { display: block; width: 100vw; height: 100vh; }
 .back:hover { background: rgba(61, 36, 18, 0.9); }
 #mpSlot { display: flex; align-items: center; gap: 8px; }
 
-#scores { position: absolute; top: 64px; right: 16px; background: rgba(26, 15, 7, 0.75); border-radius: 10px; padding: 10px 14px; font-size: 15px; min-width: 170px; }
+#side { position: absolute; top: 64px; right: 16px; display: grid; gap: 10px; width: 230px; justify-items: stretch; }
+#scores { background: rgba(26, 15, 7, 0.75); border-radius: 10px; padding: 10px 14px; font-size: 15px; }
 #scores b { font-family: "Bungee", sans-serif; color: #ff8c2a; display: block; margin-bottom: 4px; }
 #scores .me { color: #ffcf99; font-weight: 700; }
 #feed { position: absolute; bottom: 64px; left: 16px; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
@@ -91,3 +92,19 @@ canvas { display: block; width: 100vw; height: 100vh; }
 .bm__hint { opacity: 0.8; font-size: 14px; margin-right: auto; }
 .bm__head button { background: #3d2412; color: #fff3e0; border: none; border-radius: 10px; padding: 8px 14px; font: 700 14px "Nunito", sans-serif; cursor: pointer; }
 #bmCanvas { display: block; border-radius: 10px; margin: 0 auto; }
+
+/* the wins and losses leaderboard, top right of everyone's screen */
+#lb { background: rgba(26, 15, 7, 0.82); border: 1px solid rgba(255, 140, 42, 0.45); border-radius: 12px; padding: 10px 12px; font-size: 14px; }
+#lb[hidden] { display: none; }
+#lb h2 { font-family: "Bungee", sans-serif; font-size: 13px; color: #ff8c2a; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: baseline; }
+#lb h2 small { font: 700 11px "Nunito", sans-serif; color: #e0b07a; opacity: 0.85; }
+#lb ol { list-style: none; display: grid; gap: 3px; }
+#lb li { display: grid; grid-template-columns: 20px 1fr auto; gap: 6px; align-items: baseline; padding: 2px 4px; border-radius: 6px; }
+#lb li.me { background: rgba(255, 140, 42, 0.2); color: #ffe9b8; font-weight: 700; }
+#lb li .n { opacity: 0.7; font-size: 12px; text-align: right; }
+#lb li .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#lb li .rec { font-variant-numeric: tabular-nums; white-space: nowrap; }
+#lb .w { color: #7df08f; } #lb .l { color: #ff9a8a; }
+#lb .gap { text-align: center; opacity: 0.5; line-height: 0.6; }
+#lb .none { opacity: 0.75; padding: 4px; }
+@media (max-width: 700px) { #side { width: 170px; } #lb { font-size: 12px; } }

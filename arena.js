@@ -43,7 +43,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
       case "arena_welcome":
         myId = m.you; arena = m.arena; radius = m.radius; holdSecs = m.hold; logs = m.logs; safe = m.safe; joined = true;
         $("gate").hidden = true; $("scores").hidden = false;
-        loadShop();
+        loadShop(); loadBoard();
         break;
       case "arena_state":
         serverOffset = Date.now() - m.ts;
@@ -443,6 +443,25 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     drawMini(players);
     if (mapOpen) drawMap();
   }
+
+  // ---------- the wins and losses leaderboard (all games together), top right ----------
+  let lbRows = null, lbAt = 0;
+  async function loadBoard() {
+    if (!T || !T.user) return;
+    try { lbRows = (await T.api("/api/leaderboard?game=all")).rows; lbAt = Date.now(); renderBoard(); } catch (_) {}
+  }
+  function renderBoard() {
+    const box = $("lb"); if (!lbRows) return;
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const played = lbRows.filter((r) => r.wins + r.losses > 0), top = played.slice(0, 8);
+    const row = (r, rank) => `<li class="${r.id === myId ? "me" : ""}"><span class="n">${rank}</span><span class="who">${esc(r.username)}</span><span class="rec"><span class="w">${r.wins}W</span> <span class="l">${r.losses}L</span></span></li>`;
+    let rows = top.map((r, i) => row(r, i + 1)).join("");
+    const mine = lbRows.findIndex((r) => r.id === myId);
+    if (mine >= 0 && !top.some((r) => r.id === myId)) rows += `<li class="gap">⋮</li>` + row(lbRows[mine], mine + 1);
+    box.innerHTML = `<h2>🏆 Wins and losses <small>all games</small></h2>` + (rows ? `<ol>${rows}</ol>` : `<div class="none">No matches played yet. Be the first to win one.</div>`);
+    box.hidden = false;
+  }
+  setInterval(loadBoard, 20000);
 
   // ---------- the big map: click the little one (or press M) to see where every game is, and put a marker on one ----------
   let mapOpen = false, waypoint = null, mapHits = [], mapHover = null, mapK = 1;

@@ -146,9 +146,12 @@ class OnlineFight {
 function connectOnline() {
   if (app.socket) return app.socket;
   if (typeof io === "undefined") { $("online-status").textContent = "Couldn't load the online library."; return null; }
-  const s = io((window.GAME_SERVER_URL || "") + "/boxing", { transports: ["websocket"] });
+  const s = io((window.GAME_SERVER_URL || "") + "/boxing", { transports: ["websocket"], auth: { token: (() => { try { return sessionStorage.getItem("tungToken") || ""; } catch { return ""; } })() } });
   app.socket = s;
-  s.on("connect_error", () => setOnlineStatus("Can't reach the game server. Is it running?"));
+  s.on("connect_error", (e) => {
+    if (e && e.message === "login") { setOnlineStatus("Log in to play online."); app.socket = null; s.close(); if (window.tungLoginGate) window.tungLoginGate(); return; }
+    setOnlineStatus("Can't reach the game server. Is it running?");
+  });
   s.on("waiting", () => setOnlineStatus("Looking for an opponent…"));
   s.on("room", (d) => setOnlineStatus(`Room code: <b>${d.code}</b><br>Send this code to your friend.`));
   s.on("joinError", (d) => setOnlineStatus(d.msg));
@@ -158,7 +161,7 @@ function connectOnline() {
   });
   return s;
 }
-function setOnlineStatus(html) { $("online-status").innerHTML = html; setOnlineBusy(!/Can't|not found|full|Couldn't/.test(html)); }
+function setOnlineStatus(html) { $("online-status").innerHTML = html; setOnlineBusy(!/Can't|not found|full|Couldn't|Log in/.test(html)); }
 function setOnlineBusy(b) { for (const id of ["btn-quick", "btn-create", "btn-join"]) $(id).disabled = b; }
 
 function openOnline() {

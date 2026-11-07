@@ -160,9 +160,12 @@ class OnlineSession {
 function connect() {
   if (app.socket) return app.socket;
   if (typeof io === "undefined") { $("online-status").textContent = "Couldn't load the online library."; return null; }
-  const s = io((window.GAME_SERVER_URL || "") + "/dizzy", { transports: ["websocket"] });
+  const s = io((window.GAME_SERVER_URL || "") + "/dizzy", { transports: ["websocket"], auth: { token: (() => { try { return sessionStorage.getItem("tungToken") || ""; } catch { return ""; } })() } });
   app.socket = s;
-  s.on("connect_error", () => { $("online-status").textContent = "Can't reach the game server. Is it running?"; });
+  s.on("connect_error", (e) => {
+    if (e && e.message === "login") { $("online-status").textContent = "Log in to play online."; app.socket = null; s.close(); if (window.tungLoginGate) window.tungLoginGate(); return; }
+    $("online-status").textContent = "Can't reach the game server. Is it running?";
+  });
   s.on("connect", () => { $("online-status").textContent = ""; });
   s.on("joinError", (d) => { $("online-status").textContent = d.msg; });
   s.on("lobby", renderLobby);
