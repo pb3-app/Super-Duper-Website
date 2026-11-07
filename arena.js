@@ -71,9 +71,9 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
         try { sessionStorage.setItem("tungArenaReturn", "1"); } catch (_) {}
         location.href = "/games/" + m.game + "/index.html";
         break;
-      case "arena_pair":
+      case "arena_room": // a group log: the room is already made, everybody on the log is in it
         try { sessionStorage.setItem("tungArenaReturn", "1"); } catch (_) {}
-        location.href = "/games/" + m.game + "/index.html?pair=" + encodeURIComponent(m.key) + "&name=" + encodeURIComponent(m.name || "");
+        location.href = "/games/" + m.game + "/index.html?room=" + encodeURIComponent(m.id);
         break;
       case "arena_full":
         showGate("Tung Arena is full", "Try again in a minute.", false);
@@ -81,7 +81,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     }
   }
   if (T) {
-    for (const t of ["arena_welcome", "arena_state", "arena_event", "arena_solo", "arena_pair", "arena_full", "arena_sd", "arena_me"]) T.on("msg:" + t, onMsg);
+    for (const t of ["arena_welcome", "arena_state", "arena_event", "arena_solo", "arena_room", "arena_full", "arena_sd", "arena_me"]) T.on("msg:" + t, onMsg);
     T.on("ready", () => { refreshGate(); join(); });
     T.on("logout", () => { joined = false; myId = null; snapshots.length = 0; refreshGate(); });
     T.booted.then(() => { refreshGate(); join(); });
@@ -262,7 +262,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   }
 
   function drawPlate(l, on) {
-    const solo = l.kind === "solo", label = (l.icon ? l.icon + " " : "") + (solo ? shortTitle(l.title) : l.title);
+    const solo = l.kind === "solo", label = (l.icon ? l.icon + " " : "") + (solo ? shortTitle(l.title) : l.title) + (l.group ? " · group" : "");
     ctx.font = (solo ? "700 13px" : "700 17px") + " Nunito, sans-serif";
     const pips = l.need, pipW = pips * 14, tw = Math.ceil(ctx.measureText(label).width), pw = tw + pipW + 26, ph = solo ? 24 : 32;
     let px = l.x, py;
@@ -502,7 +502,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     const s = logState[l.id], on = s ? s[1] : 1, name = shortTitle(l.title);
     let text;
     if (l.kind === "solo") text = s && s[2] >= 0 ? `${name} alone in ${s[2]}` : `${name}: stay on the log to play alone`;
-    else if (on < l.need) text = `${name}: waiting for another tung`;
+    else if (on < l.need) text = l.group ? `${name} group: waiting for ${l.need - on} more ${l.need - on === 1 ? "tung" : "tungs"} (${l.need} to ${l.max})` : `${name}: waiting for another tung`;
     else text = `${name} starts in ${s && s[2] >= 0 ? s[2] : holdSecs}`;
     st.textContent = text; st.hidden = false;
   }
@@ -599,7 +599,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
       const horiz = l.w >= l.h, w = Math.max(10, l.w * k), h = Math.max(10, l.h * k);
       c.fillStyle = logState[l.id] ? "#ff8c2a" : "#b07a40"; c.strokeStyle = "#3d2412"; c.lineWidth = 2;
       c.fillRect(x - w / 2, y - h / 2, w, h); c.strokeRect(x - w / 2, y - h / 2, w, h);
-      const label = (l.icon ? l.icon + " " : "") + shortTitle(l.title);
+      const label = (l.icon ? l.icon + " " : "") + shortTitle(l.title) + (l.group ? " 👥" : "");
       c.font = "700 12px Nunito, sans-serif"; c.fillStyle = "#fff3e0";
       let lx = x, ly = y;
       if (horiz) { ly = y + (l.y < arena.h / 2 ? 1 : -1) * (h / 2 + 12); c.textAlign = "center"; }
@@ -620,7 +620,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     if (waypoint) { drawPin(c, waypoint.x * k, waypoint.y * k, 1); }
     // hover tooltip
     if (mapHover) {
-      const l = mapHover.l, text = (l.icon ? l.icon + " " : "") + l.title + (l.kind === "solo" ? " · play alone" : l.kind === "showdown" ? " · cross the bridge and bonk tungs off" : " · stand here with another tung");
+      const l = mapHover.l, text = (l.icon ? l.icon + " " : "") + l.title + (l.kind === "solo" ? " · play alone" : l.kind === "showdown" ? " · cross the bridge and bonk tungs off" : l.group ? ` · group log: ${l.need} to ${l.max} tungs` : " · stand here with another tung");
       c.font = "700 13px Nunito, sans-serif"; const tw = c.measureText(text).width + 18;
       let tx = Math.min(Math.max(mapHover.x - tw / 2, 6), W - tw - 6), ty = mapHover.y - 38; if (ty < 6) ty = mapHover.y + 20;
       c.fillStyle = "rgba(26, 15, 7, 0.95)"; c.fillRect(tx, ty, tw, 26); c.strokeStyle = "#ff8c2a"; c.lineWidth = 1.5; c.strokeRect(tx, ty, tw, 26);
@@ -644,7 +644,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   bmc.addEventListener("pointermove", (e) => { mapHover = mapPick(e); bmc.style.cursor = mapHover ? "pointer" : "default"; drawMap(); });
   bmc.addEventListener("click", (e) => {
     const h = mapPick(e); if (!h) return;
-    waypoint = { x: h.l.x, y: h.l.y, title: shortTitle(h.l.title), icon: h.l.icon, kind: h.l.kind };
+    waypoint = { x: h.l.x, y: h.l.y, title: shortTitle(h.l.title) + (h.l.group ? " (group)" : ""), icon: h.l.icon, kind: h.l.kind };
     feed(`Marker set on ${waypoint.title}${h.l.kind === "solo" ? " (practice corner)" : ""}`);
     closeMap();
   });

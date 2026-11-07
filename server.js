@@ -140,9 +140,11 @@ const GAMES = {
     title: 'Tung Tung Cup Pong', icon: '🥤', progressLabel: 'Cups sunk', judge: 'score', realtime: true, soloWL: true,
     options: { cups: { label: 'Cups each', values: [6, 10], default: 6 } },
   },
-  // played on their own pages with their own lobbies (Socket.IO, see realtime/); only their online wins and losses are kept here
-  boxing: { title: 'Tung Boxing', icon: '🥊', progressLabel: 'Wins', external: true },
-  dizzy: { title: 'Dizzy Tungs', icon: '🌀', progressLabel: 'Wins', external: true },
+  boxing: { title: 'Tung Boxing', icon: '🥊', progressLabel: 'Wins', judge: 'score', realtime: true, soloWL: true },
+  dizzy: {
+    title: 'Dizzy Tungs', icon: '🌀', progressLabel: 'Wins', judge: 'score', realtime: true, soloWL: true, groomMax: 4,
+    options: { lives: { label: 'Lives each', values: [1, 2, 3, 5, 7, 10], default: 3 } },
+  },
   pictionary: { title: 'Tung Tung Pictionary', icon: '🎨', progressLabel: 'Points', rooms: true, picRooms: true },
   paper: {
     title: 'Tung Paper.io', icon: '📄', progressLabel: 'Peak land', judge: 'score', realtime: true,
@@ -167,6 +169,8 @@ const SCORE_CAP = {
   sumo: (ms) => Math.floor(ms / 8000) + 1,
   archery: (ms) => (Math.floor(ms / 900) + 2) * 10,
   cuppong: (ms) => Math.min(10, Math.floor(ms / 1200) + 2),
+  boxing: () => 1,
+  dizzy: () => 1,
 };
 const SOLO_MAX = { snake: SNAKE_GRID * SNAKE_GRID, slope: 99999, brainrot: 999999, flappy: 999, whack: 9999, paper: 1000, archery: 150 };
 const isAuth = (g) => g === 'sprouts' || g === 'pool' || !!GAMES[g].turnBased; // server decides these, clients do not report scores
@@ -762,7 +766,6 @@ server.on('upgrade', (req, socket, head) => {
   const origin = req.headers.origin;
   let okOrigin = true;
   if (origin) { try { okOrigin = new URL(origin).host === req.headers.host; } catch { okOrigin = false; } }
-  if (url.pathname.startsWith('/socket.io/')) return; // handled by Socket.IO (Tung Boxing and Dizzy Tungs)
   if (url.pathname !== '/ws' || !okOrigin) { socket.destroy(); return; }
   wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
 });
@@ -832,7 +835,6 @@ function onChallenge(ws, msg) {
   const game = String(msg.game || '');
   if (!GAMES[game]) return wsSend(ws, { t: 'error', message: 'Unknown game' });
   if (GAMES[game].rooms && !GAMES[game].challenge) return wsSend(ws, { t: 'error', message: 'That game is played in rooms, not 1-on-1 challenges' });
-  if (GAMES[game].external) return wsSend(ws, { t: 'error', message: 'Start that game from its page or from its log in Tung Arena' });
   if (!db.users[to] || to === ws.key) return wsSend(ws, { t: 'error', message: 'Unknown player' });
   if (!online.has(to)) return wsSend(ws, { t: 'error', message: `${db.users[to].username} is offline` });
   if (userMatch.has(to)) return wsSend(ws, { t: 'error', message: `${db.users[to].username} is in a match` });
@@ -1219,7 +1221,15 @@ function leaveRoom(key) {
   broadcastRooms();
   schedulePresence();
 }
+// Tungs sent from Tung Arena to a room are not "offline" while their browser moves over to the game page.
+const arenaHold = new Map();
+function arenaHoldUser(key) {
+  clearTimeout(arenaHold.get(key));
+  const t = setTimeout(() => { arenaHold.delete(key); if (!online.has(key)) onUserOffline(key); }, 30000);
+  t.unref(); arenaHold.set(key, t);
+}
 function onUserOffline(key) {
+  if (arenaHold.has(key)) return;
   tuLeave(key, true);
   grLeave(key, true);
   picLeave(key, true);
@@ -1231,6 +1241,7 @@ function onUserOffline(key) {
   setTimeout(() => { if (!online.has(key) && userRoom.get(key) === room.id) leaveRoom(key); }, 20000).unref();
 }
 function onUserOnline(ws) {
+  if (arenaHold.has(ws.key)) { clearTimeout(arenaHold.get(ws.key)); arenaHold.delete(ws.key); }
   { const gr = grRooms.get(grUserRoom.get(ws.key)); if (gr) wsSend(ws, { t: 'gr_room', room: grView(gr) }); const pr = picRooms.get(picUserRoom.get(ws.key)); if (pr) { wsSend(ws, { t: 'pic_room', room: picView(pr, ws.key) }); } }
   { const tr = tuRooms.get(tuUserRoom.get(ws.key)); if (tr) wsSend(ws, { t: 'tu_room', room: tuView(tr) }); }
   const room = rooms.get(userRoom.get(ws.key));
@@ -1339,11 +1350,25 @@ function grLeave(key, offline) {
   if (offline && !online.has(key)) return doIt();
   doIt();
 }
+// A room made for the tungs of a group log in Tung Arena: it starts by itself once everybody's page has loaded.
+function grArrived(r, key) {
+  if (!r || !r.auto || r.state !== 'lobby') return;
+  r.auto.arrived.add(key);
+  if (r.members.every((k) => r.auto.arrived.has(k))) { clearTimeout(r.auto.timer); r.auto.timer = null; setTimeout(() => grStart(r), 1500); }
+}
+function grStart(r) {
+  if (r.state !== 'lobby' || r.members.length < 2) return;
+  r.state = 'countdown'; r.players = r.members.slice(); r.left = new Set(); r.counted = true;
+  const seed = crypto.randomBytes(6).toString('hex'), players = r.players.map((k, i) => ({ ...grPub(k), slot: i }));
+  for (const k of r.members) sendUser(k, { t: 'gr_go', game: r.game, opts: r.opts, seed, players, host: r.host, you: k, ms: 3500 });
+  grBroadcastList(r.game);
+  r.startTimer = setTimeout(() => { if (r.state === 'countdown') { r.state = 'running'; grSend(r); } }, 3500);
+}
 function onGr(ws, msg) {
   const err = (message) => wsSend(ws, { t: 'error', message });
   const r = grRooms.get(grUserRoom.get(ws.key));
   switch (msg.t) {
-    case 'gr_watch': { const g = String(msg.game || ''); if (!GAMES[g] || !GAMES[g].groomMax) return; ws.grWatch = g; wsSend(ws, { t: 'gr_rooms', game: g, rooms: grList(g) }); if (r) wsSend(ws, { t: 'gr_room', room: grView(r) }); return; }
+    case 'gr_watch': { const g = String(msg.game || ''); if (!GAMES[g] || !GAMES[g].groomMax) return; ws.grWatch = g; wsSend(ws, { t: 'gr_rooms', game: g, rooms: grList(g) }); if (r) wsSend(ws, { t: 'gr_room', room: grView(r) }); grArrived(r, ws.key); return; }
     case 'gr_unwatch': ws.grWatch = null; return;
     case 'gr_create': {
       const g = String(msg.game || ''); if (!GAMES[g] || !GAMES[g].groomMax) return err('Unknown game');
@@ -1367,12 +1392,7 @@ function onGr(ws, msg) {
     case 'gr_start': {
       if (!r || r.host !== ws.key || r.state !== 'lobby') return;
       if (r.members.length < 2) return err('You need at least 2 players');
-      r.state = 'countdown'; r.players = r.members.slice(); r.left = new Set(); r.counted = true;
-      const seed = crypto.randomBytes(6).toString('hex'), players = r.players.map((k, i) => ({ ...grPub(k), slot: i }));
-      for (const k of r.members) sendUser(k, { t: 'gr_go', game: r.game, opts: r.opts, seed, players, host: r.host, you: k, ms: 3500 });
-      grBroadcastList(r.game);
-      r.startTimer = setTimeout(() => { if (r.state === 'countdown') { r.state = 'running'; grSend(r); } }, 3500);
-      return;
+      grStart(r); return;
     }
     case 'gr_rt': {
       if (!r || (r.state !== 'running' && r.state !== 'countdown')) return;
@@ -1765,20 +1785,6 @@ setInterval(() => {
   }
 }, 25000).unref();
 
-// ---------- Real-time games on Socket.IO: Tung Boxing and Dizzy Tungs (see realtime/) ----------
-// They bring their own lobbies (quick match and room codes) and run on their own Socket.IO namespaces.
-{
-  const { Server: IOServer } = require('socket.io');
-  const io = new IOServer(server, { serveClient: true, cors: { origin: false } });
-  // the games ask the site who a socket is (the session token the page sends) and hand back each online win and loss
-  const hooks = {
-    auth: (token) => { const key = sessionKey(String(token || '')); return key && db.users[key] ? { key, name: db.users[key].username } : null; },
-    record: (key, game, result) => { if (GAMES[game] && (result === 'w' || result === 'l')) { recordResult(key, game, result); saveDb(); } },
-  };
-  import('./realtime/boxing.mjs').then((m) => m.setupBoxing(io, hooks)).catch((e) => console.error('Tung Boxing failed to start', e));
-  import('./realtime/dizzy.mjs').then((m) => m.setupDizzy(io, hooks)).catch((e) => console.error('Dizzy Tungs failed to start', e));
-}
-
 // ---------- Tung Arena: the lobby where tungs run around, bonk each other and pick a game ----------
 // Players are the logged-in accounts on the arena page. The server runs the world and the clients send inputs. A game is
 // started by standing on its log: 2 tungs on the same log for 10 seconds start the 1v1 match, and 1 tung alone on a
@@ -1789,13 +1795,15 @@ const bonkBoost = (bonks) => Math.min(1, Math.floor((bonks || 0) / 10) / 10);
 const AR_COLORS = ['#c8874a', '#a86b35', '#d9a066', '#8b5a2b', '#e0b07a', '#b5793f'];
 const arenaPlayers = new Map(); // key -> player
 let arenaTimer = null, arenaTickNo = 0;
+const ARENA_GROUP = ['bomber', 'sumo', 'dizzy', 'pictionary', 'tungup', 'imposter']; // games with open rooms for more than 2 players
+const arenaRoomMax = (g) => (g === 'pictionary' ? PIC_MAX : g === 'tungup' ? TU_MAX : g === 'imposter' ? Imposter.MAX_PLAYERS : GAMES[g].groomMax);
+const arenaRoomMin = (g) => (g === 'imposter' ? Imposter.MIN_PLAYERS : 3);
 const arenaGameMeta = (g) => ({ title: GAMES[g].title, icon: GAMES[g].icon });
 const arenaLogs = (() => {
   const logs = [];
-  const mp = Object.keys(GAMES).filter((g) => !GAMES[g].soloOnly && !GAMES[g].external && !(GAMES[g].rooms && !GAMES[g].challenge));
-  mp.push('dizzy', 'boxing'); // they run their own rooms, so a log sends the tungs on it to the same room (see arenaLaunch)
+  const mp = Object.keys(GAMES).filter((g) => !GAMES[g].soloOnly && !(GAMES[g].rooms && !GAMES[g].challenge));
   // multiplayer logs: evenly around the edge of the map, long side along the wall
-  const inset = 120, W = AR.w - inset * 2, H = AR.h - inset * 2, P = 2 * (W + H), step = P / mp.length;
+  const inset = 120, W = AR.w - inset * 2, H = AR.h - inset * 2, P = 2 * (W + H);
   const at = (s) => {
     s = ((s % P) + P) % P;
     if (s < W) return { x: inset + s, y: inset, v: false };
@@ -1803,10 +1811,14 @@ const arenaLogs = (() => {
     s -= H; if (s < W) return { x: inset + W - s, y: inset + H, v: false };
     s -= W; return { x: inset, y: inset + H - s, v: true };
   };
-  mp.forEach((g, i) => {
-    const p = at(step * (i + 0.5));
-    const pair = !!GAMES[g].external; // true for the games that bring their own lobby
-    logs.push({ id: 'mp:' + g, game: g, kind: 'mp', need: 2, max: g === 'dizzy' ? 4 : 2, pair, x: p.x, y: p.y, w: p.v ? 92 : 210, h: p.v ? 210 : 92 });
+  // the games that take more than 2 players get a second, group log: 3 or more tungs on it start a room for all of them
+  const grp = ARENA_GROUP.filter((g) => GAMES[g]);
+  const ring = mp.map((g) => ({ g, group: false })).concat(grp.map((g) => ({ g, group: true })));
+  const step2 = P / ring.length;
+  ring.forEach(({ g, group }, i) => {
+    const p = at(step2 * (i + 0.5));
+    if (group) logs.push({ id: 'grp:' + g, game: g, kind: 'mp', group: true, need: Math.max(3, arenaRoomMin(g)), max: arenaRoomMax(g), x: p.x, y: p.y, w: p.v ? 92 : 250, h: p.v ? 250 : 92 });
+    else logs.push({ id: 'mp:' + g, game: g, kind: 'mp', need: 2, max: 2, x: p.x, y: p.y, w: p.v ? 92 : 210, h: p.v ? 210 : 92 });
   });
   // practice corner: one small log per game, in a grid well inside the map (about 600 pixels from the logs on the edge)
   const all = Object.keys(GAMES), cols = 6, cw = 190, ch = 130, gx = Math.round(AR.w * 0.58), gy = Math.round(AR.h * 0.55);
@@ -1862,7 +1874,7 @@ function sdFall(p) {
 
 const arenaInfo = () => ({
   arena: { w: AR.w, h: AR.h }, radius: AR.r, hold: AR.hold, safe: arenaSafe, showdown: SD, board: sdBoard(),
-  logs: arenaLogs.map((l) => ({ id: l.id, game: l.game, kind: l.kind, need: l.need, x: l.x, y: l.y, w: l.w, h: l.h, title: arenaGameMeta(l.game).title, icon: arenaGameMeta(l.game).icon })),
+  logs: arenaLogs.map((l) => ({ id: l.id, game: l.game, kind: l.kind, group: !!l.group, max: l.max || 0, need: l.need, x: l.x, y: l.y, w: l.w, h: l.h, title: arenaGameMeta(l.game).title, icon: arenaGameMeta(l.game).icon })),
 });
 const arenaSpawn = () => ({ x: AR.w * 0.3 + Math.random() * AR.w * 0.2, y: AR.h * 0.45 + Math.random() * AR.h * 0.17 });
 
@@ -2001,6 +2013,41 @@ function arenaStep() {
   arenaBroadcast({ t: 'arena_state', ts: now, players, logs: logsOn });
 }
 
+// A group log: make an open room with everybody from the log already in it, then send them all to the game's page.
+function arenaGroupLaunch(l, keys) {
+  const g = l.game;
+  if (keys.length < l.need) return;
+  let id;
+  const mk = () => crypto.randomBytes(4).toString('hex');
+  if (GAMES[g].groomMax) {
+    const room = { id: mk(), game: g, host: keys[0], members: keys.slice(), state: 'lobby', opts: sanitizeOptions(g, {}), players: [], left: new Set(), counted: false, startTimer: null, auto: { arrived: new Set(), timer: null } };
+    grRooms.set(room.id, room);
+    for (const k of keys) { grUserRoom.set(k, room.id); userMatch.set(k, room.id); }
+    // whoever does not turn up within 30 seconds is dropped, and the rest start
+    room.auto.timer = setTimeout(() => {
+      if (room.state !== 'lobby') return;
+      for (const k of room.members.slice()) if (!room.auto.arrived.has(k)) grLeave(k, false);
+      if (grRooms.has(room.id)) grStart(room);
+    }, 30000);
+    room.auto.timer.unref();
+    grBroadcastList(g); id = room.id;
+  } else if (g === 'pictionary') {
+    const room = { id: mk(), host: keys[0], members: keys.slice(), state: 'lobby', opts: { rounds: 2, time: 80 }, g: null, counted: false };
+    picRooms.set(room.id, room); for (const k of keys) { picUserRoom.set(k, room.id); userMatch.set(k, room.id); }
+    picBroadcastList(); id = room.id;
+  } else if (g === 'tungup') {
+    const room = { id: mk(), host: keys[0], members: keys.slice(), state: 'lobby', map: 'junkyard', chaos: 'normal', prog: {}, fin: {}, counted: false, capTimer: null, startTimer: null, startAt: 0 };
+    tuRooms.set(room.id, room); for (const k of keys) { tuUserRoom.set(k, room.id); userMatch.set(k, room.id); }
+    tuBroadcastList(); id = room.id;
+  } else if (g === 'imposter') {
+    const room = { id: mk(), host: keys[0], members: [], state: 'lobby', game: null, recorded: false, notice: null };
+    rooms.set(room.id, room); for (const k of keys) addToRoom(room, k);
+    broadcastRooms(); id = room.id;
+  } else return;
+  schedulePresence();
+  for (const k of keys) { arenaHoldUser(k); sendUser(k, { t: 'arena_room', game: g, id }); arenaLeave(k, true); }
+}
+
 function arenaLaunch(l) {
   const keys = l.order.slice(0, l.max || l.need);
   if (l.kind === 'solo') {
@@ -2009,11 +2056,7 @@ function arenaLaunch(l) {
     arenaLeave(k, true);
     return;
   }
-  if (l.pair) { // Dizzy Tungs and Tung Boxing: everyone gets the same key, and the game page matches them up with each other
-    const key = crypto.randomBytes(6).toString('hex');
-    for (const k of keys) { sendUser(k, { t: 'arena_pair', game: l.game, key, name: db.users[k] ? db.users[k].username : '' }); arenaLeave(k, true); }
-    return;
-  }
+  if (l.group) { arenaGroupLaunch(l, keys.filter((k) => online.has(k) && !userMatch.has(k))); return; }
   const [a, b] = keys;
   if (!a || !b || userMatch.has(a) || userMatch.has(b) || !online.has(a) || !online.has(b)) return;
   const m = createMatch({ id: crypto.randomBytes(6).toString('hex'), game: l.game, from: a, to: b, options: sanitizeOptions(l.game, {}) });

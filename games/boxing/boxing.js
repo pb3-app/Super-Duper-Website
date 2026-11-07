@@ -1,4 +1,5 @@
-// Tung Boxing - browser side: menus, first-person drawing, controls, single player + online
+// Tung Boxing - a normal arcade game page: Single Player / Multiplayer switch, challenges come from the site (NetPlay).
+// In a multiplayer match one browser (the host) runs the fight; the other sends its punches and draws the snapshots it gets back.
 import { Match, Brain, CHARACTERS, OPPONENTS, RULES, damageForCharge } from "./engine.js";
 
 const $ = (id) => document.getElementById(id);
@@ -7,53 +8,35 @@ const ctx = canvas.getContext("2d");
 
 // ================= App state =================
 const app = {
-  mode: null,        // "single" | "online"
-  charId: null,
-  fight: null,       // LocalFight | OnlineFight
-  socket: null
+  fight: null,       // LocalFight | HostFight | GuestFight
+  online: null,      // the multiplayer match while it is being set up / played
+  single: null       // the opponent of the single player fight (for a rematch)
 };
+let np = null;
+const myName = () => (window.TungMP && TungMP.user ? TungMP.user.username : "You");
 
-try { $("name").value = localStorage.getItem("tungName") || ""; } catch {}
-function playerName() {
-  const n = $("name").value.trim().slice(0, 16);
-  try { localStorage.setItem("tungName", n); } catch {}
-  return n || "Tung" + Math.floor(Math.random() * 1000);
-}
+let myChar = "grey";
+try { const c = localStorage.getItem("boxingChar"); if (CHARACTERS[c]) myChar = c; } catch {}
+const saveChar = (id) => { myChar = id; try { localStorage.setItem("boxingChar", id); } catch {} };
 
-// ================= Screens =================
-const screens = ["scr-mode", "scr-char", "scr-opp", "scr-online"];
-function show(id) {
-  for (const s of screens) $(s).hidden = s !== id;
-  $("hud").hidden = true;
-}
-function showHud() { for (const s of screens) $(s).hidden = true; $("hud").hidden = false; }
-
-document.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", () => {
-  app.mode = b.dataset.mode;
-  playerName();
-  show("scr-char");
-}));
-document.querySelectorAll(".back").forEach((b) => b.addEventListener("click", () => {
-  const cur = screens.find((s) => !$(s).hidden);
-  if (cur === "scr-char") show("scr-mode");
-  else if (cur === "scr-opp" || cur === "scr-online") { leaveOnline(); show("scr-char"); }
-}));
-
-// Character cards
-for (const [id, c] of Object.entries(CHARACTERS)) {
+// ================= Tung cards =================
+function charCard(id, onClick) {
+  const c = CHARACTERS[id];
   const card = document.createElement("button");
-  card.className = "card";
+  card.className = "card"; card.dataset.id = id;
   card.innerHTML = `<canvas width="220" height="220"></canvas><div class="nm" style="color:${c.color}">${c.name}</div><ul>${c.perks.map((p) => `<li>${p}</li>`).join("")}</ul>`;
   drawTungIcon(card.querySelector("canvas"), c.color);
-  card.addEventListener("click", () => {
-    app.charId = id;
-    if (app.mode === "single") show("scr-opp");
-    else openOnline();
-  });
-  $("char-cards").appendChild(card);
+  card.addEventListener("click", () => onClick(id));
+  return card;
 }
-
-// Opponent cards
+function renderChars() {
+  const box = $("char-cards"); box.innerHTML = "";
+  for (const id of Object.keys(CHARACTERS)) {
+    const card = charCard(id, (i) => { saveChar(i); renderChars(); });
+    if (id === myChar) card.classList.add("sel");
+    box.appendChild(card);
+  }
+}
 for (const o of OPPONENTS) {
   const card = document.createElement("button");
   card.className = "card";
@@ -95,30 +78,61 @@ class LocalFight {
 }
 
 function startLocal(opp) {
-  const myDef = CHARACTERS[app.charId];
+  const myDef = CHARACTERS[myChar];
+  app.single = opp;
   app.fight = new LocalFight(myDef, opp);
-  beginFight(playerName(), myDef, opp.name, opp);
+  app.fight.single = true;
+  beginFight(myName(), myDef, opp.name, opp);
+  np.setPlaying(true);
 }
 
-// ================= Online =================
-class OnlineFight {
-  constructor(socket, info) {
-    this.socket = socket;
-    this.you = info.you;
-    this.myDef = CHARACTERS[info.chars[info.you]];
-    this.foeDef = CHARACTERS[info.chars[1 - info.you]];
-    this.countdown = info.countdown;
-    this.snap = null; this.snapAt = 0;
-    this.events = [];
-    this.winner = null;
-    this.onState = (s) => { this.snap = s; this.snapAt = performance.now(); };
-    this.onEvents = (list) => { for (const e of list) this.events.push({ ...e, mine: e.who === this.you }); };
-    this.onEnd = (d) => { this.winner = d.winner === this.you; if (d.forfeit) this.events.push({ type: "forfeit", mine: d.winner === this.you }); };
-    socket.on("state", this.onState);
-    socket.on("events", this.onEvents);
-    socket.on("end", this.onEnd);
+// ================= Multiplayer: pick your tung, then the host runs the fight =================
+const PICK_MS = 15000;
+class HostFight {
+  constructor(ids, chars, mySeat) {
+    this.ids = ids; this.chars = chars; this.mySeat = mySeat;
+    this.match = new Match(CHARACTERS[chars[0]], CHARACTERS[chars[1]], { online: true });
+    this.countdown = 2400; this.acc = 0; this.sendAcc = 0; this.events = []; this.out = [];
+    this.myDef = CHARACTERS[chars[mySeat]]; this.foeDef = CHARACTERS[chars[1 - mySeat]];
   }
   get started() { return this.countdown <= 0; }
+  send() { np.send({ k: "s", ch: this.chars, st: this.match.snapshot(), ev: this.out, cd: Math.max(0, Math.round(this.countdown)) }); this.out = []; }
+  tick(dt) {
+    this.countdown -= dt;
+    if (this.countdown > 0) { this.sendAcc += dt; if (this.sendAcc >= 100) { this.sendAcc = 0; this.send(); } return; }
+    this.acc += Math.min(dt, 100);
+    while (this.acc >= 5) { this.match.update(5); this.acc -= 5; }
+    const ev = this.match.takeEvents();
+    for (const e of ev) this.events.push({ ...e, mine: e.who === this.mySeat });
+    this.out.push(...ev);
+    this.sendAcc += dt;
+    if (this.sendAcc >= 33 || this.match.winner !== null) { this.sendAcc = 0; this.send(); }
+  }
+  view() { const s = this.match.snapshot(); const me = s.f[this.mySeat], foe = s.f[1 - this.mySeat]; return { me, foe, winner: s.winner === null ? null : s.winner === this.mySeat }; }
+  takeEvents() { const e = this.events; this.events = []; return e; }
+  press(h) { if (this.started) this.match.press(this.mySeat, h); }
+  release(h) { if (this.started) this.match.release(this.mySeat, h); }
+  dodge(d) { if (this.started) this.match.dodgePress(this.mySeat, d); }
+  remote(seat, d) {
+    if (!this.started) return;
+    if (d.k === "p" && (d.h === "L" || d.h === "R")) this.match.press(seat, d.h);
+    else if (d.k === "r" && (d.h === "L" || d.h === "R")) this.match.release(seat, d.h);
+    else if (d.k === "d" && (d.d === "L" || d.d === "R" || d.d === "D")) this.match.dodgePress(seat, d.d);
+  }
+  quit() {}
+}
+
+class GuestFight {
+  constructor(chars, mySeat) {
+    this.you = mySeat; this.chars = chars;
+    this.myDef = CHARACTERS[chars[mySeat]]; this.foeDef = CHARACTERS[chars[1 - mySeat]];
+    this.countdown = 2400; this.snap = null; this.snapAt = 0; this.events = [];
+  }
+  get started() { return this.countdown <= 0; }
+  push(d) {
+    this.snap = d.st; this.snapAt = performance.now(); this.countdown = d.cd;
+    for (const e of d.ev || []) this.events.push({ ...e, mine: e.who === this.you });
+  }
   tick(dt) { this.countdown -= dt; }
   view() {
     if (!this.snap) return null;
@@ -131,56 +145,55 @@ class OnlineFight {
       g.punchCd = Math.max(0, g.punchCd - age); g.dodgeCd = Math.max(0, g.dodgeCd - age);
       return g;
     };
-    return { me: adv(this.snap.f[this.you]), foe: adv(this.snap.f[1 - this.you]), winner: this.winner };
+    const w = this.snap.winner;
+    return { me: adv(this.snap.f[this.you]), foe: adv(this.snap.f[1 - this.you]), winner: w === null ? null : w === this.you };
   }
   takeEvents() { const e = this.events; this.events = []; return e; }
-  press(h) { if (this.started) this.socket.emit("in", { k: "p", h }); }
-  release(h) { if (this.started) this.socket.emit("in", { k: "r", h }); }
-  dodge(d) { if (this.started) this.socket.emit("in", { k: "d", d }); }
-  quit() {
-    this.socket.off("state", this.onState); this.socket.off("events", this.onEvents); this.socket.off("end", this.onEnd);
-    this.socket.emit("leave");
+  press(h) { if (this.started) np.send({ k: "p", h }); }
+  release(h) { if (this.started) np.send({ k: "r", h }); }
+  dodge(d) { if (this.started) np.send({ k: "d", d }); }
+  quit() {}
+}
+
+// the tung picking screen that comes up right before the first round
+function openPick() {
+  const o = app.online; if (!o) return;
+  o.phase = "pick"; o.deadline = performance.now() + PICK_MS; o.locked = null;
+  const box = $("pick-cards"); box.innerHTML = "";
+  for (const id of Object.keys(CHARACTERS)) {
+    const card = charCard(id, (i) => lockPick(i));
+    if (id === myChar) card.classList.add("sel");
+    box.appendChild(card);
   }
+  $("pickScr").hidden = false;
+  clearInterval(o.timer);
+  o.timer = setInterval(pickTick, 200);
+  pickTick();
 }
-
-function connectOnline() {
-  if (app.socket) return app.socket;
-  if (typeof io === "undefined") { $("online-status").textContent = "Couldn't load the online library."; return null; }
-  const s = io((window.GAME_SERVER_URL || "") + "/boxing", { transports: ["websocket"], auth: { token: (() => { try { return sessionStorage.getItem("tungToken") || ""; } catch { return ""; } })() } });
-  app.socket = s;
-  s.on("connect_error", (e) => {
-    if (e && e.message === "login") { setOnlineStatus("Log in to play online."); app.socket = null; s.close(); if (window.tungLoginGate) window.tungLoginGate(); return; }
-    setOnlineStatus("Can't reach the game server. Is it running?");
-  });
-  s.on("waiting", () => setOnlineStatus("Looking for an opponent…"));
-  s.on("room", (d) => setOnlineStatus(`Room code: <b>${d.code}</b><br>Send this code to your friend.`));
-  s.on("joinError", (d) => setOnlineStatus(d.msg));
-  s.on("start", (info) => {
-    app.fight = new OnlineFight(s, info);
-    beginFight(info.names[info.you], app.fight.myDef, info.names[1 - info.you], app.fight.foeDef);
-  });
-  return s;
+function lockPick(id) {
+  const o = app.online; if (!o || o.phase !== "pick" || o.locked) return;
+  o.locked = id; saveChar(id);
+  $("pick-cards").querySelectorAll(".card").forEach((c) => { c.classList.toggle("sel", c.dataset.id === id); c.disabled = true; });
+  if (o.host) { o.picks[o.me] = id; maybeStartFight(); }
+  else { const send = () => np.send({ k: "char", c: id }); send(); o.resend = setInterval(send, 400); }
+  pickTick();
 }
-function setOnlineStatus(html) { $("online-status").innerHTML = html; setOnlineBusy(!/Can't|not found|full|Couldn't|Log in/.test(html)); }
-function setOnlineBusy(b) { for (const id of ["btn-quick", "btn-create", "btn-join"]) $(id).disabled = b; }
-
-function openOnline() {
-  const c = CHARACTERS[app.charId];
-  $("online-you").innerHTML = `Playing as <b style="color:${c.color}">${c.name}</b>`;
-  $("online-status").textContent = "";
-  setOnlineBusy(false);
-  show("scr-online");
-  connectOnline();
+function pickTick() {
+  const o = app.online; if (!o || o.phase !== "pick") return;
+  const left = Math.max(0, Math.ceil((o.deadline - performance.now()) / 1000));
+  if (!o.locked && left <= 0) { lockPick(myChar); return; }
+  $("pickInfo").textContent = o.locked ? `${CHARACTERS[o.locked].name} locked in. Waiting for your opponent… (${left}s)` : `Pick one: the fight starts when you are both ready (${left}s)`;
+  if (o.host && performance.now() > o.deadline + 1200) maybeStartFight(true);
 }
-function leaveOnline() { if (app.socket) app.socket.emit("leave"); setOnlineBusy(false); $("online-status").textContent = ""; }
-
-$("btn-quick").addEventListener("click", () => { const s = connectOnline(); if (!s) return; setOnlineStatus("Connecting…"); s.emit("quick", { char: app.charId, name: playerName() }); });
-$("btn-create").addEventListener("click", () => { const s = connectOnline(); if (!s) return; setOnlineStatus("Creating room…"); s.emit("create", { char: app.charId, name: playerName() }); });
-$("btn-join").addEventListener("click", () => {
-  const code = $("room-code").value.trim().toUpperCase();
-  if (code.length !== 4) { $("online-status").textContent = "Type the 4-letter room code first."; return; }
-  const s = connectOnline(); if (!s) return; setOnlineStatus("Joining…"); s.emit("join", { code, char: app.charId, name: playerName() });
-});
+function maybeStartFight(force) {
+  const o = app.online; if (!o || !o.host || o.phase !== "pick") return;
+  if (!force && !o.ids.every((id) => o.picks[id])) return;
+  const chars = o.ids.map((id) => o.picks[id] || "grey");
+  endPick(o);
+  app.fight = new HostFight(o.ids, chars, 0);
+  beginFight(o.names[0], app.fight.myDef, o.names[1], app.fight.foeDef);
+}
+function endPick(o) { o.phase = "fight"; clearInterval(o.timer); clearInterval(o.resend); $("pickScr").hidden = true; }
 
 // ================= Fight flow =================
 const fx = { popups: [], shake: 0, redFlash: 0, foeFlash: 0, camX: 0, camY: 0, foeX: 0, foeY: 0, endAt: 0, banner: "", bannerUntil: 0 };
@@ -194,16 +207,33 @@ function beginFight(myName, myDef, foeName, foeDef) {
   $("hud-foe-name").textContent = foeName;
   $("hud-foe-name").style.color = foeDef.level === 5 ? "#c9c2b8" : foeDef.color;
   $("touch-down").hidden = !myDef.canDodgeDown;
-  showHud();
+  $("center-text").textContent = ""; $("result").hidden = true;
 }
 
-function endFightToMenu() {
+function toMenu() {
   if (app.fight) app.fight.quit();
-  app.fight = null;
-  $("center-text").textContent = "";
-  show("scr-char");
+  if (app.online) { clearInterval(app.online.timer); clearInterval(app.online.resend); }
+  app.fight = null; app.online = null;
+  $("center-text").textContent = ""; $("pickScr").hidden = true; $("result").hidden = true;
+  np.setPlaying(false);
 }
-$("quit").addEventListener("click", endFightToMenu);
+function showResult(title, sub, buttons) {
+  const r = $("result"); r.innerHTML = `<h2>${title}</h2><p>${sub}</p><div class="btn-row"></div>`; r.hidden = false;
+  for (const [label, fn] of buttons) { const b = document.createElement("button"); b.className = "btn"; b.textContent = label; b.onclick = fn; r.querySelector(".btn-row").append(b); }
+}
+$("quit").addEventListener("click", () => { if (np.kind) np.leave(); else toMenu(); });
+$("pickLeave").addEventListener("click", () => { if (np.kind) np.leave(); else toMenu(); });
+
+// the fight is decided: single player keeps the record and offers a rematch, a multiplayer match tells the site who won
+function fightOver(f, won) {
+  if (f.over) return; f.over = true;
+  if (f.single) {
+    if (window.TungMP && TungMP.user) TungMP.submitSolo({ game: "boxing", result: won ? "win" : "loss" });
+    setTimeout(() => { if (app.fight === f) showResult(won ? "🏆 You win!" : "💀 You lost", won ? "K.O.!" : "Better luck next time.", [["Rematch", () => startLocal(app.single)], ["Menu", toMenu]]); }, 2600);
+  } else {
+    setTimeout(() => { if (app.fight === f && np) np.report({ score: won ? 1 : 0 }); }, 2400);
+  }
+}
 
 function popup(text, x, y, color, size = 1) { fx.popups.push({ text, x, y, color, size, life: 1 }); }
 
@@ -238,7 +268,6 @@ function handleEvents(events, view) {
     }
   }
 }
-
 // ================= Controls =================
 const keyMap = {
   KeyA: ["dodge", "L"], ArrowLeft: ["dodge", "L"],
@@ -269,7 +298,6 @@ document.querySelectorAll("#touch button").forEach((b) => {
   b.addEventListener("pointerup", up); b.addEventListener("pointercancel", up); b.addEventListener("pointerleave", up);
 });
 window.addEventListener("blur", () => { if (app.fight) { app.fight.release("L"); app.fight.release("R"); } });
-
 // ================= Drawing helpers =================
 function shade(hex, amt) {
   const n = parseInt(hex.slice(1), 16);
@@ -406,7 +434,6 @@ function drawBackground(W, H, px, py) {
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 function ease(t) { return t * t; }
-
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(100, now - last); last = now;
@@ -418,9 +445,9 @@ function frame(now) {
       handleEvents(f.takeEvents(), v);
       render(v, dt, f);
       updateHud(v, f);
-      if (fx.endAt && now - fx.endAt > 2800) endFightToMenu();
-    } else { renderIdle(dt); }
-  } else renderIdle(dt);
+      if (v.winner !== null) fightOver(f, v.winner);
+    } else renderIdle(dt);
+  } else if (app.online) renderIdle(dt);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
@@ -615,16 +642,35 @@ function updateHud(v, f) {
   set("me", v.me); set("foe", v.foe);
 }
 
-show("scr-mode");
+renderChars();
 
-// Started from a log in Tung Arena: the tungs who stood on it arrive with the same key and are matched up with each other.
-(() => {
-  const q = new URLSearchParams(location.search), key = q.get("pair");
-  if (!key) return;
-  app.mode = "online"; app.charId = app.charId && CHARACTERS[app.charId] ? app.charId : "grey";
-  openOnline();
-  const s = app.socket; if (!s) return;
-  setOnlineStatus("Looking for your opponent…");
-  const go = () => s.emit("arena", { key, char: app.charId, name: q.get("name") || playerName() });
-  if (s.connected) go(); else s.once("connect", go);
-})();
+// ================= Multiplayer (challenges from the site) =================
+np = NetPlay.attach({
+  game: "boxing", rooms: false, panel: $("mpPanel"), menu: $("menu"), play: $("stage"),
+  onModeChange() { if (app.fight && app.fight.single) toMenu(); },
+  onPrepare(c) {
+    if (app.fight) app.fight.quit();
+    if (app.online) { clearInterval(app.online.timer); clearInterval(app.online.resend); }
+    app.fight = null; $("result").hidden = true; $("center-text").textContent = "";
+    app.online = { host: c.host, ids: c.players.map((p) => p.id), names: c.players.map((p) => p.name), me: c.me.id, mySeat: c.players.findIndex((p) => p.id === c.me.id), picks: {}, phase: "wait" };
+    $("hud-me-name").textContent = c.me.name;
+  },
+  onStart() { if (app.online && app.online.phase === "wait") openPick(); },
+  onStop() {},
+  onExit() { if (app.online) { clearInterval(app.online.timer); clearInterval(app.online.resend); } app.fight = null; app.online = null; $("pickScr").hidden = true; $("result").hidden = true; $("center-text").textContent = ""; },
+  onNet(from, d) {
+    const o = app.online; if (!o || !d) return;
+    if (o.host) {
+      if (d.k === "char") { if (CHARACTERS[d.c] && !o.picks[from]) { o.picks[from] = d.c; maybeStartFight(); } }
+      else if (app.fight && app.fight.remote) { const seat = o.ids.indexOf(from); if (seat > 0) app.fight.remote(seat, d); }
+    } else if (d.k === "s" && Array.isArray(d.ch)) {
+      if (!app.fight) {
+        endPick(o);
+        app.fight = new GuestFight(d.ch, o.mySeat);
+        beginFight(o.names[o.mySeat], app.fight.myDef, o.names[1 - o.mySeat], app.fight.foeDef);
+      }
+      app.fight.push(d);
+    }
+  },
+});
+window.__boxing = () => ({ app, np, myChar });

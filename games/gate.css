@@ -7,4 +7,4 @@
 #gateBtn { font-family: "Bungee", sans-serif; font-size: 18px; background: #ff8c2a; color: #2b1a0e; border: none; border-radius: 12px; padding: 12px 20px; cursor: pointer; box-shadow: 0 5px 0 #a8551a; }
 #gateBtn:active { transform: translateY(3px); box-shadow: 0 2px 0 #a8551a; }
 #gateBtn[hidden] { display: none; }
-body:has(#hud:not([hidden])) #mpSlot { display: none; } /* not over the fight itself */
+body:has(#stage:not([hidden])) #mpSlot { display: none; } /* not over the fight itself */

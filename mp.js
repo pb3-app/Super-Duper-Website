@@ -857,7 +857,8 @@
     });
 
     // initial mode
-    if (sh.pendingId) { setMode('multi'); }
+    let roomParam = false; try { roomParam = new URLSearchParams(location.search).has('room'); } catch {}
+    if (sh.pendingId || roomParam) { setMode('multi'); }
     else setMode('single');
     S.shellApi = {
       progress(v) {
