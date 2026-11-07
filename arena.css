@@ -1,0 +1,36 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #1a0f07; color: #fff3e0; font-family: "Nunito", system-ui, sans-serif; touch-action: none; }
+canvas { display: block; width: 100vw; height: 100vh; }
+
+/* the account and music buttons come from mp.js; these colours match the arena */
+:root { --night: #1a0f07; --night-2: #2b1a0e; --wood: #6b4423; --wood-dark: #3d2412; --wood-light: #e0b07a; --accent: #ff8c2a; --text: #fff3e0; }
+
+#hud { position: fixed; inset: 0; pointer-events: none; }
+#hud a, #hud button, #hud .mp-btn, #hud .mp-chip { pointer-events: auto; }
+.bar { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
+.bar h1 { font-family: "Bungee", sans-serif; font-size: 22px; color: #ff8c2a; text-shadow: 3px 3px 0 #1a0f07; margin-right: auto; }
+.back { color: #ffcf99; text-decoration: none; font-weight: 700; background: rgba(26, 15, 7, 0.75); padding: 8px 14px; border-radius: 10px; }
+.back:hover { background: rgba(61, 36, 18, 0.9); }
+#mpSlot { display: flex; align-items: center; gap: 8px; }
+
+#scores { position: absolute; top: 64px; right: 16px; background: rgba(26, 15, 7, 0.75); border-radius: 10px; padding: 10px 14px; font-size: 15px; min-width: 170px; }
+#scores b { font-family: "Bungee", sans-serif; color: #ff8c2a; display: block; margin-bottom: 4px; }
+#scores .me { color: #ffcf99; font-weight: 700; }
+#feed { position: absolute; bottom: 64px; left: 16px; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
+#feed div { background: rgba(26, 15, 7, 0.7); padding: 4px 10px; border-radius: 8px; }
+
+#status { position: absolute; left: 50%; bottom: 84px; transform: translateX(-50%); background: rgba(26, 15, 7, 0.85); border: 2px solid #ff8c2a; border-radius: 14px; padding: 10px 20px; font-family: "Bungee", sans-serif; font-size: 18px; color: #ffcf99; text-align: center; max-width: min(92vw, 560px); }
+#hint { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(92vw, 900px); text-align: center; font-size: 13px; opacity: 0.75; text-shadow: 0 1px 3px #000; }
+
+#bonkBtn { display: none; position: absolute; right: 18px; bottom: 54px; width: 84px; height: 84px; border-radius: 50%; border: none; background: #ff8c2a; color: #2b1a0e; font-family: "Bungee", sans-serif; font-size: 18px; box-shadow: 0 5px 0 #a8551a; }
+#bonkBtn:active { transform: translateY(3px); box-shadow: 0 2px 0 #a8551a; }
+@media (pointer: coarse) { #bonkBtn { display: block; } #hint { display: none; } }
+
+#gate { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: radial-gradient(circle at 50% 40%, rgba(107, 68, 35, 0.92) 0%, rgba(26, 15, 7, 0.97) 70%); z-index: 30; }
+#gate[hidden] { display: none; }
+.gate__box { text-align: center; max-width: 420px; display: grid; gap: 14px; }
+.gate__box h2 { font-family: "Bungee", sans-serif; font-size: clamp(24px, 6vw, 38px); color: #e0b07a; text-shadow: 3px 3px 0 #1a0f07; }
+.gate__box p { opacity: 0.85; }
+#gateBtn { font-family: "Bungee", sans-serif; font-size: 18px; background: #ff8c2a; color: #2b1a0e; border: none; border-radius: 12px; padding: 12px 20px; cursor: pointer; box-shadow: 0 5px 0 #a8551a; }
+#gateBtn:active { transform: translateY(3px); box-shadow: 0 2px 0 #a8551a; }
+#gateBtn[hidden] { display: none; }

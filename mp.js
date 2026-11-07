@@ -89,6 +89,35 @@
     };
   })();
 
+  // ---------- Back to Tung Arena: a game started from the arena sends you back 10 seconds after it ends ----------
+  // The arena page sets window.__tungArena, and a game it starts (a match or a solo game) leaves a flag in sessionStorage.
+  const ArenaReturn = (() => {
+    let timer = null, toast = null;
+    const flagged = () => { try { return sessionStorage.getItem('tungArenaReturn') === '1'; } catch { return false; } };
+    function cancel() {
+      clearInterval(timer); timer = null;
+      if (toast) { toast.remove(); toast = null; }
+      try { sessionStorage.removeItem('tungArenaReturn'); } catch {}
+    }
+    function go() { clearInterval(timer); location.href = '/arena.html'; }
+    return {
+      flag() { try { sessionStorage.setItem('tungArenaReturn', '1'); } catch {} },
+      cancel,
+      start() {
+        if (timer || !flagged()) return;
+        let left = 10;
+        const words = () => 'Back to Tung Arena in ' + left + '…';
+        toast = showToast({ title: words(), actions: [{ label: 'Go now', fn: go }, { label: 'Stay here', kind: 'ghost', fn: cancel }] });
+        timer = setInterval(() => {
+          left--;
+          if (left <= 0) return go();
+          const el = toast && toast.el.querySelector('.top div:last-child');
+          if (el) el.textContent = words();
+        }, 1000);
+      },
+    };
+  })();
+
   // Deterministic RNG so both players get the same board (exposed for games).
   function hashSeed(str) {
     let x = 1779033703 ^ str.length;
@@ -216,6 +245,7 @@
       case 'challenge_out': outgoingChallenge(m); break;
       case 'challenge_update': challengeUpdate(m); break;
       case 'match_start':
+        ArenaReturn.cancel(); if (window.__tungArena) ArenaReturn.flag();
         location.href = '/games/' + m.game + '/index.html?match=' + encodeURIComponent(m.matchId);
         break;
       default:
@@ -572,6 +602,7 @@
     if (!S.user) { showToast({ title: 'Log in to save your score to the solo leaderboard.', ttl: 4000 }); return; }
     try { await api('/api/solo', { method: 'POST', body: payload }); if (S.shell && S.shell.lb) S.shell.lb.refresh(); }
     catch (e) { showToast({ title: 'Could not save score: ' + e.message, ttl: 4000 }); }
+    ArenaReturn.start();
   }
   function mountLeaderboard(container, { game, tabs }) {
     let current = game;
@@ -756,6 +787,7 @@
       renderBar();
       showResult(m, mine, opp);
       if (sh.lb) sh.lb.refresh();
+      ArenaReturn.start();
     });
 
     function showResult(m, mine, opp) {
@@ -864,6 +896,7 @@
   // ---------- boot ----------
   async function boot() {
     Music.start();
+    if (document.body.dataset.game) { const back = document.querySelector('a.back'); if (back) { back.href = '/arena.html'; back.textContent = '← Arena'; } }
     try { S.cfg = await api('/api/config'); }
     catch { S.offline = true; }
     // Game pages still need the shell elements even when offline.

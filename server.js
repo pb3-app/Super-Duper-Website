@@ -340,7 +340,7 @@ const MIME = {
   '.js': 'text/javascript; charset=utf-8', '.json': 'application/json',
   '.mp3': 'audio/mpeg', '.jpg': 'image/jpeg', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
 };
-const ROOT_FILES = new Set(['index.html', 'styles.css', 'app.js', 'mp.js', 'mp.css', 'home.css', 'favicon.svg', 'share.jpg']);
+const ROOT_FILES = new Set(['index.html', 'styles.css', 'app.js', 'mp.js', 'mp.css', 'home.css', 'favicon.svg', 'share.jpg', 'arena.html', 'arena.js', 'arena.css']);
 const CSP = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'sha256-tLacyvDXM7iOBdrKicHZHGDOpIjXw5dTwO25l/lTFaI=' 'sha256-1bYHHe3SE5ji7T/2HhIPPaOd3hoICy83QpaTDL+iRYk='; connect-src 'self' ws: wss:; frame-ancestors 'none'";
 
 function json(res, status, obj) {
@@ -1621,6 +1621,7 @@ wss.on('connection', (ws) => {
         if (c && c.from === ws.key) closeChallenge(c, 'cancelled');
         return;
       }
+      case 'arena_join': case 'arena_leave': case 'arena_input': case 'arena_bonk': return onArena(ws, msg);
       case 'sp_move': return onSpMove(ws, msg);
       case 'pool_shot': return onPoolShot(ws, msg);
       case 'tb_move': return onTbMove(ws, msg);
@@ -1643,7 +1644,7 @@ wss.on('connection', (ws) => {
   });
   ws.on('close', () => {
     clearTimeout(authTimer);
-    if (ws.key) { onSocketGone(ws); removeOnline(ws); }
+    if (ws.key) { arenaSocketGone(ws); onSocketGone(ws); removeOnline(ws); }
   });
   ws.on('error', () => {});
 });
@@ -1655,6 +1656,155 @@ setInterval(() => {
     ws.ping();
   }
 }, 25000).unref();
+
+// ---------- Tung Arena: the lobby where tungs run around, bonk each other and pick a game ----------
+// Players are the logged-in accounts on the arena page. The server runs the world and the clients send inputs. A game is
+// started by standing on its log: 2 tungs on the same log for 10 seconds start the 1v1 match, and 1 tung alone on a
+// practice-corner log for 10 seconds goes to that game's solo mode.
+const AR = { w: 2600, h: 1700, r: 28, tick: 30, speed: 260, range: 85, cooldown: 0.6, knock: 900, friction: 6, hold: 10, max: 40 };
+const AR_COLORS = ['#c8874a', '#a86b35', '#d9a066', '#8b5a2b', '#e0b07a', '#b5793f'];
+const arenaPlayers = new Map(); // key -> player
+let arenaTimer = null, arenaTickNo = 0;
+const arenaLogs = (() => {
+  const logs = [];
+  const mp = Object.keys(GAMES).filter((g) => !GAMES[g].soloOnly && !(GAMES[g].rooms && !GAMES[g].challenge));
+  // multiplayer logs: evenly around the edge of the map, long side along the wall
+  const inset = 120, W = AR.w - inset * 2, H = AR.h - inset * 2, P = 2 * (W + H), step = P / mp.length;
+  const at = (s) => {
+    s = ((s % P) + P) % P;
+    if (s < W) return { x: inset + s, y: inset, v: false };
+    s -= W; if (s < H) return { x: inset + W, y: inset + s, v: true };
+    s -= H; if (s < W) return { x: inset + W - s, y: inset + H, v: false };
+    s -= W; return { x: inset, y: inset + H - s, v: true };
+  };
+  mp.forEach((g, i) => {
+    const p = at(step * (i + 0.5));
+    logs.push({ id: 'mp:' + g, game: g, kind: 'mp', need: 2, x: p.x, y: p.y, w: p.v ? 92 : 210, h: p.v ? 210 : 92 });
+  });
+  // practice corner: one small log per game, a grid inside the bottom-right of the map
+  const all = Object.keys(GAMES), cols = 6, cw = 170, ch = 120, gx = AR.w - 250 - cols * cw, gy = AR.h - 330 - Math.ceil(all.length / cols) * ch;
+  all.forEach((g, i) => logs.push({ id: 'solo:' + g, game: g, kind: 'solo', need: 1, x: gx + (i % cols) * cw + cw / 2, y: gy + Math.floor(i / cols) * ch + ch / 2, w: 140, h: 60 }));
+  for (const l of logs) { l.order = []; l.since = null; }
+  return logs;
+})();
+const arenaInfo = () => ({
+  arena: { w: AR.w, h: AR.h }, radius: AR.r, hold: AR.hold,
+  logs: arenaLogs.map((l) => ({ id: l.id, game: l.game, kind: l.kind, need: l.need, x: l.x, y: l.y, w: l.w, h: l.h, title: GAMES[l.game].title, icon: GAMES[l.game].icon })),
+});
+const arenaSpawn = () => ({ x: 700 + Math.random() * 900, y: 500 + Math.random() * 500 });
+
+function arenaJoin(ws) {
+  if (!ws.key || !db.users[ws.key]) return;
+  let p = arenaPlayers.get(ws.key);
+  if (!p) {
+    if (arenaPlayers.size >= AR.max) return wsSend(ws, { t: 'arena_full' });
+    if (userMatch.has(ws.key)) return wsSend(ws, { t: 'error', message: 'Finish your current match first' });
+    const sp = arenaSpawn(), u = db.users[ws.key];
+    p = { key: ws.key, name: u.username, color: AR_COLORS[[...ws.key].reduce((a, c) => a + c.charCodeAt(0), 0) % AR_COLORS.length],
+      x: sp.x, y: sp.y, vx: 0, vy: 0, facing: 0, input: { up: false, down: false, left: false, right: false, aim: 0 },
+      cooldown: 0, swing: 0, stunned: 0, score: 0, ws };
+    arenaPlayers.set(ws.key, p);
+    arenaBroadcast({ t: 'arena_event', type: 'join', name: p.name });
+  }
+  p.ws = ws;
+  wsSend(ws, { t: 'arena_welcome', you: ws.key, ...arenaInfo() });
+  if (!arenaTimer) arenaTimer = setInterval(arenaStep, 1000 / AR.tick);
+}
+function arenaLeave(key, quiet) {
+  const p = arenaPlayers.get(key);
+  if (!p) return;
+  arenaPlayers.delete(key);
+  for (const l of arenaLogs) { l.order = l.order.filter((k) => k !== key); if (l.order.length < l.need) l.since = null; }
+  if (!quiet) arenaBroadcast({ t: 'arena_event', type: 'leave', name: p.name });
+  if (!arenaPlayers.size && arenaTimer) { clearInterval(arenaTimer); arenaTimer = null; }
+}
+function arenaSocketGone(ws) { const p = ws.key && arenaPlayers.get(ws.key); if (p && p.ws === ws) arenaLeave(ws.key); }
+function arenaBroadcast(msg) { const out = JSON.stringify(msg); for (const p of arenaPlayers.values()) if (p.ws.readyState === 1) p.ws.send(out); }
+
+function onArena(ws, msg) {
+  switch (msg.t) {
+    case 'arena_join': return arenaJoin(ws);
+    case 'arena_leave': return arenaLeave(ws.key, false);
+    case 'arena_input': {
+      const p = arenaPlayers.get(ws.key);
+      if (!p || p.ws !== ws || !msg.i || typeof msg.i !== 'object') return;
+      for (const k of ['up', 'down', 'left', 'right']) p.input[k] = !!msg.i[k];
+      if (Number.isFinite(msg.i.aim)) p.input.aim = msg.i.aim;
+      return;
+    }
+    case 'arena_bonk': {
+      const p = arenaPlayers.get(ws.key);
+      if (!p || p.ws !== ws || p.cooldown > 0 || p.stunned > 0) return;
+      p.cooldown = AR.cooldown; p.swing = 0.2;
+      for (const o of arenaPlayers.values()) {
+        if (o === p) continue;
+        const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy);
+        if (d > AR.range + AR.r) continue;
+        let diff = Math.abs(Math.atan2(dy, dx) - p.facing);
+        if (diff > Math.PI) diff = Math.PI * 2 - diff;
+        if (diff > Math.PI / 2) continue;
+        o.vx += (dx / (d || 1)) * AR.knock; o.vy += (dy / (d || 1)) * AR.knock; o.stunned = 0.35; p.score++;
+        arenaBroadcast({ t: 'arena_event', type: 'bonk', from: p.name, to: o.name, x: Math.round(o.x), y: Math.round(o.y) });
+      }
+    }
+  }
+}
+
+function arenaStep() {
+  const dt = 1 / AR.tick, now = Date.now();
+  for (const p of arenaPlayers.values()) {
+    p.cooldown = Math.max(0, p.cooldown - dt); p.swing = Math.max(0, p.swing - dt); p.stunned = Math.max(0, p.stunned - dt);
+    p.facing = p.input.aim;
+    let mx = 0, my = 0;
+    if (p.stunned <= 0) {
+      if (p.input.up) my--; if (p.input.down) my++; if (p.input.left) mx--; if (p.input.right) mx++;
+      const len = Math.hypot(mx, my); if (len) { mx /= len; my /= len; }
+    }
+    p.x += (mx * AR.speed + p.vx) * dt; p.y += (my * AR.speed + p.vy) * dt;
+    const decay = Math.exp(-AR.friction * dt); p.vx *= decay; p.vy *= decay;
+    if (p.x < AR.r) { p.x = AR.r; p.vx = Math.abs(p.vx) * 0.5; }
+    if (p.x > AR.w - AR.r) { p.x = AR.w - AR.r; p.vx = -Math.abs(p.vx) * 0.5; }
+    if (p.y < AR.r) { p.y = AR.r; p.vy = Math.abs(p.vy) * 0.5; }
+    if (p.y > AR.h - AR.r) { p.y = AR.h - AR.r; p.vy = -Math.abs(p.vy) * 0.5; }
+  }
+  // the logs: who stands on which, and when the 10 seconds are up
+  const gone = [];
+  for (const l of arenaLogs) {
+    const hw = l.w / 2, hh = l.h / 2;
+    const on = [...arenaPlayers.values()].filter((p) => Math.abs(p.x - l.x) <= hw && Math.abs(p.y - l.y) <= hh).map((p) => p.key);
+    l.order = l.order.filter((k) => on.includes(k));
+    for (const k of on) if (!l.order.includes(k)) l.order.push(k);
+    if (l.order.length >= l.need) { if (l.since === null) l.since = now; } else l.since = null;
+    if (l.since !== null && now - l.since >= AR.hold * 1000) { gone.push(l); l.since = null; }
+  }
+  for (const l of gone) arenaLaunch(l);
+
+  arenaTickNo++;
+  if (arenaTickNo % 3 === 2) return; // snapshots go out at 20 per second
+  const players = [...arenaPlayers.values()].map((p) => ({
+    id: p.key, n: p.name, c: p.color, x: Math.round(p.x), y: Math.round(p.y),
+    f: Math.round(p.facing * 100) / 100, s: p.swing > 0 ? 1 : 0, st: p.stunned > 0 ? 1 : 0, sc: p.score,
+  }));
+  const logsOn = arenaLogs.filter((l) => l.order.length).map((l) => [l.id, l.order.length, l.since === null ? -1 : Math.max(0, Math.ceil(AR.hold - (now - l.since) / 1000))]);
+  arenaBroadcast({ t: 'arena_state', ts: now, players, logs: logsOn });
+}
+
+function arenaLaunch(l) {
+  const keys = l.order.slice(0, l.need);
+  if (l.kind === 'solo') {
+    const k = keys[0];
+    sendUser(k, { t: 'arena_solo', game: l.game });
+    arenaLeave(k, true);
+    return;
+  }
+  const [a, b] = keys;
+  if (!a || !b || userMatch.has(a) || userMatch.has(b) || !online.has(a) || !online.has(b)) return;
+  const m = createMatch({ id: crypto.randomBytes(6).toString('hex'), game: l.game, from: a, to: b, options: sanitizeOptions(l.game, {}) });
+  for (const k of m.keys) {
+    sendUser(k, { t: 'match_start', matchId: m.id, game: m.game, options: m.options });
+    arenaLeave(k, true);
+  }
+}
 
 async function start() {
   if (REMOTE) await loadRemote();
