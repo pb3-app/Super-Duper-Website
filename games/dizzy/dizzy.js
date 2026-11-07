@@ -508,3 +508,15 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 show("scr-main");
+
+// Started from a log in Tung Arena: the tungs who stood on it arrive with the same key and are matched up with each other.
+(() => {
+  const q = new URLSearchParams(location.search), key = q.get("pair");
+  if (!key) return;
+  show("scr-online");
+  openOnline();
+  const s = app.socket; if (!s) return;
+  $("online-status").textContent = "Finding the tungs from your log…";
+  const go = () => s.emit("arena", { key, name: q.get("name") || playerName() });
+  if (s.connected) go(); else s.once("connect", go);
+})();

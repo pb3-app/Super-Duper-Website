@@ -613,3 +613,15 @@ function updateHud(v, f) {
 }
 
 show("scr-mode");
+
+// Started from a log in Tung Arena: the tungs who stood on it arrive with the same key and are matched up with each other.
+(() => {
+  const q = new URLSearchParams(location.search), key = q.get("pair");
+  if (!key) return;
+  app.mode = "online"; app.charId = app.charId && CHARACTERS[app.charId] ? app.charId : "grey";
+  openOnline();
+  const s = app.socket; if (!s) return;
+  setOnlineStatus("Looking for your opponent…");
+  const go = () => s.emit("arena", { key, char: app.charId, name: q.get("name") || playerName() });
+  if (s.connected) go(); else s.once("connect", go);
+})();

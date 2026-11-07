@@ -9,6 +9,7 @@ const QUICK_AUTOSTART_MS = 8000;   // quick-match lobbies start 8s after a 2nd p
 export function setupDizzy(io) {
   const nsp = io.of("/dizzy");
   const rooms = new Map();         // code -> room
+  const arenaRooms = new Map();    // key -> room, for the tungs sent here from one log in Tung Arena
 
   const cleanName = (n) => String(n || "").replace(/[^\w \-]/g, "").trim().slice(0, 16) || "Tung" + Math.floor(Math.random() * 1000);
   const validBots = (b) => (b === "none" || Object.prototype.hasOwnProperty.call(BOT_LEVELS, b) ? b : "medium");
@@ -46,7 +47,7 @@ export function setupDizzy(io) {
     if (idx >= 0) room.members.splice(idx, 1);
     if (room.game && socket.data.seat !== undefined) room.game.removePlayer(socket.data.seat);
     socket.data.seat = undefined;
-    if (room.members.length === 0) { stopGame(room); clearTimeout(room.autoTimer); rooms.delete(room.code); return; }
+    if (room.members.length === 0) { stopGame(room); clearTimeout(room.autoTimer); rooms.delete(room.code); if (room.key) arenaRooms.delete(room.key); return; }
     if (room.public) scheduleAutoStart(room);
     sendLobby(room);
   }
@@ -117,6 +118,15 @@ export function setupDizzy(io) {
       joinRoom(socket, room);
     });
 
+    socket.on("arena", (d) => {
+      const key = String(d?.key || "").slice(0, 32);
+      if (!key) return;
+      socket.data.name = cleanName(d?.name);
+      let room = arenaRooms.get(key);
+      if (!room || room.game || !rooms.has(room.code) || room.members.length >= 4) { room = newRoom(true); room.key = key; arenaRooms.set(key, room); }
+      joinRoom(socket, room);
+    });
+
     socket.on("join", (d) => {
       socket.data.name = cleanName(d?.name);
       const room = rooms.get(String(d?.code || "").toUpperCase());
@@ -126,7 +136,7 @@ export function setupDizzy(io) {
 
     socket.on("quick", (d) => {
       socket.data.name = cleanName(d?.name);
-      let room = [...rooms.values()].find((r) => r.public && !r.game && r.members.length < 4);
+      let room = [...rooms.values()].find((r) => r.public && !r.game && !r.key && r.members.length < 4);
       if (!room) room = newRoom(true);
       joinRoom(socket, room);
     });

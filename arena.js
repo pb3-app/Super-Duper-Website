@@ -60,13 +60,17 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
         try { sessionStorage.setItem("tungArenaReturn", "1"); } catch (_) {}
         location.href = "/games/" + m.game + "/index.html";
         break;
+      case "arena_pair":
+        try { sessionStorage.setItem("tungArenaReturn", "1"); } catch (_) {}
+        location.href = "/games/" + m.game + "/index.html?pair=" + encodeURIComponent(m.key) + "&name=" + encodeURIComponent(m.name || "");
+        break;
       case "arena_full":
         showGate("Tung Arena is full", "Try again in a minute.", false);
         break;
     }
   }
   if (T) {
-    for (const t of ["arena_welcome", "arena_state", "arena_event", "arena_solo", "arena_full"]) T.on("msg:" + t, onMsg);
+    for (const t of ["arena_welcome", "arena_state", "arena_event", "arena_solo", "arena_pair", "arena_full"]) T.on("msg:" + t, onMsg);
     T.on("ready", () => { refreshGate(); join(); });
     T.on("logout", () => { joined = false; myId = null; snapshots.length = 0; refreshGate(); });
     T.booted.then(() => { refreshGate(); join(); });

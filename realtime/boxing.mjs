@@ -11,6 +11,7 @@ export function setupBoxing(io) {
   const nsp = io.of("/boxing");
   let waiting = null;          // socket waiting for a quick match
   const rooms = new Map();     // code -> socket waiting in a private room
+  const arenaWaiting = new Map(); // key -> socket waiting for the other tung from the same log in Tung Arena
   const fights = new Set();
 
   function cleanName(n) {
@@ -29,6 +30,7 @@ export function setupBoxing(io) {
   function stopWaiting(socket) {
     if (waiting === socket) waiting = null;
     if (socket.data.roomCode) { rooms.delete(socket.data.roomCode); socket.data.roomCode = null; }
+    if (socket.data.arenaKey) { if (arenaWaiting.get(socket.data.arenaKey) === socket) arenaWaiting.delete(socket.data.arenaKey); socket.data.arenaKey = null; }
   }
 
   function startFight(a, b) {
@@ -89,6 +91,16 @@ export function setupBoxing(io) {
       setup(d);
       if (waiting && waiting.connected && waiting !== socket) startFight(waiting, socket);
       else { waiting = socket; socket.emit("waiting"); }
+    });
+
+    // two tungs who stood on the same log in Tung Arena arrive with the same key
+    socket.on("arena", (d) => {
+      const key = String(d?.key || "").slice(0, 32);
+      if (!key) return;
+      setup(d);
+      const other = arenaWaiting.get(key);
+      if (other && other.connected && other !== socket) { arenaWaiting.delete(key); startFight(other, socket); }
+      else { arenaWaiting.set(key, socket); socket.data.arenaKey = key; socket.emit("waiting"); }
     });
 
     socket.on("create", (d) => {

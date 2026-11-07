@@ -1731,6 +1731,7 @@ const arenaGameMeta = (g) => (GAMES[g] ? { title: GAMES[g].title, icon: GAMES[g]
 const arenaLogs = (() => {
   const logs = [];
   const mp = Object.keys(GAMES).filter((g) => !GAMES[g].soloOnly && !(GAMES[g].rooms && !GAMES[g].challenge));
+  mp.push('dizzy', 'boxing'); // they run their own rooms, so a log sends the tungs on it to the same room (see arenaLaunch)
   // multiplayer logs: evenly around the edge of the map, long side along the wall
   const inset = 120, W = AR.w - inset * 2, H = AR.h - inset * 2, P = 2 * (W + H), step = P / mp.length;
   const at = (s) => {
@@ -1742,7 +1743,8 @@ const arenaLogs = (() => {
   };
   mp.forEach((g, i) => {
     const p = at(step * (i + 0.5));
-    logs.push({ id: 'mp:' + g, game: g, kind: 'mp', need: 2, x: p.x, y: p.y, w: p.v ? 92 : 210, h: p.v ? 210 : 92 });
+    const pair = !GAMES[g]; // true for the games that bring their own lobby
+    logs.push({ id: 'mp:' + g, game: g, kind: 'mp', need: 2, max: g === 'dizzy' ? 4 : 2, pair, x: p.x, y: p.y, w: p.v ? 92 : 210, h: p.v ? 210 : 92 });
   });
   // practice corner: one small log per game, in a grid well inside the map (about 600 pixels from the logs on the edge)
   const all = [...Object.keys(GAMES), ...Object.keys(ARENA_EXTRA)], cols = 6, cw = 190, ch = 130, gx = Math.round(AR.w * 0.58), gy = Math.round(AR.h * 0.55);
@@ -1867,11 +1869,16 @@ function arenaStep() {
 }
 
 function arenaLaunch(l) {
-  const keys = l.order.slice(0, l.need);
+  const keys = l.order.slice(0, l.max || l.need);
   if (l.kind === 'solo') {
     const k = keys[0];
     sendUser(k, { t: 'arena_solo', game: l.game });
     arenaLeave(k, true);
+    return;
+  }
+  if (l.pair) { // Dizzy Tungs and Tung Boxing: everyone gets the same key, and the game page matches them up with each other
+    const key = crypto.randomBytes(6).toString('hex');
+    for (const k of keys) { sendUser(k, { t: 'arena_pair', game: l.game, key, name: db.users[k] ? db.users[k].username : '' }); arenaLeave(k, true); }
     return;
   }
   const [a, b] = keys;
