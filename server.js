@@ -401,8 +401,8 @@ function clientIp(req) {
 // The balance is worked out, never stored: every multiplayer win ever recorded, less what the player has spent.
 function shopOf(u) { return u.shop || (u.shop = { owned: [], equipped: {}, spent: 0 }); }
 function shopState(u) {
-  const sh = u.shop || { owned: [], equipped: {}, spent: 0 }, wins = statsFor(u, 'all').w;
-  return { wins, spent: sh.spent, balance: wins - sh.spent, owned: sh.owned, equipped: sh.equipped, today: Shop.offerFor(Shop.todayStr()), resetsIn: Shop.msUntilReset() };
+  const sh = u.shop || { owned: [], equipped: {}, spent: 0 }, wins = statsFor(u, 'all').w, bonus = sh.bonus || 0;
+  return { wins, bonus, spent: sh.spent, balance: wins + bonus - sh.spent, owned: sh.owned, equipped: sh.equipped, today: Shop.offerFor(Shop.todayStr()), resetsIn: Shop.msUntilReset() };
 }
 // what a tung wears, as the numbers the arena sends (the item's place in the list + 1, 0 for nothing)
 function gearOf(u) { const eq = (u.shop && u.shop.equipped) || {}; return Shop.SLOTS.map((slot) => (eq[slot] && Shop.byId[eq[slot]] ? Shop.byId[eq[slot]].n : 0)); }
@@ -1770,11 +1770,48 @@ function inSafeZone(p) {
   const pad = AR.r * 0.6; // standing partly on a log counts
   return arenaLogs.some((l) => Math.abs(p.x - l.x) <= l.w / 2 + pad && Math.abs(p.y - l.y) <= l.h / 2 + pad);
 }
+// Tung Showdown: at the top of the arena, a round platform over a bottomless pit, reached by a bridge. Bonk people off to build a streak.
+const SD = { cx: AR.w / 2, cy: 780, plat: 300, abyss: 470, bx0: AR.w / 2 - 60, bx1: AR.w / 2 + 60, by0: 780 + 300 - 40, by1: 780 + 470 + 60 };
+SD.respawn = { x: SD.cx, y: SD.by1 + 90 }; // where a tung that fell comes back: on the floor below the bridge
+const sdOnPlatform = (p) => Math.hypot(p.x - SD.cx, p.y - SD.cy) <= SD.plat;
+const sdOnBridge = (p) => p.x >= SD.bx0 && p.x <= SD.bx1 && p.y >= SD.by0 && p.y <= SD.by1;
+const sdInPit = (p) => Math.hypot(p.x - SD.cx, p.y - SD.cy) <= SD.abyss;
+const SD_COIN_CAP = 16; // tung coins per 10-streak step: 1, 2, 4, 8, 16, then 16 each
+let sdDirty = true, sdSentAt = 0;
+function sdBoard() {
+  const cur = [...arenaPlayers.values()].filter((p) => p.z && p.streak > 0).sort((a, b) => b.streak - a.streak).slice(0, 5).map((p) => [p.name, p.streak]);
+  const all = Object.values(db.users).filter((u) => u.showdown && u.showdown.best > 0).sort((a, b) => b.showdown.best - a.showdown.best).slice(0, 5).map((u) => [u.username, u.showdown.best]);
+  return { cur, all };
+}
+function sdEndStreak(p) { if (p.streak) { p.streak = 0; sdDirty = true; } }
+function sdAddStreak(a, victim) {
+  const now = Date.now();
+  a.credited = a.credited || {};
+  if (a.credited[victim.key] && now - a.credited[victim.key] < 15000) return; // the same tung can't be knocked off again and again for credit
+  a.credited[victim.key] = now;
+  a.streak++; sdDirty = true;
+  const u = db.users[a.key]; if (!u) return;
+  u.showdown = u.showdown || { best: 0 };
+  if (a.streak > u.showdown.best) { u.showdown.best = a.streak; saveDb(); }
+  if (a.streak % 10 === 0) { // 10 knock-offs: 1 coin, 20: 2, 30: 4, 40: 8 ...
+    const coins = Math.min(SD_COIN_CAP, 2 ** (a.streak / 10 - 1)), sh = shopOf(u);
+    sh.bonus = (sh.bonus || 0) + coins; saveDb();
+    wsSend(a.ws, { t: 'arena_event', type: 'coins', n: coins, streak: a.streak });
+    arenaBroadcast({ t: 'arena_event', type: 'streak', name: a.name, streak: a.streak });
+  }
+}
+function sdFall(p) {
+  p.fall = 1; p.vx = p.vy = 0;
+  const hit = p.lastHit;
+  if (hit && Date.now() - hit.at < 5000) { const a = arenaPlayers.get(hit.key); if (a && a !== p && a.z && !a.fall) sdAddStreak(a, p); }
+  p.lastHit = null; sdEndStreak(p);
+}
+
 const arenaInfo = () => ({
-  arena: { w: AR.w, h: AR.h }, radius: AR.r, hold: AR.hold, safe: arenaSafe,
+  arena: { w: AR.w, h: AR.h }, radius: AR.r, hold: AR.hold, safe: arenaSafe, showdown: SD, board: sdBoard(),
   logs: arenaLogs.map((l) => ({ id: l.id, game: l.game, kind: l.kind, need: l.need, x: l.x, y: l.y, w: l.w, h: l.h, title: arenaGameMeta(l.game).title, icon: arenaGameMeta(l.game).icon })),
 });
-const arenaSpawn = () => ({ x: AR.w * 0.3 + Math.random() * AR.w * 0.2, y: AR.h * 0.3 + Math.random() * AR.h * 0.2 });
+const arenaSpawn = () => ({ x: AR.w * 0.3 + Math.random() * AR.w * 0.2, y: AR.h * 0.45 + Math.random() * AR.h * 0.17 });
 
 function arenaJoin(ws) {
   if (!ws.key || !db.users[ws.key]) return;
@@ -1785,7 +1822,7 @@ function arenaJoin(ws) {
     const sp = arenaSpawn(), u = db.users[ws.key];
     p = { key: ws.key, name: u.username, color: AR_COLORS[[...ws.key].reduce((a, c) => a + c.charCodeAt(0), 0) % AR_COLORS.length],
       x: sp.x, y: sp.y, vx: 0, vy: 0, facing: 0, input: { up: false, down: false, left: false, right: false, aim: 0 },
-      cooldown: 0, swing: 0, stunned: 0, score: 0, q: gearOf(u), ws };
+      cooldown: 0, swing: 0, stunned: 0, score: 0, q: gearOf(u), streak: 0, z: false, fall: 0, lastHit: null, ws };
     arenaPlayers.set(ws.key, p);
     arenaBroadcast({ t: 'arena_event', type: 'join', name: p.name });
   }
@@ -1796,7 +1833,7 @@ function arenaJoin(ws) {
 function arenaLeave(key, quiet) {
   const p = arenaPlayers.get(key);
   if (!p) return;
-  arenaPlayers.delete(key);
+  arenaPlayers.delete(key); sdDirty = true;
   for (const l of arenaLogs) { l.order = l.order.filter((k) => k !== key); if (l.order.length < l.need) l.since = null; }
   if (!quiet) arenaBroadcast({ t: 'arena_event', type: 'leave', name: p.name });
   if (!arenaPlayers.size && arenaTimer) { clearInterval(arenaTimer); arenaTimer = null; }
@@ -1817,20 +1854,20 @@ function onArena(ws, msg) {
     }
     case 'arena_bonk': {
       const p = arenaPlayers.get(ws.key);
-      if (!p || p.ws !== ws || p.cooldown > 0 || p.stunned > 0) return;
+      if (!p || p.ws !== ws || p.cooldown > 0 || p.stunned > 0 || p.fall > 0) return;
       if (inSafeZone(p)) { // no bonking from a log or from the practice corner
         if (!p.safeAt || Date.now() - p.safeAt > 1500) { p.safeAt = Date.now(); wsSend(ws, { t: 'arena_event', type: 'safe' }); }
         return;
       }
       p.cooldown = AR.cooldown; p.swing = 0.2;
       for (const o of arenaPlayers.values()) {
-        if (o === p || inSafeZone(o)) continue; // nobody on a log or in the practice corner can be bonked
+        if (o === p || o.fall > 0 || inSafeZone(o)) continue; // nobody on a log or in the practice corner can be bonked
         const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy);
         if (d > AR.range + AR.r) continue;
         let diff = Math.abs(Math.atan2(dy, dx) - p.facing);
         if (diff > Math.PI) diff = Math.PI * 2 - diff;
         if (diff > Math.PI / 2) continue;
-        o.vx += (dx / (d || 1)) * AR.knock; o.vy += (dy / (d || 1)) * AR.knock; o.stunned = 0.35; p.score++;
+        o.vx += (dx / (d || 1)) * AR.knock; o.vy += (dy / (d || 1)) * AR.knock; o.stunned = 0.35; p.score++; o.lastHit = { key: p.key, at: Date.now() };
         arenaBroadcast({ t: 'arena_event', type: 'bonk', from: p.name, to: o.name, x: Math.round(o.x), y: Math.round(o.y) });
       }
     }
@@ -1841,6 +1878,11 @@ function arenaStep() {
   const dt = 1 / AR.tick, now = Date.now();
   for (const p of arenaPlayers.values()) {
     p.cooldown = Math.max(0, p.cooldown - dt); p.swing = Math.max(0, p.swing - dt); p.stunned = Math.max(0, p.stunned - dt);
+    if (p.fall > 0) { // falling into the pit: no control, then back on the floor below the bridge
+      p.fall -= dt;
+      if (p.fall <= 0) { p.fall = 0; p.x = SD.respawn.x + (Math.random() - 0.5) * 80; p.y = SD.respawn.y; p.vx = p.vy = 0; p.stunned = 0.3; p.z = false; }
+      continue;
+    }
     p.facing = p.input.aim;
     let mx = 0, my = 0;
     if (p.stunned <= 0) {
@@ -1853,6 +1895,11 @@ function arenaStep() {
     if (p.x > AR.w - AR.r) { p.x = AR.w - AR.r; p.vx = -Math.abs(p.vx) * 0.5; }
     if (p.y < AR.r) { p.y = AR.r; p.vy = Math.abs(p.vy) * 0.5; }
     if (p.y > AR.h - AR.r) { p.y = AR.h - AR.r; p.vy = -Math.abs(p.vy) * 0.5; }
+    // the showdown: off the platform and the bridge, inside the pit, you fall; walking back out onto the floor ends the streak too
+    const inZone = sdInPit(p) || sdOnBridge(p);
+    if (inZone && !sdOnPlatform(p) && !sdOnBridge(p)) { sdFall(p); p.z = true; continue; }
+    if (p.z && !inZone) sdEndStreak(p);
+    if (p.z !== inZone) { p.z = inZone; sdDirty = true; }
   }
   // the logs: who stands on which, and when the 10 seconds are up
   const gone = [];
@@ -1866,11 +1913,12 @@ function arenaStep() {
   }
   for (const l of gone) arenaLaunch(l);
 
+  if (sdDirty && now - sdSentAt > 1000) { sdDirty = false; sdSentAt = now; arenaBroadcast({ t: 'arena_sd', board: sdBoard() }); }
   arenaTickNo++;
   if (arenaTickNo % 3 === 2) return; // snapshots go out at 20 per second
   const players = [...arenaPlayers.values()].map((p) => ({
     id: p.key, n: p.name, c: p.color, x: Math.round(p.x), y: Math.round(p.y),
-    f: Math.round(p.facing * 100) / 100, s: p.swing > 0 ? 1 : 0, st: p.stunned > 0 ? 1 : 0, sc: p.score, q: p.q,
+    f: Math.round(p.facing * 100) / 100, s: p.swing > 0 ? 1 : 0, st: p.stunned > 0 ? 1 : 0, sc: p.score, q: p.q, z: p.z ? 1 : 0, k: p.streak, fl: p.fall > 0 ? Math.round(p.fall * 100) / 100 : 0,
   }));
   const logsOn = arenaLogs.filter((l) => l.order.length).map((l) => [l.id, l.order.length, l.since === null ? -1 : Math.max(0, Math.ceil(AR.hold - (now - l.since) / 1000))]);
   arenaBroadcast({ t: 'arena_state', ts: now, players, logs: logsOn });

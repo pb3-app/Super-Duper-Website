@@ -11,7 +11,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   const Shop = window.TungShop;
   const INTERP_DELAY = 100; // ms behind real time, so movement looks smooth
 
-  let myId = null, arena = { w: 4600, h: 3200 }, radius = 28, holdSecs = 10, safe = null;
+  let myId = null, arena = { w: 4600, h: 3200 }, radius = 28, holdSecs = 10, safe = null, showdown = null, sdBoard = { cur: [], all: [] };
   let logs = [];                 // the logs, from the server's welcome
   let logState = {};             // log id -> [id, how many on it, seconds left or -1]
   const snapshots = [], effects = [];
@@ -41,7 +41,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   function onMsg(m) {
     switch (m.t) {
       case "arena_welcome":
-        myId = m.you; arena = m.arena; radius = m.radius; holdSecs = m.hold; logs = m.logs; safe = m.safe; joined = true;
+        myId = m.you; arena = m.arena; radius = m.radius; holdSecs = m.hold; logs = m.logs; safe = m.safe; showdown = m.showdown; sdBoard = m.board || sdBoard; joined = true;
         $("gate").hidden = true; $("scores").hidden = false;
         loadShop(); loadBoard();
         break;
@@ -50,8 +50,11 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
         logState = {}; for (const l of m.logs) logState[l[0]] = l;
         snapshots.push(m); while (snapshots.length > 30) snapshots.shift();
         break;
+      case "arena_sd": sdBoard = m.board; break;
       case "arena_event":
         if (m.type === "bonk") { effects.push({ x: m.x, y: m.y, life: 0.7, text: "TUNG!" }); feed(`${m.from} bonked ${m.to}`); }
+        else if (m.type === "coins") { feed(`+${m.n} tung ${m.n === 1 ? "buck" : "bucks"} for a ${m.streak} streak!`); loadShop(); }
+        else if (m.type === "streak") feed(`${m.name} is on a ${m.streak} streak in the Showdown`);
         else if (m.type === "safe") feed("No bonking on logs or in the practice corner");
         else if (m.type === "join") feed(`${m.name} joined`);
         else if (m.type === "leave") feed(`${m.name} left`);
@@ -70,7 +73,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     }
   }
   if (T) {
-    for (const t of ["arena_welcome", "arena_state", "arena_event", "arena_solo", "arena_pair", "arena_full"]) T.on("msg:" + t, onMsg);
+    for (const t of ["arena_welcome", "arena_state", "arena_event", "arena_solo", "arena_pair", "arena_full", "arena_sd"]) T.on("msg:" + t, onMsg);
     T.on("ready", () => { refreshGate(); join(); });
     T.on("logout", () => { joined = false; myId = null; snapshots.length = 0; refreshGate(); });
     T.booted.then(() => { refreshGate(); join(); });
@@ -162,7 +165,44 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
       ctx.fillStyle = "rgba(255, 243, 224, 0.75)"; ctx.font = "700 16px Nunito, sans-serif";
       ctx.fillText("one tung on a log plays that game alone · no bonking here", (x0 + x1) / 2, y1 + 28);
     }
+    drawShowdown();
     ctx.strokeStyle = "#ff8c2a"; ctx.lineWidth = 10; ctx.strokeRect(0, 0, arena.w, arena.h);
+  }
+
+  function drawShowdown() {
+    if (!showdown) return;
+    const { cx, cy, plat, abyss, bx0, bx1, by0, by1 } = showdown;
+    // the pit
+    const g = ctx.createRadialGradient(cx, cy, plat * 0.5, cx, cy, abyss);
+    g.addColorStop(0, "#07090d"); g.addColorStop(1, "#141a24");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, abyss, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.05)"; ctx.lineWidth = 3;
+    for (let r = plat + 50; r < abyss; r += 50) { ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke(); }
+    ctx.strokeStyle = "#3d2412"; ctx.lineWidth = 18; ctx.beginPath(); ctx.arc(cx, cy, abyss + 8, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = "#a9733a"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(cx, cy, abyss - 2, 0, Math.PI * 2); ctx.stroke();
+    // the platform
+    ctx.fillStyle = "rgba(0, 0, 0, 0.45)"; ctx.beginPath(); ctx.arc(cx + 12, cy + 18, plat, 0, Math.PI * 2); ctx.fill();
+    const pg = ctx.createRadialGradient(cx - 80, cy - 90, 40, cx, cy, plat);
+    pg.addColorStop(0, "#a9733a"); pg.addColorStop(1, "#7a4b22");
+    ctx.fillStyle = pg; ctx.beginPath(); ctx.arc(cx, cy, plat, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(61, 36, 18, 0.45)"; ctx.lineWidth = 3;
+    for (const k of [0.33, 0.66]) { ctx.beginPath(); ctx.arc(cx, cy, plat * k, 0, Math.PI * 2); ctx.stroke(); }
+    for (let i = 0; i < 12; i++) { const an = (i / 12) * Math.PI * 2; ctx.beginPath(); ctx.moveTo(cx + Math.cos(an) * 30, cy + Math.sin(an) * 30); ctx.lineTo(cx + Math.cos(an) * plat, cy + Math.sin(an) * plat); ctx.stroke(); }
+    ctx.strokeStyle = "#3d2412"; ctx.lineWidth = 14; ctx.beginPath(); ctx.arc(cx, cy, plat, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = "#ff8c2a"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(cx, cy, plat - 14, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = "rgba(255, 207, 153, 0.28)"; ctx.font = "64px Bungee, sans-serif"; ctx.textAlign = "center"; ctx.fillText("SHOWDOWN", cx, cy + 22);
+    // the bridge
+    ctx.fillStyle = "#8b5a2b"; ctx.fillRect(bx0, by0, bx1 - bx0, by1 - by0);
+    ctx.strokeStyle = "#5a381c"; ctx.lineWidth = 3;
+    for (let y = by0 + 12; y < by1; y += 24) { ctx.beginPath(); ctx.moveTo(bx0, y); ctx.lineTo(bx1, y); ctx.stroke(); }
+    ctx.fillStyle = "#3d2412"; ctx.fillRect(bx0 - 8, by0, 10, by1 - by0); ctx.fillRect(bx1 - 2, by0, 10, by1 - by0);
+    for (let y = by0 + 6; y < by1; y += 60) { ctx.fillRect(bx0 - 14, y, 22, 14); ctx.fillRect(bx1 - 8, y, 22, 14); }
+    // the signs
+    ctx.fillStyle = "#ff8c2a"; ctx.font = "58px Bungee, sans-serif"; ctx.textAlign = "center"; ctx.lineWidth = 8; ctx.strokeStyle = "#1a0f07"; ctx.lineJoin = "round";
+    ctx.strokeText("TUNG SHOWDOWN", cx, cy - abyss - 42); ctx.fillText("TUNG SHOWDOWN", cx, cy - abyss - 42);
+    ctx.font = "700 20px Nunito, sans-serif"; ctx.fillStyle = "#ffe9b8"; ctx.fillText("bonk tungs off the platform for a streak · falling or leaving loses it", cx, cy - abyss - 12);
+    ctx.fillStyle = "rgba(26, 15, 7, 0.78)"; rr(cx - 150, by1 + 18, 300, 40, 12); ctx.fill();
+    ctx.fillStyle = "#ffcf99"; ctx.font = "26px Bungee, sans-serif"; ctx.fillText("▲ SHOWDOWN BRIDGE", cx, by1 + 47);
   }
 
   function drawLog(l) {
@@ -354,7 +394,12 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
 
   function drawPlayer(p, isMe) {
     const r = radius;
+    if (p.fl) { // falling into the pit: smaller and fainter until it is gone
+      ctx.save(); ctx.globalAlpha = Math.max(0.1, p.fl); ctx.translate(p.x, p.y); const sc = 0.25 + 0.75 * p.fl; ctx.scale(sc, sc); ctx.rotate((1 - p.fl) * 5); drawTung(p); ctx.restore();
+      return;
+    }
     ctx.save(); ctx.translate(p.x, p.y); drawTung(p); ctx.restore();
+    if (p.k > 0) { ctx.fillStyle = "#ff8c2a"; ctx.font = "bold 16px Nunito, sans-serif"; ctx.textAlign = "center"; ctx.fillText("🔥 " + p.k, p.x, p.y - r * 2.1 - (gearIds(p).hat ? 22 : 0) - 20); }
     ctx.fillStyle = isMe ? "#ffcf99" : "#fff3e0"; ctx.font = "bold 15px Nunito, sans-serif"; ctx.textAlign = "center";
     ctx.fillText(p.n, p.x, p.y - r * 2.1 - (gearIds(p).hat ? 22 : 0));
     if (isMe) { const o = gearIds(p).hat ? 22 : 0; ctx.fillStyle = "#ff8c2a"; ctx.beginPath(); ctx.moveTo(p.x - 6, p.y - r * 2.6 - o); ctx.lineTo(p.x + 6, p.y - r * 2.6 - o); ctx.lineTo(p.x, p.y - r * 2.35 - o); ctx.fill(); }
@@ -392,6 +437,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     mctx.clearRect(0, 0, W, H);
     mctx.fillStyle = "rgba(26, 15, 7, 0.8)"; mctx.fillRect(0, 0, W, H);
     mctx.strokeStyle = "#ff8c2a"; mctx.lineWidth = 2; mctx.strokeRect(1, 1, W - 2, H - 2);
+    if (showdown) { mctx.fillStyle = "#06080c"; mctx.beginPath(); mctx.arc(showdown.cx * k, showdown.cy * k, showdown.abyss * k, 0, 7); mctx.fill(); mctx.strokeStyle = "#ff8c2a"; mctx.lineWidth = 1.5; mctx.stroke(); mctx.fillStyle = "#a9733a"; mctx.beginPath(); mctx.arc(showdown.cx * k, showdown.cy * k, showdown.plat * k, 0, 7); mctx.fill(); mctx.fillRect(showdown.bx0 * k, showdown.by0 * k, (showdown.bx1 - showdown.bx0) * k, (showdown.by1 - showdown.by0) * k); }
     if (safe) { mctx.fillStyle = "rgba(255, 207, 153, 0.25)"; mctx.fillRect(safe.x0 * k, safe.y0 * k, (safe.x1 - safe.x0) * k, (safe.y1 - safe.y0) * k); }
     for (const l of logs) { if (l.kind === "solo") continue; const st = logState[l.id]; mctx.fillStyle = st ? "#ff8c2a" : "#a9733a"; mctx.fillRect((l.x - l.w / 2) * k, (l.y - l.h / 2) * k, Math.max(3, l.w * k), Math.max(3, l.h * k)); }
     for (const p of players) { mctx.fillStyle = p.id === myId ? "#ffffff" : "#e0b07a"; mctx.beginPath(); mctx.arc(p.x * k, p.y * k, p.id === myId ? 4 : 2.5, 0, 7); mctx.fill(); }
@@ -403,6 +449,16 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     const html = "<b>BONKS</b>" + sorted.map((p) => `<div class="${p.id === myId ? "me" : ""}">${esc(p.n)}: ${p.sc}</div>`).join("");
     if (html !== lastScores) { $("scores").innerHTML = html; lastScores = html; }
+    // the streak boards: only while you are in the Showdown
+    const sdBox = $("sd");
+    if (me && me.z) {
+      const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+      const list = (rows) => rows.length ? `<ol>${rows.map(([n, v], i) => `<li><span class="n">${i + 1}</span><span class="who">${esc(n)}</span><b>${v}</b></li>`).join("")}</ol>` : `<div class="none">nobody yet</div>`;
+      const k = me.k || 0, next = (Math.floor(k / 10) + 1) * 10, coins = Math.min(16, 2 ** (next / 10 - 1));
+      const html = `<h2>⚔️ Tung Showdown</h2><div class="sd__me">Your streak <b>${k}</b><small>${next} knock-offs: +${coins} tung ${coins === 1 ? "buck" : "bucks"}</small></div><h3>Streaks right now</h3>${list(sdBoard.cur)}<h3>Best ever</h3>${list(sdBoard.all)}`;
+      if (html !== sdBox._html) { sdBox.innerHTML = html; sdBox._html = html; }
+      sdBox.hidden = false;
+    } else sdBox.hidden = true;
     // what the log under you is doing
     const st = $("status");
     const l = me && logs.find((q) => Math.abs(me.x - q.x) <= q.w / 2 && Math.abs(me.y - q.y) <= q.h / 2);
@@ -488,6 +544,14 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
       c.strokeStyle = "rgba(255, 140, 42, 0.6)"; c.lineWidth = 2; c.setLineDash([8, 6]); c.strokeRect(x0, y0, w, h); c.setLineDash([]);
       c.fillStyle = "#ffcf99"; c.font = "800 13px Nunito, sans-serif"; c.textAlign = "center"; c.fillText("PRACTICE CORNER (play alone)", x0 + w / 2, y0 - 8);
     }
+    if (showdown) {
+      const sx = showdown.cx * k, sy = showdown.cy * k;
+      c.fillStyle = "#06080c"; c.beginPath(); c.arc(sx, sy, showdown.abyss * k, 0, 7); c.fill(); c.strokeStyle = "#ff8c2a"; c.lineWidth = 2; c.stroke();
+      c.fillStyle = "#a9733a"; c.beginPath(); c.arc(sx, sy, showdown.plat * k, 0, 7); c.fill();
+      c.fillRect(showdown.bx0 * k, showdown.by0 * k, (showdown.bx1 - showdown.bx0) * k, (showdown.by1 - showdown.by0) * k);
+      c.fillStyle = "#ffe9b8"; c.font = "800 13px Nunito, sans-serif"; c.textAlign = "center"; c.fillText("⚔️ TUNG SHOWDOWN", sx, sy + 4);
+      mapHits.push({ x: sx, y: sy, r: showdown.plat * k, l: { title: "Tung Showdown", icon: "⚔️", kind: "showdown", x: showdown.cx, y: showdown.by1 } });
+    }
     c.textBaseline = "middle";
     for (const l of logs) {
       const x = l.x * k, y = l.y * k;
@@ -520,7 +584,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     if (waypoint) { drawPin(c, waypoint.x * k, waypoint.y * k, 1); }
     // hover tooltip
     if (mapHover) {
-      const l = mapHover.l, text = (l.icon ? l.icon + " " : "") + l.title + (l.kind === "solo" ? " · play alone" : " · stand here with another tung");
+      const l = mapHover.l, text = (l.icon ? l.icon + " " : "") + l.title + (l.kind === "solo" ? " · play alone" : l.kind === "showdown" ? " · cross the bridge and bonk tungs off" : " · stand here with another tung");
       c.font = "700 13px Nunito, sans-serif"; const tw = c.measureText(text).width + 18;
       let tx = Math.min(Math.max(mapHover.x - tw / 2, 6), W - tw - 6), ty = mapHover.y - 38; if (ty < 6) ty = mapHover.y + 20;
       c.fillStyle = "rgba(26, 15, 7, 0.95)"; c.fillRect(tx, ty, tw, 26); c.strokeStyle = "#ff8c2a"; c.lineWidth = 1.5; c.strokeRect(tx, ty, tw, 26);
@@ -623,7 +687,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   }
   function renderShop() {
     const d = shopData; if (!d) return;
-    $("shopBalance").textContent = `🪙 ${d.balance} tung buck${d.balance === 1 ? "" : "s"} · ${d.wins} multiplayer win${d.wins === 1 ? "" : "s"}`;
+    $("shopBalance").textContent = `🪙 ${d.balance} tung buck${d.balance === 1 ? "" : "s"} · ${d.wins} multiplayer win${d.wins === 1 ? "" : "s"}${d.bonus ? ` + ${d.bonus} from the Showdown` : ""}`;
     document.querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("on", b.dataset.tab === shopTab));
     const body = $("shopBody");
     if (shopTab === "shop") {
@@ -671,5 +735,5 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   });
   setInterval(loadShop, 60000);
 
-  window.__arena = { msg: onMsg, draw, logs: () => logs, setShop: (d) => { shopData = d; renderBucks(); }, openShop, previewItem, wear: (g) => { for (const p of snapshots[snapshots.length - 1].players) if (p.id === myId) p.g = g; } };
+  window.__arena = { msg: onMsg, draw, logs: () => logs, myId: () => myId, setShop: (d) => { shopData = d; renderBucks(); }, openShop, previewItem, wear: (g) => { for (const p of snapshots[snapshots.length - 1].players) if (p.id === myId) p.g = g; } };
 })();

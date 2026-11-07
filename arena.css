@@ -79,9 +79,10 @@ canvas { display: block; width: 100vw; height: 100vh; }
 .shop__tile.on { border-color: #ff8c2a; background: #5a381c; }
 @media (max-width: 700px) { .ward { grid-template-columns: 1fr; } .ward__me { justify-self: center; } .bar { flex-wrap: wrap; } }
 
-#mini { position: absolute; top: 64px; left: 16px; width: 200px; height: auto; border-radius: 8px; pointer-events: auto; cursor: pointer; outline-offset: 2px; }
+#left { position: absolute; top: 64px; left: 16px; display: grid; gap: 10px; width: 200px; }
+#mini { position: static; width: 200px; height: auto; border-radius: 8px; pointer-events: auto; cursor: pointer; outline-offset: 2px; }
 #mini:hover { filter: brightness(1.25); }
-@media (max-width: 700px) { #mini { width: 130px; } }
+@media (max-width: 700px) { #left { width: 130px; } #mini { width: 130px; } }
 
 /* the big map */
 #bigmap { position: fixed; inset: 0; z-index: 35; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(10, 5, 2, 0.8); touch-action: auto; }
@@ -108,3 +109,17 @@ canvas { display: block; width: 100vw; height: 100vh; }
 #lb .gap { text-align: center; opacity: 0.5; line-height: 0.6; }
 #lb .none { opacity: 0.75; padding: 4px; }
 @media (max-width: 700px) { #side { width: 170px; } #lb { font-size: 12px; } }
+
+/* the Showdown streak boards: top left, only while you are in the Showdown */
+#sd { background: rgba(26, 15, 7, 0.86); border: 1px solid rgba(255, 140, 42, 0.55); border-radius: 12px; padding: 10px 12px; font-size: 14px; pointer-events: none; }
+#sd[hidden] { display: none; }
+#sd h2 { font-family: "Bungee", sans-serif; font-size: 13px; color: #ff8c2a; margin-bottom: 6px; }
+#sd h3 { font: 800 11px "Nunito", sans-serif; color: #e0b07a; margin: 8px 0 3px; text-transform: none; }
+#sd .sd__me { display: grid; gap: 2px; padding: 6px 8px; background: rgba(255, 140, 42, 0.18); border-radius: 8px; }
+#sd .sd__me b { font: 22px "Bungee", sans-serif; color: #ffe9b8; margin-left: 4px; }
+#sd .sd__me small { opacity: 0.8; font-size: 11px; }
+#sd ol { list-style: none; display: grid; gap: 2px; }
+#sd li { display: grid; grid-template-columns: 16px 1fr auto; gap: 6px; }
+#sd li .n { opacity: 0.6; font-size: 12px; text-align: right; }
+#sd li .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#sd .none { opacity: 0.6; font-size: 12px; }
