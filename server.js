@@ -2154,7 +2154,7 @@ wss.on('connection', (ws) => {
         if (c && c.from === ws.key) closeChallenge(c, 'cancelled');
         return;
       }
-      case 'arena_join': case 'arena_leave': case 'arena_input': case 'arena_bonk': return onArena(ws, msg);
+      case 'arena_join': case 'arena_leave': case 'arena_input': case 'arena_bonk': case 'arena_chat': return onArena(ws, msg);
       case 'sp_move': return onSpMove(ws, msg);
       case 'pool_shot': return onPoolShot(ws, msg);
       case 'tb_move': return onTbMove(ws, msg);
@@ -2300,7 +2300,7 @@ function arenaJoin(ws) {
     arenaBroadcast({ t: 'arena_event', type: 'join', name: p.name });
   }
   p.ws = ws;
-  wsSend(ws, { t: 'arena_welcome', you: ws.key, bonks: (db.users[ws.key] && db.users[ws.key].bonks) || 0, ...arenaInfo() });
+  wsSend(ws, { t: 'arena_welcome', chat: arenaChatLog.slice(-12), you: ws.key, bonks: (db.users[ws.key] && db.users[ws.key].bonks) || 0, ...arenaInfo() });
   if (!arenaTimer) arenaTimer = setInterval(arenaStep, 1000 / AR.tick);
 }
 function arenaLeave(key, quiet) {
@@ -2312,12 +2312,27 @@ function arenaLeave(key, quiet) {
   if (!arenaPlayers.size && arenaTimer) { clearInterval(arenaTimer); arenaTimer = null; }
 }
 function arenaSocketGone(ws) { const p = ws.key && arenaPlayers.get(ws.key); if (p && p.ws === ws) arenaLeave(ws.key); }
+const arenaChatLog = []; // the last few global chat lines, so somebody who just arrived sees what was said
+function arenaChat(ws, msg) {
+  const p = arenaPlayers.get(ws.key);
+  if (!p || p.ws !== ws) return;
+  const text = String(msg.text || '').replace(/[\u0000-\u001f\u007f\u200b-\u200f\u2028-\u202e]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+  if (!text) return;
+  const now = Date.now();
+  p.chatAt = (p.chatAt || []).filter((t) => now - t < 15000);
+  if (p.chatAt.length >= 6 || (p.chatAt.length && now - p.chatAt[p.chatAt.length - 1] < 700)) return wsSend(ws, { t: 'arena_event', type: 'chatslow' });
+  p.chatAt.push(now);
+  const line = { t: 'arena_chat', id: p.key, name: p.name, text, ts: now };
+  arenaChatLog.push(line); if (arenaChatLog.length > 20) arenaChatLog.shift();
+  arenaBroadcast(line);
+}
 function arenaBroadcast(msg) { const out = JSON.stringify(msg); for (const p of arenaPlayers.values()) if (p.ws.readyState === 1) p.ws.send(out); }
 
 function onArena(ws, msg) {
   switch (msg.t) {
     case 'arena_join': return arenaJoin(ws);
     case 'arena_leave': return arenaLeave(ws.key, false);
+    case 'arena_chat': return arenaChat(ws, msg);
     case 'arena_input': {
       const p = arenaPlayers.get(ws.key);
       if (!p || p.ws !== ws || !msg.i || typeof msg.i !== 'object') return;

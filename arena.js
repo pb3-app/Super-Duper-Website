@@ -41,10 +41,11 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   function onMsg(m) {
     switch (m.t) {
       case "arena_welcome":
-        myId = m.you; arena = m.arena; radius = m.radius; holdSecs = m.hold; logs = m.logs; safe = m.safe; showdown = m.showdown; sdBoard = m.board || sdBoard; wheel = m.wheel ? { ...m.wheel } : null; wheelSpin = null; me$ = { bonks: m.bonks || 0, pct: Math.round(Math.min(1, Math.floor((m.bonks || 0) / 10) / 10) * 100) }; joined = true;
+        myId = m.you; arena = m.arena; radius = m.radius; holdSecs = m.hold; logs = m.logs; safe = m.safe; showdown = m.showdown; sdBoard = m.board || sdBoard; wheel = m.wheel ? { ...m.wheel } : null; wheelSpin = null; if (chatLog.childElementCount === 0) for (const c of m.chat || []) addChat(c, false); me$ = { bonks: m.bonks || 0, pct: Math.round(Math.min(1, Math.floor((m.bonks || 0) / 10) / 10) * 100) }; joined = true;
         $("gate").hidden = true; $("scores").hidden = false;
         loadShop(); loadBoard();
         break;
+      case "arena_chat": addChat(m, true); break;
       case "arena_state":
         serverOffset = Date.now() - m.ts;
         logState = {}; for (const l of m.logs) logState[l[0]] = l;
@@ -63,6 +64,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
         }
         else if (m.type === "coins") { feed(`+${m.n} tung ${m.n === 1 ? "buck" : "bucks"} for a ${m.streak} streak!`); loadShop(); }
         else if (m.type === "streak") feed(`${m.name} is on a ${m.streak} streak in the Showdown`);
+        else if (m.type === "chatslow") feed("Slow down a little: too many chat messages")
         else if (m.type === "safe") feed("No bonking on logs or in the practice corner");
         else if (m.type === "join") feed(`${m.name} joined`);
         else if (m.type === "leave") feed(`${m.name} left`);
@@ -92,15 +94,72 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     }
   }
   if (T) {
-    for (const t of ["arena_welcome", "arena_state", "arena_event", "arena_solo", "arena_room", "arena_full", "arena_sd", "arena_me"]) T.on("msg:" + t, onMsg);
+    for (const t of ["arena_welcome", "arena_chat", "arena_state", "arena_event", "arena_solo", "arena_room", "arena_full", "arena_sd", "arena_me"]) T.on("msg:" + t, onMsg);
     T.on("ready", () => { refreshGate(); join(); });
-    T.on("logout", () => { joined = false; myId = null; snapshots.length = 0; refreshGate(); });
+    T.on("logout", () => { joined = false; chatBox.hidden = true;  myId = null; snapshots.length = 0; refreshGate(); });
     T.booted.then(() => { refreshGate(); join(); });
   }
   function feed(text) {
     const div = document.createElement("div"); div.textContent = text; $("feed").appendChild(div);
     while ($("feed").children.length > 5) $("feed").firstChild.remove();
     setTimeout(() => div.remove(), 5000);
+  }
+
+  // ---------- global chat: lines at the bottom right, and a bubble over the speaker's head ----------
+  const chatBox = $("chat"), chatLog = $("chatLog"), chatForm = $("chatForm"), chatInput = $("chatInput");
+  const bubbles = {}; // player id -> { lines, born }
+  let chatOpen = false;
+  const BUBBLE_MS = 7000, LINE_MS = 14000;
+  function addChat(m, live) {
+    const mine = m.id === myId, div = document.createElement("div");
+    div.className = "line" + (mine ? " me" : ""); div.dataset.ts = String(live ? Date.now() : m.ts || 0);
+    const b = document.createElement("b"); b.textContent = m.name; div.append(b, document.createTextNode(m.text));
+    chatLog.appendChild(div);
+    while (chatLog.childElementCount > 40) chatLog.firstChild.remove();
+    chatLog.scrollTop = chatLog.scrollHeight;
+    if (!joined) return;
+    chatBox.hidden = false; fadeChat();
+    if (live) bubbles[m.id] = { text: m.text, born: performance.now() };
+  }
+  function fadeChat() {
+    const now = Date.now();
+    for (const d of chatLog.children) d.classList.toggle("old", !chatOpen && now - Number(d.dataset.ts) > LINE_MS);
+  }
+  setInterval(fadeChat, 1000);
+  function openChat() {
+    if (!joined || chatOpen) return;
+    chatOpen = true; chatBox.hidden = false; chatBox.classList.add("open"); chatForm.hidden = false; fadeChat(); chatLog.scrollTop = chatLog.scrollHeight;
+    for (const k of ["up", "down", "left", "right"]) input[k] = false; touchTarget = null; sendInput();
+    setTimeout(() => chatInput.focus(), 0);
+  }
+  function closeChat() { chatOpen = false; chatBox.classList.remove("open"); chatForm.hidden = true; chatInput.value = ""; chatInput.blur(); fadeChat(); }
+  chatForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const text = chatInput.value.trim();
+    if (text && joined) T.send({ t: "arena_chat", text });
+    closeChat();
+  });
+  chatInput.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeChat(); } });
+  $("chatBtn").addEventListener("click", () => (chatOpen ? closeChat() : openChat()));
+  // the bubble over a head: wraps long lines, fades out at the end
+  function drawBubble(p, topY) {
+    const bb = bubbles[p.id]; if (!bb) return;
+    const age = performance.now() - bb.born; if (age > BUBBLE_MS) { delete bubbles[p.id]; return; }
+    const c = ctx; c.save();
+    c.globalAlpha = age > BUBBLE_MS - 600 ? Math.max(0, (BUBBLE_MS - age) / 600) : 1;
+    c.font = "700 15px Nunito, sans-serif";
+    const maxW = 210, words = bb.text.split(" "), lines = []; let cur = "";
+    for (const w of words) { const t = cur ? cur + " " + w : w; if (c.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t; }
+    if (cur) lines.push(cur);
+    if (lines.length > 4) { lines.length = 4; lines[3] = lines[3].slice(0, -1) + "…"; }
+    const w = Math.min(maxW + 8, Math.max(...lines.map((l) => c.measureText(l).width)) + 20), h = lines.length * 19 + 14, x = p.x - w / 2, y = topY - h - 10;
+    c.fillStyle = "#fff8ea"; c.strokeStyle = "#2b1a0e"; c.lineWidth = 3;
+    c.beginPath(); c.roundRect(x, y, w, h, 12); c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(p.x - 7, y + h - 1); c.lineTo(p.x, y + h + 9); c.lineTo(p.x + 7, y + h - 1); c.fill();
+    c.beginPath(); c.moveTo(p.x - 7, y + h); c.lineTo(p.x, y + h + 9); c.lineTo(p.x + 7, y + h); c.stroke();
+    c.fillStyle = "#2b1a0e"; c.textAlign = "center"; c.textBaseline = "top";
+    lines.forEach((l, i) => c.fillText(l, p.x, y + 8 + i * 19));
+    c.restore();
   }
 
   // ---------- the prize wheel that stands in the arena ----------
@@ -206,6 +265,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   const keyMap = { KeyW: "up", ArrowUp: "up", KeyS: "down", ArrowDown: "down", KeyA: "left", ArrowLeft: "left", KeyD: "right", ArrowRight: "right" };
   addEventListener("keydown", (e) => {
     if (shopOpen || admOpen || (e.target && /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(e.target.tagName))) return;
+    if (e.key === "/" && !e.ctrlKey && !e.metaKey) { e.preventDefault(); openChat(); return; }
     if (keyMap[e.code]) { input[keyMap[e.code]] = true; e.preventDefault(); sendInput(); }
     if (e.code === "Space") { bonk(); e.preventDefault(); }
     if (e.code === "KeyE" && wheelNear) { useWheel(); e.preventDefault(); }
@@ -425,6 +485,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     if (p.k > 0) { ctx.fillStyle = "#ff8c2a"; ctx.font = "bold 16px Nunito, sans-serif"; ctx.textAlign = "center"; ctx.fillText("🔥 " + p.k, p.x, p.y - r * 2.1 - (gearIds(p).hat ? 22 : 0) - 20); }
     ctx.fillStyle = isMe ? "#ffcf99" : "#fff3e0"; ctx.font = "bold 15px Nunito, sans-serif"; ctx.textAlign = "center";
     ctx.fillText(p.n, p.x, p.y - r * 2.1 - (gearIds(p).hat ? 22 : 0));
+    drawBubble(p, p.y - r * 2.1 - (gearIds(p).hat ? 22 : 0) - 24 - (p.k > 0 ? 22 : 0) - (isMe ? 12 : 0));
     if (isMe) { const o = gearIds(p).hat ? 22 : 0; ctx.fillStyle = "#ff8c2a"; ctx.beginPath(); ctx.moveTo(p.x - 6, p.y - r * 2.6 - o); ctx.lineTo(p.x + 6, p.y - r * 2.6 - o); ctx.lineTo(p.x, p.y - r * 2.35 - o); ctx.fill(); }
   }
 
