@@ -52,3 +52,8 @@ kbd { background: #fff3e0; color: #2b1a0e; border-radius: 5px; padding: 1px 7px;
 .stage-result table { margin: 0 auto .8rem; border-collapse: collapse; }
 .stage-result td { padding: 4px 10px; text-align: left; }
 .stage-result tr.win td { color: #ffd34a; font-weight: 800; }
+#pickScr { position: absolute; inset: 0; z-index: 10; overflow-y: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 20px 14px; text-align: center; background: radial-gradient(circle at 50% 35%, rgba(107, 68, 35, 0.94) 0%, rgba(26, 15, 7, 0.98) 75%); }
+#pickScr[hidden] { display: none; }
+#pickScr h2 { font-family: "Bungee", sans-serif; font-size: clamp(24px, 5vw, 40px); color: #ff8c2a; text-shadow: 3px 3px 0 #1a0f07; margin: 0; }
+#pickScr .sub { font-weight: 700; color: #ffcf99; min-height: 1.4em; }
+#pickScr .types { width: min(900px, 100%); }

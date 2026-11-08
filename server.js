@@ -66,6 +66,7 @@ const GAMES = {
       dots: { label: 'Starting dots', values: [2, 3, 4, 5, 6], default: 3 },
       mode: { label: 'Mode', values: ['normal', 'misere'], default: 'normal' },
     },
+    vote: ['mode'],
   },
   imposter: { title: 'The Imposter', icon: '🕵️', progressLabel: 'Score', rooms: true, soloWL: true },
   pool: { title: 'Tung Pool', icon: '🎱', progressLabel: 'Balls potted', soloWL: true },
@@ -75,10 +76,12 @@ const GAMES = {
   battleship: {
     title: 'Tung Battleship', icon: '🚢', progressLabel: 'Hits', turnBased: true, soloWL: true,
     options: { rule: { label: 'Rules', values: ['classic', 'streak'], default: 'classic' } },
+    vote: ['rule'],
   },
   chess: {
     title: 'Tung Tung Chess', icon: '♟️', progressLabel: 'Captured', turnBased: true, soloWL: true,
     options: { variant: { label: 'Variant', values: ['standard', 'crazyhouse'], default: 'standard' } },
+    vote: ['variant'],
   },
   boxes: {
     title: 'Tung Dots & Boxes', icon: '🔲', progressLabel: 'Boxes', turnBased: true, soloWL: true,
@@ -101,6 +104,7 @@ const GAMES = {
       level: { label: 'Track', values: F1_TRACKS, default: 'speedway' },
       laps: { label: 'Laps', values: [2, 3, 5], default: 3 },
     },
+    vote: ['level'], // the players vote on these before the game starts
   },
   tungup: {
     title: 'Tung Up!', icon: '🧗', progressLabel: 'Height %', judge: 'race', realtime: true, rooms: true, challenge: true,
@@ -108,6 +112,7 @@ const GAMES = {
       level: { label: 'Map', values: TU_MAPS, default: 'junkyard' },
       chaos: { label: 'Chaos', values: ['off', 'normal', 'wild'], default: 'normal' },
     },
+    vote: ['level', 'chaos'], pick: true, // pick: after the vote everybody picks their tung and bat
   },
   airhockey: {
     title: 'Tung Tung Air Hockey', icon: '🏒', progressLabel: 'Goals', judge: 'score', realtime: true, soloWL: true,
@@ -128,6 +133,7 @@ const GAMES = {
   golf: {
     title: 'Tung Tung Mini Golf', icon: '⛳', progressLabel: 'Strokes', judge: 'low', realtime: true,
     options: { level: { label: 'Course', values: GOLF_COURSES, default: 'meadow' } },
+    vote: ['level'],
   },
   archery: {
     title: 'Tung Tung Archery', icon: '🏹', progressLabel: 'Points', judge: 'score', realtime: true,
@@ -135,6 +141,7 @@ const GAMES = {
       arrows: { label: 'Arrows each', values: [5, 10, 15], default: 10 },
       wind: { label: 'Wind', values: ['calm', 'breezy', 'gusty'], default: 'breezy' },
     },
+    vote: ['wind'],
   },
   cuppong: {
     title: 'Tung Tung Cup Pong', icon: '🥤', progressLabel: 'Cups sunk', judge: 'score', realtime: true, soloWL: true,
@@ -851,6 +858,64 @@ function onChallenge(ws, msg) {
   sendUser(to, { t: 'challenge_in', id: c.id, from: publicUser(db.users[ws.key]), game, options: c.options, ttl: CHALLENGE_MS });
 }
 
+// ---------- Votes: before a game with several maps or modes starts, everybody who is going to play votes on them ----------
+// Most votes wins; a tie is settled at random; nobody voting keeps the default. Used by 1v1 matches (challenges and arena logs) and Tung Up rooms.
+const VOTE_MS = 15000, VOTE_RESULT_MS = 2400, PICK_MS = 20000;
+const votes = new Map(), userVote = new Map();
+const voteKeysOf = (g) => (GAMES[g].vote || []).filter((k) => GAMES[g].options && GAMES[g].options[k]);
+function voteTally(v) {
+  const t = {};
+  for (const q of v.questions) {
+    t[q.key] = {};
+    for (const [k, picks] of Object.entries(v.cast)) if (picks[q.key] !== undefined) (t[q.key][picks[q.key]] = t[q.key][picks[q.key]] || []).push(k);
+  }
+  return t;
+}
+function voteView(v) {
+  return { id: v.id, game: v.game, title: GAMES[v.game].title, icon: GAMES[v.game].icon, questions: v.questions, ms: Math.max(0, v.endsAt - Date.now()), voters: v.voters.map((k) => publicUser(db.users[k])), tally: voteTally(v), ended: v.picks || null };
+}
+function startVote(game, voters, base, onDone) {
+  const keys = voteKeysOf(game);
+  if (!keys.length) return false;
+  const v = {
+    id: crypto.randomBytes(5).toString('hex'), game, voters: voters.slice(), base: base || {}, cast: {}, done: false, onDone, picks: null,
+    questions: keys.map((k) => { const o = GAMES[game].options[k]; return { key: k, label: o.label || k, values: o.values, default: (base && base[k] !== undefined) ? base[k] : o.default }; }),
+    endsAt: Date.now() + VOTE_MS, timer: null,
+  };
+  votes.set(v.id, v);
+  for (const k of v.voters) { userVote.set(k, v.id); sendUser(k, { t: 'vote_start', ...voteView(v) }); }
+  v.timer = setTimeout(() => voteResolve(v), VOTE_MS);
+  schedulePresence();
+  return true;
+}
+function voteCast(ws, msg) {
+  const v = votes.get(String(msg.id));
+  if (!v || v.done || !v.voters.includes(ws.key)) return;
+  const q = v.questions.find((x) => x.key === String(msg.key)); if (!q) return;
+  const val = q.values.find((x) => String(x) === String(msg.value)); if (val === undefined) return;
+  (v.cast[ws.key] = v.cast[ws.key] || {})[q.key] = val;
+  const out = { t: 'vote_state', id: v.id, tally: voteTally(v) };
+  for (const k of v.voters) sendUser(k, out);
+  if (v.voters.every((k) => v.questions.every((x) => v.cast[k] && v.cast[k][x.key] !== undefined))) voteResolve(v);
+}
+function voteResolve(v) {
+  if (v.done) return; v.done = true; clearTimeout(v.timer);
+  const tally = voteTally(v), opts = { ...v.base }, picks = {};
+  for (const q of v.questions) {
+    const counts = q.values.map((x) => (tally[q.key][x] || []).length), best = Math.max(0, ...counts);
+    const cand = best ? q.values.filter((x, i) => counts[i] === best) : [q.default];
+    const value = cand[Math.floor(Math.random() * cand.length)];
+    opts[q.key] = value; picks[q.key] = { value, votes: best, tie: cand.length > 1, none: !best };
+  }
+  v.picks = picks;
+  for (const k of v.voters) sendUser(k, { t: 'vote_end', id: v.id, picks });
+  setTimeout(() => {
+    votes.delete(v.id);
+    for (const k of v.voters) if (userVote.get(k) === v.id) userVote.delete(k);
+    v.onDone(sanitizeOptions(v.game, opts));
+  }, VOTE_RESULT_MS);
+}
+
 function onChallengeResponse(ws, msg) {
   const c = challenges.get(String(msg.id));
   if (!c || c.to !== ws.key) return;
@@ -860,11 +925,16 @@ function onChallengeResponse(ws, msg) {
   closeChallenge(c, 'accepted');
   cancelChallengesOf(c.from, 'cancelled');
   cancelChallengesOf(c.to, 'cancelled');
-  const m = createMatch(c);
-  const start = { t: 'match_start', matchId: m.id, game: m.game, options: m.options };
-  wsSend(ws, start);
-  if (c.fromSock.readyState === 1) wsSend(c.fromSock, start);
-  else sendUser(c.from, start);
+  const go = () => {
+    if (!online.has(c.from) || !online.has(c.to)) { userMatch.delete(c.from); userMatch.delete(c.to); schedulePresence(); return; }
+    const m = createMatch(c);
+    const start = { t: 'match_start', matchId: m.id, game: m.game, options: m.options };
+    if (ws.readyState === 1) wsSend(ws, start); else sendUser(c.to, start);
+    if (c.fromSock.readyState === 1) wsSend(c.fromSock, start);
+    else sendUser(c.from, start);
+  };
+  userMatch.set(c.from, 'vote'); userMatch.set(c.to, 'vote'); // busy while they vote
+  if (!startVote(c.game, [c.from, c.to], c.options, (opts) => { c.options = opts; go(); })) go();
 }
 
 // ---------- Matches ----------
@@ -915,13 +985,27 @@ function onJoin(ws, msg, resume) {
   ws.matchId = m.id;
   clearTimeout(p.forfeitTimer);
   wsSend(ws, { t: 'match_joined', match: matchInfo(m, ws.key), waiting: !bothJoined(m), resumed: !!resume });
-  if (!started && bothJoined(m)) startCountdown(m);
+  if (!started && bothJoined(m)) { if (GAMES[m.game].pick) startPick(m); else startCountdown(m); }
+  else if (m.state === 'picking') wsSend(ws, { t: 'match_pick', ms: Math.max(0, m.pickEnd - Date.now()) });
   else if (m.state === 'countdown') wsSend(ws, { t: 'match_countdown', ms: Math.max(0, m.startAt - Date.now()) });
   else if (m.state === 'running' && m.game === 'pool') wsSend(ws, { t: 'pool_start', state: m.pool, turn: m.turn, idx: m.keys.indexOf(ws.key) });
   else if (m.state === 'running' && m.game === 'sprouts') wsSend(ws, { t: 'sp_start', state: m.sp, turn: m.turn, idx: m.keys.indexOf(ws.key) });
   else if (m.state === 'running' && m.tb) tbSendTo(m, ws.key, ws, null, null);
 }
 
+// games where everybody picks a character or items first: the countdown waits until all are ready (or 20 seconds are up)
+function startPick(m) {
+  clearTimeout(m.joinTimer);
+  m.state = 'picking'; m.pickReady = new Set(); m.pickEnd = Date.now() + PICK_MS;
+  for (const k of m.keys) for (const s of m.players[k].socks) wsSend(s, { t: 'match_pick', ms: PICK_MS });
+  m.pickTimer = setTimeout(() => { if (m.state === 'picking') startCountdown(m); }, PICK_MS + 800);
+}
+function onPickReady(ws) {
+  const m = matches.get(ws.matchId);
+  if (!m || m.state !== 'picking') return;
+  m.pickReady.add(ws.key);
+  if (m.keys.every((k) => m.pickReady.has(k))) { clearTimeout(m.pickTimer); startCountdown(m); }
+}
 function startCountdown(m) {
   clearTimeout(m.joinTimer);
   m.state = 'countdown';
@@ -1118,7 +1202,7 @@ function forfeit(m, key, reason) {
 function endMatch(m, winnerKey, reason, cancelled = false) {
   if (m.state === 'ended') return;
   m.state = 'ended';
-  clearTimeout(m.joinTimer); clearTimeout(m.startTimer); clearTimeout(m.capTimer); clearTimeout(m.turnTimer);
+  clearTimeout(m.joinTimer); clearTimeout(m.pickTimer); clearTimeout(m.startTimer); clearTimeout(m.capTimer); clearTimeout(m.turnTimer);
   for (const k of m.keys) {
     clearTimeout(m.players[k].forfeitTimer);
     if (userMatch.get(k) === m.id) userMatch.delete(k);
@@ -1241,6 +1325,7 @@ function onUserOffline(key) {
   setTimeout(() => { if (!online.has(key) && userRoom.get(key) === room.id) leaveRoom(key); }, 20000).unref();
 }
 function onUserOnline(ws) {
+  { const v = votes.get(userVote.get(ws.key)); if (v && !v.done) wsSend(ws, { t: 'vote_start', ...voteView(v) }); }
   if (arenaHold.has(ws.key)) { clearTimeout(arenaHold.get(ws.key)); arenaHold.delete(ws.key); }
   { const gr = grRooms.get(grUserRoom.get(ws.key)); if (gr) wsSend(ws, { t: 'gr_room', room: grView(gr) }); const pr = picRooms.get(picUserRoom.get(ws.key)); if (pr) { wsSend(ws, { t: 'pic_room', room: picView(pr, ws.key) }); } }
   { const tr = tuRooms.get(tuUserRoom.get(ws.key)); if (tr) wsSend(ws, { t: 'tu_room', room: tuView(tr) }); }
@@ -1594,7 +1679,7 @@ function tuView(r) {
 function tuSend(r) { for (const k of r.members) sendUser(k, { t: 'tu_room', room: tuView(r) }); }
 function tuEnd(r, winnerKey, reason) {
   if (r.state !== 'running') return;
-  r.state = 'lobby'; clearTimeout(r.capTimer); clearTimeout(r.startTimer);
+  r.state = 'lobby'; r.goSent = false; clearTimeout(r.capTimer); clearTimeout(r.startTimer);
   const ranking = r.members.map((k) => ({ ...tuPub(k), progress: r.prog[k] || 0, time: r.fin[k] || null })).sort((a, b) => (b.id === winnerKey) - (a.id === winnerKey) || b.progress - a.progress);
   if (r.counted) for (const k of r.members) recordResult(k, 'tungup', k === winnerKey ? 'w' : 'l');
   saveDb();
@@ -1623,6 +1708,22 @@ function tuLeave(key, offline) {
   if (offline && r.state === 'running') { setTimeout(() => { if (!online.has(key)) doIt(); }, 15000).unref(); return; }
   if (offline && !online.has(key)) return doIt();
   doIt();
+}
+function tuGo(r) {
+  if (!tuRooms.has(r.id) || r.state !== 'countdown' || r.goSent) return;
+  clearTimeout(r.pickTimer);
+  if (r.members.length < 2) { r.state = 'lobby'; tuSend(r); tuBroadcastList(); return; } // somebody left during the vote
+  r.goSent = true;
+  r.prog = {}; r.fin = {}; r.counted = true;
+  const seed = crypto.randomBytes(6).toString('hex');
+  const players = r.members.map((k, i) => ({ ...tuPub(k), slot: i }));
+  for (const k of r.members) sendUser(k, { t: 'tu_go', seed, map: r.map, chaos: r.chaos, players, you: k, ms: 3500 });
+  tuBroadcastList();
+  r.startTimer = setTimeout(() => {
+    if (r.state !== 'countdown') return;
+    r.state = 'running'; r.startAt = Date.now(); tuSend(r);
+    r.capTimer = setTimeout(() => { const best = r.members.slice().sort((a, b) => (r.prog[b] || 0) - (r.prog[a] || 0))[0]; tuEnd(r, best, 'timeout'); }, TU_CAP_MS);
+  }, 3500);
 }
 function onTu(ws, msg) {
   const err = (message) => wsSend(ws, { t: 'error', message });
@@ -1660,16 +1761,21 @@ function onTu(ws, msg) {
     case 'tu_start': {
       if (!r || r.host !== ws.key || r.state !== 'lobby') return;
       if (r.members.length < 2) return err('You need at least 2 racers');
-      r.state = 'countdown'; r.prog = {}; r.fin = {}; r.counted = true;
-      const seed = crypto.randomBytes(6).toString('hex');
-      const players = r.members.map((k, i) => ({ ...tuPub(k), slot: i }));
-      for (const k of r.members) sendUser(k, { t: 'tu_go', seed, map: r.map, chaos: r.chaos, players, you: k, ms: 3500 });
-      tuBroadcastList();
-      r.startTimer = setTimeout(() => {
-        if (r.state !== 'countdown') return;
-        r.state = 'running'; r.startAt = Date.now(); tuSend(r);
-        r.capTimer = setTimeout(() => { const best = r.members.slice().sort((a, b) => (r.prog[b] || 0) - (r.prog[a] || 0))[0]; tuEnd(r, best, 'timeout'); }, TU_CAP_MS);
-      }, 3500);
+      r.state = 'countdown'; tuSend(r); tuBroadcastList();
+      // the racers vote on the map and the chaos level, then pick their tung and bat, then the race starts
+      const afterVote = () => {
+        if (!tuRooms.has(r.id) || r.state !== 'countdown') return;
+        r.pickReady = new Set(); r.pickEnd = Date.now() + PICK_MS;
+        for (const k of r.members) sendUser(k, { t: 'tu_pick', ms: PICK_MS });
+        r.pickTimer = setTimeout(() => tuGo(r), PICK_MS + 800);
+      };
+      if (!startVote('tungup', r.members, { level: r.map, chaos: r.chaos }, (opts) => { if (!tuRooms.has(r.id) || r.state !== 'countdown') return; r.map = opts.level; r.chaos = opts.chaos; tuSend(r); afterVote(); })) afterVote();
+      return;
+    }
+    case 'tu_ready': {
+      if (!r || r.state !== 'countdown' || !r.pickReady) return;
+      r.pickReady.add(ws.key);
+      if (r.members.every((k) => r.pickReady.has(k))) { clearTimeout(r.pickTimer); tuGo(r); }
       return;
     }
     case 'tu_rt': { // relay to the others in the room
@@ -1755,8 +1861,10 @@ wss.on('connection', (ws) => {
       case 'tb_move': return onTbMove(ws, msg);
       case 'gr_watch': case 'gr_unwatch': case 'gr_create': case 'gr_join': case 'gr_leave': case 'gr_config': case 'gr_start': case 'gr_rt': case 'gr_result': return onGr(ws, msg);
       case 'pic_watch': case 'pic_unwatch': case 'pic_create': case 'pic_join': case 'pic_leave': case 'pic_config': case 'pic_start': case 'pic_pick': case 'pic_draw': case 'pic_sync': case 'pic_guess': return onPic(ws, msg);
-      case 'tu_watch': case 'tu_unwatch': case 'tu_create': case 'tu_join': case 'tu_leave': case 'tu_config': case 'tu_start': case 'tu_rt': case 'tu_progress': case 'tu_top': return onTu(ws, msg);
+      case 'tu_watch': case 'tu_unwatch': case 'tu_create': case 'tu_join': case 'tu_leave': case 'tu_config': case 'tu_start': case 'tu_ready': case 'tu_rt': case 'tu_progress': case 'tu_top': return onTu(ws, msg);
       case 'rt': return onRt(ws, msg);
+      case 'vote_cast': return voteCast(ws, msg);
+      case 'pick_ready': return onPickReady(ws);
       case 'imp_watch': case 'imp_unwatch': case 'imp_create': case 'imp_join': case 'imp_leave':
       case 'imp_start': case 'imp_act': case 'imp_again': return onImp(ws, msg);
       case 'join_match': return onJoin(ws, msg, false);
@@ -2059,11 +2167,15 @@ function arenaLaunch(l) {
   if (l.group) { arenaGroupLaunch(l, keys.filter((k) => online.has(k) && !userMatch.has(k))); return; }
   const [a, b] = keys;
   if (!a || !b || userMatch.has(a) || userMatch.has(b) || !online.has(a) || !online.has(b)) return;
-  const m = createMatch({ id: crypto.randomBytes(6).toString('hex'), game: l.game, from: a, to: b, options: sanitizeOptions(l.game, {}) });
-  for (const k of m.keys) {
-    sendUser(k, { t: 'match_start', matchId: m.id, game: m.game, options: m.options });
-    arenaLeave(k, true);
-  }
+  const c = { id: crypto.randomBytes(6).toString('hex'), game: l.game, from: a, to: b, options: sanitizeOptions(l.game, {}) };
+  const go = () => {
+    if (!online.has(a) || !online.has(b)) { userMatch.delete(a); userMatch.delete(b); schedulePresence(); return; }
+    const m = createMatch(c);
+    for (const k of m.keys) sendUser(k, { t: 'match_start', matchId: m.id, game: m.game, options: m.options });
+  };
+  for (const k of [a, b]) arenaLeave(k, true);
+  userMatch.set(a, 'vote'); userMatch.set(b, 'vote');
+  if (!startVote(l.game, [a, b], c.options, (opts) => { c.options = opts; go(); })) go();
 }
 
 async function start() {

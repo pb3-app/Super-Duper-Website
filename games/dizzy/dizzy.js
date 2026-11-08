@@ -108,7 +108,7 @@ class HostSession {
     this.ids = info.players.map((p) => p.id);
     this.names = info.players.map((p) => p.name);
     this.lives = Math.max(1, Number(info.opts && info.opts.lives) || 3);
-    this.types = { [info.me.id]: myType };
+    this.types = {};      // what everybody picked on the pick screen
     this.mySeat = this.ids.indexOf(info.me.id);
     this.game = null; this.acc = 0; this.events = []; this.sendAcc = 0; this.outEv = [];
   }
@@ -130,7 +130,7 @@ class HostSession {
   press(seat) { if (this.game) this.game.press(seat); }
   release(seat) { if (this.game) this.game.release(seat); }
   remote(from, d) {
-    if (d.k === "type") { this.types[from] = TYPES[d.type] ? d.type : "random"; return; }
+    if (d.k === "type") { this.types[from] = TYPES[d.type] ? d.type : "random"; maybeStartHost(); return; }
     const seat = this.ids.indexOf(from); if (seat < 0 || !this.game) return;
     if (d.k === "p") this.game.press(seat); else if (d.k === "r") this.game.release(seat);
   }
@@ -147,9 +147,12 @@ class GuestSession {
     this.snaps = [];          // recent snapshots for smoothing
     this.offset = null;       // local clock - host game clock
     this.events = [];
-    // tell the host which tung we picked (repeat until the game starts: the host may not be listening yet)
-    const hello = () => np.send({ k: "type", type: myType });
+  }
+  // tell the host which tung we picked (repeated until the game starts: the host may not be listening yet)
+  sendType(type) {
+    const hello = () => np.send({ k: "type", type });
     hello();
+    clearInterval(this.hello);
     this.hello = setInterval(() => { if (this.snaps.length) clearInterval(this.hello); else hello(); }, 400);
   }
   push(d) {
@@ -183,6 +186,46 @@ class GuestSession {
   get mySeats() { return [this.mySeat]; }
 }
 
+// ================= Pick your tung (after the room / match starts, before the first round) =================
+const PICK_MS = 15000;
+let pick = null;
+function openPick() {
+  const s = app.session; if (!s || !s.online) return;
+  closePick();
+  pick = { deadline: performance.now() + PICK_MS, locked: null, timer: null };
+  const box = $("pick-cards"); box.innerHTML = "";
+  for (const id of ["random", ...TYPE_IDS]) {
+    const t = TYPES[id], b = document.createElement("button");
+    b.className = "tcard" + (id === myType ? " sel" : ""); b.dataset.id = id;
+    b.innerHTML = id === "random" ? `<div class="ic">🎲</div><div class="nm">Random</div><ul><li>Surprise me</li></ul>` : `<div class="ic">${t.icon}</div><div class="nm">${t.name}</div><ul>${t.perks.map((p) => `<li>${p}</li>`).join("")}</ul>`;
+    b.addEventListener("click", () => lockPick(id));
+    box.appendChild(b);
+  }
+  $("pickScr").hidden = false;
+  pick.timer = setInterval(pickTick, 200); pickTick();
+}
+function closePick() { if (pick) clearInterval(pick.timer); pick = null; $("pickScr").hidden = true; }
+function lockPick(id) {
+  const s = app.session; if (!pick || pick.locked || !s) return;
+  pick.locked = id;
+  if (id !== "random") { myType = id; try { localStorage.setItem("dizzyType", id); } catch {} }
+  $("pick-cards").querySelectorAll(".tcard").forEach((c) => { c.classList.toggle("sel", c.dataset.id === id); c.disabled = true; });
+  if (s.isHost) { s.types[s.ids[s.mySeat]] = id; maybeStartHost(); } else s.sendType(id);
+  pickTick();
+}
+function pickTick() {
+  const s = app.session; if (!pick || !s) return;
+  const left = Math.max(0, Math.ceil((pick.deadline - performance.now()) / 1000));
+  if (!pick.locked && left <= 0) { lockPick(myType); return; }
+  $("pickInfo").textContent = pick.locked ? `Locked in. Waiting for the others… (${left}s)` : `Pick your tung: the game starts when everybody is ready (${left}s)`;
+  if (s.isHost && performance.now() > pick.deadline + 1200) maybeStartHost(true);
+}
+function maybeStartHost(force) {
+  const s = app.session; if (!pick || !s || !s.isHost || s.game) return;
+  if (!force && !s.ids.every((id) => s.types[id])) return;
+  closePick(); s.start();
+}
+
 // when the game is over online: the host names the finishing order, in a 1 v 1 everybody reports win (1) or loss (0)
 function reportOnline(s, v) {
   if (s.reported) return; s.reported = true;
@@ -202,6 +245,7 @@ function beginGame() {
   np.setPlaying(true);
 }
 function toMenu() {
+  closePick();
   if (app.session) app.session.quit();
   app.session = null;
   $("end-buttons").hidden = true; $("result").hidden = true;
@@ -212,6 +256,7 @@ function showResult(title, sub, buttons) {
   for (const [label, fn] of buttons) { const b = document.createElement("button"); b.className = "btn"; b.textContent = label; b.onclick = fn; r.querySelector(".btn-row").append(b); }
 }
 $("quit").addEventListener("click", () => { if (np.kind) np.leave(); else toMenu(); });
+$("pickLeave").addEventListener("click", () => { if (np.kind) np.leave(); else toMenu(); });
 $("btn-menu").addEventListener("click", toMenu);
 $("btn-again").addEventListener("click", () => {
   const s = app.session; if (!s || s.online) return;
@@ -503,14 +548,14 @@ np = NetPlay.attach({
     if (app.session) app.session.quit();
     fx.parts = []; fx.pops = []; fx.shake = 0;
     app.session = c.host ? new HostSession(c) : new GuestSession(c);
-    $("end-buttons").hidden = true; $("result").hidden = true; $("touch-zones").innerHTML = "";
+    closePick(); $("end-buttons").hidden = true; $("result").hidden = true; $("touch-zones").innerHTML = "";
   },
-  onStart() { const s = app.session; if (s && s.isHost && !s.game) s.start(); },
+  onStart() { openPick(); },
   onStop() {},
-  onExit() { if (app.session) app.session.quit(); app.session = null; $("result").hidden = true; },
+  onExit() { if (app.session) app.session.quit(); app.session = null; closePick(); $("result").hidden = true; },
   onNet(from, d) {
     const s = app.session; if (!s || !d) return;
-    if (s.isHost) s.remote(from, d); else if (d.k === "s") s.push(d);
+    if (s.isHost) s.remote(from, d); else if (d.k === "s") { if (pick) closePick(); s.push(d); }
   },
   onLeft(id) { const s = app.session; if (s && s.isHost) s.left(id); },
   onRoomEnd(m) {

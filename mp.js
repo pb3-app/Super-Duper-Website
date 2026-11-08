@@ -540,16 +540,17 @@
     const optsOf = (g) => (chosen[g] = chosen[g] || Object.fromEntries(Object.entries(S.cfg.games[g].options || {}).map(([k, o]) => [k, o.default])));
     const body = h('div');
     const render = () => {
-      const spec = S.cfg.games[game].options || {};
+      const voted = S.cfg.games[game].vote || [], spec = Object.fromEntries(Object.entries(S.cfg.games[game].options || {}).filter(([k]) => !voted.includes(k)));
       body.replaceChildren(
         h('h2', null, '⚔️ Challenge ' + target.username),
         h('div', { class: 'mp-field' }, 'Game',
           h('div', { class: 'mp-choice' }, games.map((g) =>
             h('button', { class: g === game ? 'sel' : '', onclick: () => { game = g; render(); } }, gameIcon(g) + ' ' + gameTitle(g))))),
-        Object.entries(spec).map(([k, o]) =>
+        ...Object.entries(spec).map(([k, o]) =>
           h('div', { class: 'mp-field' }, o.label || k,
             h('div', { class: 'mp-choice' }, o.values.map((v) =>
               h('button', { class: v === optsOf(game)[k] ? 'sel' : '', onclick: () => { optsOf(game)[k] = v; render(); } }, fmtOpt(k, v)))))),
+        voted.length ? h('p', { class: 'mp-hint', style: 'text-align:center' }, '🗳️ You both vote on the ' + voted.map((k) => (S.cfg.games[game].options[k].label || k).toLowerCase()).join(' and ') + ' once ' + target.username + ' accepts.') : null,
         h('p', { class: 'mp-hint', style: 'text-align:center' }, 'Wins and losses count on the leaderboard.'),
         h('div', { class: 'row' },
           h('button', { class: 'mp-btn ghost', onclick: () => m.close() }, 'Cancel'),
@@ -561,6 +562,46 @@
     const m = openModal(body);
     render();
   }
+
+  // ---------- everybody votes on the map / mode before a game starts ----------
+  let voteUI = null;
+  function closeVote() { if (voteUI) { clearInterval(voteUI.timer); voteUI.modal.close(); voteUI = null; } }
+  function voteOpen(v) {
+    if (voteUI && voteUI.id === v.id) { voteUI.tally = v.tally; voteUI.render(); return; }
+    closeVote();
+    const body = h('div', { class: 'mp-vote' }), ui = { id: v.id, tally: v.tally, ended: v.ended, end: Date.now() + v.ms, v, modal: null, timer: null };
+    const who = {}; for (const u of v.voters) who[u.id] = u;
+    const me = S.user && S.user.id;
+    ui.render = () => {
+      const left = Math.max(0, Math.ceil((ui.end - Date.now()) / 1000));
+      body.replaceChildren(
+        h('h2', null, `${v.icon} ${v.title}: ${ui.ended ? 'the votes are in!' : 'vote!'}`),
+        h('p', { class: 'mp-hint', style: 'text-align:center' }, ui.ended ? 'Starting…' : `Everyone votes. Most votes wins, a tie is picked at random. ${left}s left`),
+        ...v.questions.map((q) => {
+          const t = ui.tally[q.key] || {}, res = ui.ended && ui.ended[q.key];
+          return h('div', { class: 'mp-field' }, q.label,
+            h('div', { class: 'mp-choice' }, q.values.map((val) => {
+              const ids = t[val] || [], mine = me && ids.includes(me);
+              return h('button', { class: (mine ? 'sel ' : '') + (res && String(res.value) === String(val) ? 'won' : ''), disabled: !!ui.ended,
+                onclick: () => send({ t: 'vote_cast', id: v.id, key: q.key, value: val }) },
+              fmtOpt(q.key, val), h('span', { class: 'cnt' }, String(ids.length)),
+              ids.length ? h('span', { class: 'who' }, ids.map((id) => (who[id] ? avatarNode(who[id].avatar, 18) : null))) : null);
+            })),
+            res ? h('p', { class: 'mp-hint mp-vote-res' }, `${fmtOpt(q.key, res.value)} ${res.none ? '(nobody voted: the default)' : res.tie ? `(tied on ${res.votes}: picked at random)` : `(${res.votes} ${res.votes === 1 ? 'vote' : 'votes'})`}`) : null);
+        }));
+    };
+    ui.modal = openModal(body, { dismiss: false });
+    ui.timer = setInterval(() => { if (!ui.ended) ui.render(); }, 500);
+    voteUI = ui; ui.render();
+    tung(300, 0.15);
+  }
+  on('msg:vote_start', voteOpen);
+  on('msg:vote_state', (m) => { if (voteUI && voteUI.id === m.id) { voteUI.tally = m.tally; voteUI.render(); } });
+  on('msg:vote_end', (m) => {
+    if (!voteUI || voteUI.id !== m.id) return;
+    voteUI.ended = m.picks; voteUI.render(); tung(520, 0.2);
+    const ui = voteUI; setTimeout(() => { if (voteUI === ui) closeVote(); }, 2300);
+  });
 
   function incomingChallenge(c) {
     tung(240, 0.3); setTimeout(() => tung(180, 0.3), 160);
@@ -777,6 +818,10 @@
       };
       sh.cd = setInterval(tick, 50);
       tick();
+    });
+    on('msg:match_pick', (m) => { // pick a character / items first: the game page decides what that looks like
+      if (sh.api && sh.api.pick) sh.api.pick(m.ms, () => send({ t: 'pick_ready' }));
+      else send({ t: 'pick_ready' });
     });
     on('msg:opp', (m) => { sh.opp = { progress: m.progress, status: m.status }; renderBar(); });
     on('msg:tb_state', (m) => { if (!m.prog || !sh.match) return; sh.me = { progress: m.prog[m.idx], status: 'playing' }; sh.opp = { progress: m.prog[1 - m.idx], status: 'playing' }; renderBar(); });

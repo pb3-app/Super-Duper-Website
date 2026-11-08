@@ -43,15 +43,17 @@
       const d = M.DEFS[id], m = M.build(id), s = d.sky;
       return `<button class="pcard mapcard${sel.map === id ? ' sel' : ''}" data-map="${id}"><div class="sky" style="background:linear-gradient(to top,${s[0]},${s[1]},${s[2]})"><span>${(m.height / 10).toFixed(0)} m · ${m.platforms.length} ledges</span></div><div class="info"><h3>${d.name}</h3><p>${d.blurb}</p></div></button>`;
     }).join('');
-    $('tungCards').innerHTML = L.TUNG_IDS.map((id) => {
+    const tungHtml = L.TUNG_IDS.map((id) => {
       const t = L.TUNGS[id];
       const img = TA.dataURL({ pal: t.pal === 'brown' ? undefined : t.pal, parts: { legs: true, armFar: true, face: true, bat: false } }, 104, 124);
       return `<button class="pcard${sel.tung === id ? ' sel' : ''}" data-tung="${id}"><h3>${t.name}</h3><p>${t.blurb}</p><div class="row"><img src="${img}" alt=""><div class="stats">${bar('Health', norm(t.hp, 70, 140))}${bar('Speed', norm(t.speed, 200, 295))}${bar('Jump', norm(t.jump, 820, 950))}${bar('Weight', norm(t.weight, 0.7, 1.45))}</div></div></button>`;
     }).join('');
-    $('batCards').innerHTML = L.BAT_IDS.map((id) => {
+    const batHtml = L.BAT_IDS.map((id) => {
       const b = L.BATS[id];
       return `<button class="pcard${sel.bat === id ? ' sel' : ''}" data-bat="${id}"><h3>${b.name}</h3><p>${b.blurb}</p><div class="row"><img src="${batIcon(b)}" alt=""><div class="stats">${bar('Damage', norm(b.dmg, 6, 30))}${bar('Knockback', norm(b.knock, 300, 850))}${bar('Swing', norm(0.75 - b.swing, 0.05, 0.6))}${bar('Reach', norm(b.reach, 45, 108))}</div></div></button>`;
     }).join('');
+    $('tungCards').innerHTML = tungHtml; $('batCards').innerHTML = batHtml;
+    if (!$('tuPick').hidden) { $('pickTung').innerHTML = tungHtml; $('pickBat').innerHTML = batHtml; }
     for (const b of $('chaosSeg').children) b.classList.toggle('sel', b.dataset.v === sel.chaos);
   }
   document.addEventListener('click', (e) => {
@@ -60,6 +62,20 @@
     saveSel(); renderPickers(); updateBest();
   });
   $('chaosSeg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; sel.chaos = b.dataset.v; saveSel(); renderPickers(); });
+
+  // After the vote: everybody picks their tung and bat (shown over the page; the race waits for all or for the timer)
+  let pickTimer = null;
+  function openPick(ms, done) {
+    clearInterval(pickTimer);
+    const end = Date.now() + ms - 600; let finished = false;
+    const finish = () => { if (finished) return; finished = true; clearInterval(pickTimer); $('tuPick').hidden = true; done(); };
+    $('tuPick').hidden = false; renderPickers();
+    const tick = () => { const left = Math.max(0, Math.ceil((end - Date.now()) / 1000)); $('pickInfo').textContent = `The race starts when everybody is ready (${left}s)`; if (left <= 0) finish(); };
+    pickTimer = setInterval(tick, 250); tick();
+    $('pickReady').onclick = () => { $('pickInfo').textContent = 'Ready! Waiting for the others…'; $('pickReady').disabled = true; clearInterval(pickTimer); finishLater(); };
+    const finishLater = () => { finished = false; finish(); };
+    $('pickReady').disabled = false;
+  }
 
   // ---------------- screens ----------------
   function show(s) {
@@ -141,7 +157,7 @@
       const mapsOpts = M.IDS.map((id) => `<button data-rmap="${id}" class="${r.map === id ? 'sel' : ''}">${M.DEFS[id].name}</button>`).join('');
       const chaos = ['off', 'normal', 'wild'].map((c) => `<button data-rchaos="${c}" class="${r.chaos === c ? 'sel' : ''}">${c[0].toUpperCase() + c.slice(1)}</button>`).join('');
       box.innerHTML = `<div class="members">${r.members.map((m) => `<div class="member${m.id === r.host ? ' host' : ''}">${avatarHtml(m.avatar)}${esc(m.username)}${m.id === r.host ? ' 👑' : ''}</div>`).join('')}</div>
-        <p class="hintline">${r.members.length} / ${r.max} racers. ${r.state === 'lobby' ? (host ? 'You are the host: pick the map and chaos level, then start when everyone is ready.' : 'Waiting for the host to start the race…') : r.state === 'countdown' ? 'Starting…' : 'A race is in progress.'}</p>
+        <p class="hintline">${r.members.length} / ${r.max} racers. ${r.state === 'lobby' ? (host ? 'You are the host: start when everyone is ready: you all vote on the map and chaos level first.' : 'Waiting for the host to start the race…') : r.state === 'countdown' ? 'Starting…' : 'A race is in progress.'}</p>
         <p style="margin:.4rem 0 .2rem;font-weight:800">Map</p><div class="seg" id="rmaps">${mapsOpts}</div>
         <p style="margin:.6rem 0 .2rem;font-weight:800">Chaos</p><div class="seg" id="rchaos">${chaos}</div>
         <div class="btn-row"><button class="btn" id="roomStart" ${host && r.state === 'lobby' && r.members.length >= 2 ? '' : 'disabled'}>🏁 Start race</button><button class="btn secondary" id="roomLeave">Leave room</button></div>`;
@@ -173,7 +189,9 @@
     TungMP.on('presence', () => { if (mode === 'multi' && screen === 'select') renderPlayers(); });
     TungMP.on('msg:tu_rooms', (m) => { rooms = m.rooms; if (mode === 'multi' && screen === 'select') renderRooms(); });
     TungMP.on('msg:tu_room', (m) => { roomView = m.room; if (!m.room && net && net.kind === 'room') { net = null; } if (mode === 'multi' && screen === 'select') renderRooms(); });
+    TungMP.on('msg:tu_pick', (m) => openPick(m.ms, () => TungMP.send({ t: 'tu_ready' })));
     TungMP.on('msg:tu_go', (g) => {
+      $('tuPick').hidden = true; clearInterval(pickTimer);
       net = { kind: 'room' }; hideResult();
       const me = g.players.find((p) => p.id === g.you);
       engine.setup({ mapId: g.map, chaos: g.chaos, seed: g.seed, mode: 'room', me: { id: me.id, name: me.username, avatar: me.avatar, tung: sel.tung, bat: sel.bat }, others: g.players.filter((p) => p.id !== g.you).map((p) => ({ id: p.id, name: p.username, avatar: p.avatar, tung: 'classic', bat: 'classic' })) });
@@ -190,15 +208,19 @@
       $('rLeave').onclick = () => { TungMP.send({ t: 'tu_leave' }); hideResult(); net = null; show('select'); };
       TungMP.refreshBoard(); beepEnd(won);
     });
+    let pendingMatch = null;
+    function setupMatch() {
+      const m = pendingMatch; if (!m) return;
+      net = { kind: 'match', oppId: m.opp.id }; hideResult(); mode = 'multi';
+      engine.setup({ mapId: m.options.level, chaos: m.options.chaos, seed: m.seed, mode: 'match', me: { id: m.you.id, name: m.you.username, avatar: m.you.avatar, tung: sel.tung, bat: sel.bat }, others: [{ id: m.opp.id, name: m.opp.username, avatar: m.opp.avatar, tung: 'classic', bat: 'classic' }] });
+      engine.setPhase('idle'); show('play'); engine.startLoop();
+    }
     TungMP.registerGame({
-      prepareMatch(m) {
-        net = { kind: 'match', oppId: m.opp.id }; hideResult(); mode = 'multi';
-        engine.setup({ mapId: m.options.level, chaos: m.options.chaos, seed: m.seed, mode: 'match', me: { id: m.you.id, name: m.you.username, avatar: m.you.avatar, tung: sel.tung, bat: sel.bat }, others: [{ id: m.opp.id, name: m.opp.username, avatar: m.opp.avatar, tung: 'classic', bat: 'classic' }] });
-        engine.setPhase('idle'); show('play'); engine.startLoop();
-      },
+      pick(ms, done) { openPick(ms, () => { setupMatch(); done(); }); },
+      prepareMatch(m) { pendingMatch = m; setupMatch(); },
       startMatch() { if (net && net.kind === 'match') engine.beginNow(); },
       stopMatch() { engine.stop(); },
-      exitMatch() { net = null; engine.stop(); engine.setPhase('idle'); hideResult(); show('select'); },
+      exitMatch() { net = null; pendingMatch = null; engine.stop(); engine.setPhase('idle'); hideResult(); show('select'); },
     });
     TungMP.on('msg:rt', (m) => { if (net && net.kind === 'match') engine.onNet(net.oppId, m.d); });
   }

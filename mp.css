@@ -142,3 +142,11 @@
 .fs-exit { position: absolute; top: .5rem; right: .5rem; z-index: 40; font: inherit; font-weight: 800; font-size: .85rem; padding: .35rem .8rem; border-radius: 999px; border: 2px solid var(--wood-dark); background: rgba(0,0,0,.55); color: var(--text); cursor: pointer; opacity: .55; transition: opacity .15s; }
 .fs-exit:hover, .fs-exit:focus-visible { opacity: 1; }
 .fs-active .mp-overlay { z-index: 30; }
+
+/* the vote on the map / mode */
+.mp-vote .mp-choice button { position: relative; display: inline-flex; align-items: center; gap: .45rem; }
+.mp-vote .mp-choice button:disabled { cursor: default; opacity: .85; }
+.mp-vote .mp-choice button.won { outline: 3px solid var(--accent); }
+.mp-vote .cnt { background: rgba(0,0,0,.45); border-radius: 999px; padding: 0 .5rem; font-size: .85rem; min-width: 1.4rem; text-align: center; }
+.mp-vote .who { display: inline-flex; gap: 2px; }
+.mp-vote-res { text-align: center; margin-top: .3rem; font-weight: 800; color: var(--accent); }
