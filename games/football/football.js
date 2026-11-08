@@ -95,7 +95,7 @@
     }
   }
   function drawLabels(v) {
-    if (myTeam !== v.off || v.thrown || v.phase !== "live") return;
+    if (myTeam !== v.off || v.thrown || (v.phase !== "live" && v.phase !== "presnap")) return; // the numbers are there as soon as the team lines up
     S.RECEIVERS.forEach((slot, k) => {
       const id = v.off * 11 + slot, p = v.pl[id], X = sx(p[0]), Y = sy(p[1]) - 14;
       ctx.fillStyle = "rgba(0,0,0,.65)"; ctx.fillRect(X - 4, Y - 5, 9, 9); text(String(k + 1), X, Y, "#ffd23f", 7, "center");

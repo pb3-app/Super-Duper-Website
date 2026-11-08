@@ -153,7 +153,7 @@
   function beginPlay(g) {
     const oc = g.calls[g.off];
     if (OFF_PLAYS[oc].kind === 'kick') return startKick(g, oc);
-    lineUp(g); g.phase = 'presnap'; g.phaseT = 1.0; g.text = ''; g.textT = 0;
+    lineUp(g); g.phase = 'presnap'; g.phaseT = 1.5; g.text = ''; g.textT = 0;
   }
   function snap(g) { g.phase = 'live'; g.P.t = 0; }
 
