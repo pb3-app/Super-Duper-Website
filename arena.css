@@ -150,3 +150,20 @@ canvas { display: block; width: 100vw; height: 100vh; }
 
 #scores .boost { margin-top: 8px; padding: 6px 8px; background: rgba(255, 140, 42, 0.18); border-radius: 8px; font-weight: 700; color: #ffe9b8; display: grid; gap: 2px; }
 #scores .boost small { font-weight: 400; opacity: 0.8; font-size: 11px; }
+
+/* the catalogue: every cosmetic there is */
+.cat__filters { display: grid; gap: 8px; margin-bottom: 14px; }
+.cat__filters > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.cat__chip { background: #3d2412; color: #e0b07a; border: 2px solid transparent; border-radius: 999px; padding: 5px 12px; font: 700 13px "Nunito", sans-serif; cursor: pointer; }
+.cat__chip.on { background: #ff8c2a; color: #2b1a0e; }
+.cat__tier { font-family: "Bungee", sans-serif; font-size: 18px; margin: 18px 0 10px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.cat__tier small { font: 700 13px "Nunito", sans-serif; opacity: 0.8; color: #fff3e0; }
+.cat__tier.t1 { color: #c8c8c8; } .cat__tier.t2 { color: #62d68c; } .cat__tier.t3 { color: #7fb3ff; } .cat__tier.t4 { color: #ffc933; text-shadow: 0 0 10px rgba(255, 176, 0, 0.5); }
+.cat__grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.cat__card { padding: 10px; gap: 6px; }
+.cat__card canvas { width: 104px; height: 104px; }
+.cat__card .shop__name { font-size: 14px; }
+.cat__card:not(.owned) canvas { filter: saturate(0.85); }
+.cat__st { font-size: 12px; font-weight: 800; opacity: 0.8; }
+.cat__st.own { color: #7be38a; opacity: 1; }
+.cat__st.now { color: #ffcf99; opacity: 1; }

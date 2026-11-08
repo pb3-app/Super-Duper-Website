@@ -611,6 +611,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
 
   // ---------- the shop and the wardrobe ----------
   let shopData = null, shopOpen = false, shopTab = "shop";
+  let catTier = 0, catSlot = "all", catOwn = "all"; // the catalogue filters
   async function loadShop() {
     if (!T || !T.user) return;
     try { shopData = await T.api("/api/shop"); renderBucks(); if (shopOpen) renderShop(); } catch (_) {}
@@ -655,6 +656,28 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     if (shopTab === "shop") {
       const mins = Math.max(1, Math.floor(d.resetsIn / 60000)), left = `${Math.floor(mins / 60)}h ${mins % 60}m`;
       body.innerHTML = `<p class="shop__note">Six new items every day at 8:00 AM Eastern, one for each part of your tung. The four tiers are Tung, Tung Tung, Tung Tung Tung and Triple T Sahur: the higher the tier, the rarer it is in the shop. You earn one tung buck for every multiplayer win. New items in ${left}.</p><div class="shop__grid">${d.today.map(itemCard).join("")}</div>`;
+    } else if (shopTab === "cat") {
+      const todaySet = new Set(d.today), all = Shop.ITEMS;
+      const items = all.filter((it) => (!catTier || it.tier === catTier) && (catSlot === "all" || it.slot === catSlot) && (catOwn === "all" || (catOwn === "owned") === owns(it.id)))
+        .sort((a, b) => a.tier - b.tier || Shop.SLOTS.indexOf(a.slot) - Shop.SLOTS.indexOf(b.slot) || a.name.localeCompare(b.name));
+      const chip = (kind, val, label, on) => `<button type="button" class="cat__chip${on ? " on" : ""}" data-filter="${kind}:${val}">${label}</button>`;
+      const ownedN = all.filter((it) => owns(it.id)).length;
+      const cardHtml = (it) => {
+        const own = owns(it.id), pct = Shop.chanceOf(it) * 100, odds = pct >= 10 ? Math.round(pct) + "%" : pct >= 1 ? pct.toFixed(1) + "%" : "<1%";
+        const status = own ? `<span class="cat__st own">✔ Owned${wearing(it) ? " · wearing" : ""}</span>` : todaySet.has(it.id) ? `<span class="cat__st now">🛍 In today's shop</span>` : `<span class="cat__st">🔒 Not owned</span>`;
+        return `<div class="shop__card cat__card tier-${it.tier}${own ? " owned" : ""}"><canvas width="132" height="132" data-item="${it.id}" aria-label="${it.name}"></canvas><div class="shop__name">${it.name}</div><div class="shop__meta">${Shop.SLOT_NAMES[it.slot]} · 🪙 ${it.price}</div><div class="shop__meta">In the shop about ${odds} of days</div>${status}</div>`;
+      };
+      let list = "";
+      if (!items.length) list = '<p class="shop__note">Nothing matches those filters.</p>';
+      else for (const t of [1, 2, 3, 4]) {
+        const group = items.filter((it) => it.tier === t); if (!group.length) continue;
+        const have = group.filter((it) => owns(it.id)).length;
+        list += `<h3 class="cat__tier t${t}">${Shop.TIERS[t]} <small>${have} of ${group.length} owned · 🪙 ${Shop.PRICE[t]} each</small></h3><div class="shop__grid cat__grid">${group.map(cardHtml).join("")}</div>`;
+      }
+      body.innerHTML = `<p class="shop__note">Every cosmetic there is: <b>${all.length}</b> items, and you own <b>${ownedN}</b>. They only go on sale in the daily shop (one per part of your tung each day), and the higher the tier the less often they show up.</p>
+        <div class="cat__filters"><div>${chip("tier", 0, "All tiers", !catTier)}${[1, 2, 3, 4].map((t) => chip("tier", t, Shop.TIERS[t], catTier === t)).join("")}</div>
+        <div>${chip("slot", "all", "All parts", catSlot === "all")}${Shop.SLOTS.map((sl) => chip("slot", sl, Shop.SLOT_NAMES[sl], catSlot === sl)).join("")}</div>
+        <div>${chip("own", "all", "Everything", catOwn === "all")}${chip("own", "owned", "Owned", catOwn === "owned")}${chip("own", "missing", "Not owned yet", catOwn === "missing")}</div></div>${list}`;
     } else {
       const rows = Shop.SLOTS.map((slot) => {
         const mine = Shop.ITEMS.filter((it) => it.slot === slot && owns(it.id));
@@ -682,6 +705,8 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   addEventListener("keydown", (e) => { if (e.code === "Escape" && shopOpen) closeShop(); });
   $("shopTabs").addEventListener("click", (e) => { const b = e.target.closest("[data-tab]"); if (b) { shopTab = b.dataset.tab; shopMsg(""); renderShop(); } });
   $("shopBody").addEventListener("click", async (e) => {
+    const f = e.target.closest("[data-filter]");
+    if (f) { const [k, v] = f.dataset.filter.split(":"); if (k === "tier") catTier = Number(v); else if (k === "slot") catSlot = v; else catOwn = v; renderShop(); return; }
     const b = e.target.closest("[data-act]"); if (!b || b.disabled) return;
     b.disabled = true; shopMsg("");
     try {

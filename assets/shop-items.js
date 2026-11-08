@@ -197,6 +197,14 @@
     });
   }
 
-  const api = { SLOTS, SLOT_NAMES, TIERS, PRICE, TIER_WEIGHT, ITEMS, byId, todayStr, offerFor, msUntilReset };
+  // how likely an item is to be in a given day's shop (0..1): its tier gets picked for the slot, then it is one of that tier's items
+  function chanceOf(it) {
+    const list = ITEMS.filter((x) => x.slot === it.slot);
+    const tiers = [1, 2, 3, 4].filter((t) => list.some((x) => x.tier === t));
+    const total = tiers.reduce((n, t) => n + TIER_WEIGHT[t], 0);
+    return (TIER_WEIGHT[it.tier] / total) / list.filter((x) => x.tier === it.tier).length;
+  }
+
+  const api = { chanceOf, SLOTS, SLOT_NAMES, TIERS, PRICE, TIER_WEIGHT, ITEMS, byId, todayStr, offerFor, msUntilReset };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.TungShop = api;
 })(typeof window !== 'undefined' ? window : globalThis);
