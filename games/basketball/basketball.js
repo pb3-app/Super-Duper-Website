@@ -7,6 +7,7 @@
   const cv = $("view"), ctx = cv.getContext("2d"), msgEl = $("msg");
   const TEAMCOL = ["#ffcc33", "#4cc9f0"];
 
+  let teamGear = [{}, {}]; // what each team's tung wears (the shop items its player bought)
   let mp = false, host = true, myTeam = 0, mirror = false, S = null, running = false, raf = 0, last = 0, acc = 0, tickSend = 0;
   let evOut = [], lastProg = -1, level = "medium", seconds = 120, rng = Math.random, popups = [], flashes = [], audio;
   const inp = { dx: 0, dy: 0, shoot: -1, pass: 0, steal: 0, sw: 0 }; // my inputs; shoot: -1 none else meter at release
@@ -274,7 +275,7 @@
     if (isCtl) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(p.x, p.y + 20, 20, 8, 0, 0, 7); ctx.stroke(); }
     ctx.fillStyle = TEAMCOL[p.team]; ctx.beginPath(); ctx.ellipse(p.x, p.y + 20, 15, 6, 0, 0, 7); ctx.globalAlpha = 0.35; ctx.fill(); ctx.globalAlpha = 1;
     const flip = Math.cos(p.face) < 0;
-    TA.draw(ctx, p.x, p.y - 4 + bob, 54, { green: p.team === 1, flip, bat: 0.9, eyes: "normal", mouth: hasBall ? "smile" : "oh", look: [flip ? -0.5 : 0.5, 0.2], legs: performance.now() / 180 + p.id, parts: { legs: true, armFar: true, bat: false, face: true } });
+    TA.draw(ctx, p.x, p.y - 4 + bob, 54, { gear: teamGear[p.team], green: p.team === 1, flip, bat: 0.9, eyes: "normal", mouth: hasBall ? "smile" : "oh", look: [flip ? -0.5 : 0.5, 0.2], legs: performance.now() / 180 + p.id, parts: { legs: true, armFar: true, bat: false, face: true } });
     // jersey stripe
     ctx.fillStyle = TEAMCOL[p.team]; ctx.fillRect(p.x - 12, p.y - 4 + bob, 24, 5);
     if (isCtl) { ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.moveTo(p.x, p.y - 44); ctx.lineTo(p.x - 7, p.y - 54); ctx.lineTo(p.x + 7, p.y - 54); ctx.fill(); }
@@ -350,6 +351,7 @@
 
   // ============================ flow ============================
   function startSolo() {
+    teamGear = [TungGear.mine(), {}];
     mp = false; host = true; myTeam = 0; mirror = false; level = $("level").value; seconds = Number($("length").value);
     S = newSim(); handled = [{ pass: inp.pass, steal: inp.steal, sw: inp.sw }, { pass: 0, steal: 0, sw: 0 }]; popups = []; running = true; acc = 0;
     msgEl.textContent = ""; $("startBtn").textContent = "Restart"; cancelAnimationFrame(raf); last = 0; raf = requestAnimationFrame(frame);
@@ -366,6 +368,7 @@
     });
     TungMP.registerGame({
       prepareMatch(m) {
+        teamGear = [{}, {}]; teamGear[m.idx] = TungGear.mine(); teamGear[1 - m.idx] = TungGear.fromNums(m.opp.gear);
         mp = true; lastProg = -1; evOut = []; host = m.idx === 0; myTeam = m.idx; mirror = m.idx === 1; level = "medium"; seconds = m.options.length;
         S = newSim(); S.sync = false; popups = []; running = false; remoteIn = { dx: 0, dy: 0, shoot: -1, pass: 0, steal: 0, sw: 0 }; handled = [{ pass: 0, steal: 0, sw: 0 }, { pass: 0, steal: 0, sw: 0 }]; inp.pass = inp.steal = inp.sw = 0;
         S.players[0].name = host ? m.you.username : m.opp.username; S.players[2].name = host ? m.opp.username : m.you.username;

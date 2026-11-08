@@ -157,10 +157,12 @@
     ctx.fillText("🥁", food.x * CELL + CELL / 2, food.y * CELL + CELL / 2 + 1);
 
     // body (wooden logs)
+    const gear = TungGear.mine(), skin = gear.color ? TungShop.byId[gear.color] : null; // what the player wears
     for (let i = snake.length - 1; i >= 1; i--) {
       const s = snake[i];
-      const shade = i % 2 ? "#b5763c" : "#9c6230";
+      const shade = skin ? skin.fill : i % 2 ? "#b5763c" : "#9c6230";
       roundRect(s.x * CELL + 1, s.y * CELL + 1, CELL - 2, CELL - 2, 6, shade);
+      if (skin && i % 2) { ctx.fillStyle = "rgba(0,0,0,.14)"; ctx.fillRect(s.x * CELL + 1, s.y * CELL + 1, CELL - 2, CELL - 2); }
       ctx.fillStyle = "rgba(0,0,0,.15)";
       ctx.fillRect(s.x * CELL + CELL * 0.3, s.y * CELL + 3, 2, CELL - 6);
       ctx.fillRect(s.x * CELL + CELL * 0.65, s.y * CELL + 3, 2, CELL - 6);
@@ -170,7 +172,7 @@
     const h = snake[0];
     const hx = h.x * CELL;
     const hy = h.y * CELL;
-    roundRect(hx, hy, CELL, CELL, 8, isDead ? "#7a4a1f" : "#e0a868");
+    roundRect(hx, hy, CELL, CELL, 8, isDead ? "#7a4a1f" : skin ? skin.fill : "#e0a868");
     const ex = dir.x * 3;
     const ey = dir.y * 3;
     ctx.fillStyle = "#fff";
@@ -181,6 +183,8 @@
     circle(hx + CELL * 0.68 + ex * 1.4, hy + CELL * 0.38 + ey * 1.4, 2);
     ctx.fillStyle = "#2a1408";
     ctx.fillRect(hx + CELL * 0.35, hy + CELL * 0.65, CELL * 0.3, 3);
+    if (gear.face) { const k = CELL * 0.36 / 16; ctx.save(); ctx.translate(hx + CELL / 2, hy + CELL * 0.38 + 10 * k); ctx.scale(k, k); TungGear.face(ctx, gear.face); ctx.restore(); }
+    if (gear.hat) { const k = CELL / 46; ctx.save(); ctx.translate(hx + CELL / 2, hy + CELL * 0.1 + 29 * k); ctx.scale(k, k); TungGear.hat(ctx, gear.hat, performance.now() / 1000); ctx.restore(); }
   }
 
   function roundRect(x, y, w, h, r, color) {

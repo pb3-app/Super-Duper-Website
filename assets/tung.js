@@ -31,7 +31,7 @@
   }
 
   // Upright character, centred on (cx, cy), `h` pixels tall.
-  // opts: green, rot (radians), flip, bat (radians, 0 = pointing up), eyes ('normal'|'x'|'blink'), mouth ('smile'|'open'|'oh'), look [dx,dy], alpha, legs (0..1 walk phase)
+  // opts: gear ({ hat, face, bat, color, wear } shop item ids: what the player has bought and put on), green, rot (radians), flip, bat (radians, 0 = pointing up), eyes ('normal'|'x'|'blink'), mouth ('smile'|'open'|'oh'), look [dx,dy], alpha, legs (0..1 walk phase)
   function draw(ctx, cx, cy, h, o) {
     o = o || {};
     const P = pal(o), s = h / 160;
@@ -44,6 +44,8 @@
     if (o.alpha != null) ctx.globalAlpha = o.alpha;
     const sw = Math.sin((o.legs || 0) * Math.PI * 2) * 5;
     const has = (k) => !o.parts || o.parts[k];
+    const G = window.TungGear, gear = o.gear && G ? o.gear : null, ci = gear && gear.color && window.TungShop ? window.TungShop.byId[gear.color] : null;
+    const now = performance.now() / 1000;
     // legs
     if (has('legs')) {
     ctx.strokeStyle = P.dark; ctx.lineWidth = 9; ctx.lineCap = 'round';
@@ -55,8 +57,19 @@
     ctx.strokeStyle = P.dark; ctx.lineWidth = 8;
     ctx.beginPath(); ctx.moveTo(24, 78); ctx.quadraticCurveTo(10, 90, 8, 108); ctx.stroke();
     }
+    // what is worn behind the body: a cape or wings
+    if (gear && has('face') && (gear.wear === 'cape' || gear.wear === 'wings')) {
+      ctx.save(); ctx.translate(50, 73); ctx.scale(gear.wear === 'wings' ? 1.2 : 1.4, gear.wear === 'wings' ? 1.2 : 1.4);
+      if (gear.wear === 'cape') G.cape(ctx, now); else G.wings(ctx, now);
+      ctx.restore();
+    }
     // bat (held in the near hand, swings around the hand at (80,78))
-    if (has('bat')) {
+    if (has('bat') && gear && gear.bat) {
+      ctx.save();
+      ctx.translate(80, 78); ctx.rotate(o.bat != null ? o.bat : 0.45); ctx.rotate(-Math.PI / 2); ctx.scale(1.35, 1.35); ctx.translate(-16.8, 0);
+      G.bat(ctx, 28, gear.bat);
+      ctx.restore();
+    } else if (has('bat')) {
     ctx.save();
     ctx.translate(80, 78); ctx.rotate(o.bat != null ? o.bat : 0.45);
     ctx.strokeStyle = P.batDark; ctx.lineWidth = 15; ctx.lineCap = 'round';
@@ -69,11 +82,21 @@
     // body log
     const g = ctx.createLinearGradient(20, 0, 80, 0);
     g.addColorStop(0, P.dark); g.addColorStop(.28, P.mid); g.addColorStop(.6, P.light); g.addColorStop(1, P.mid);
+    if (ci) { // a skin from the shop: its colour (or gradient) and pattern instead of the wood
+      ctx.save(); ctx.translate(50, 73);
+      ctx.fillStyle = G.skinFill(ctx, ci, 118); rr(ctx, -30, -59, 60, 118, 22); ctx.fill();
+      const sh = ctx.createLinearGradient(-30, 0, 30, 0); sh.addColorStop(0, 'rgba(0,0,0,0.28)'); sh.addColorStop(0.6, 'rgba(255,255,255,0.16)'); sh.addColorStop(1, 'rgba(0,0,0,0.22)');
+      ctx.fillStyle = sh; rr(ctx, -30, -59, 60, 118, 22); ctx.fill();
+      if (ci.pattern) G.skin(ctx, ci.pattern, 60, 118, now);
+      else { ctx.strokeStyle = P.deep; ctx.lineWidth = 3; rr(ctx, -30, -59, 60, 118, 22); ctx.stroke(); }
+      ctx.restore();
+    } else {
     ctx.fillStyle = g; rr(ctx, 20, 14, 60, 118, 22); ctx.fill();
     ctx.strokeStyle = P.deep; ctx.lineWidth = 3; ctx.stroke();
+    }
     // bark
     ctx.strokeStyle = P.deep; ctx.globalAlpha = (o.alpha != null ? o.alpha : 1) * 0.5; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
-    for (const [x, y1, y2] of [[28, 40, 54], [31, 100, 118], [70, 30, 46], [72, 104, 120], [50, 118, 126], [44, 24, 30]]) { ctx.beginPath(); ctx.moveTo(x, y1); ctx.quadraticCurveTo(x + 3, (y1 + y2) / 2, x - 1, y2); ctx.stroke(); }
+    if (!(ci && ci.pattern)) for (const [x, y1, y2] of [[28, 40, 54], [31, 100, 118], [70, 30, 46], [72, 104, 120], [50, 118, 126], [44, 24, 30]]) { ctx.beginPath(); ctx.moveTo(x, y1); ctx.quadraticCurveTo(x + 3, (y1 + y2) / 2, x - 1, y2); ctx.stroke(); }
     ctx.globalAlpha = o.alpha != null ? o.alpha : 1;
     // top cut ring
     ctx.fillStyle = P.ring; ctx.beginPath(); ctx.ellipse(50, 22, 26, 10, 0, 0, 7); ctx.fill();
@@ -94,12 +117,19 @@
     else if (mo === 'sad') { ctx.strokeStyle = '#2b1208'; ctx.lineWidth = 3.5; ctx.beginPath(); ctx.moveTo(38, 104); ctx.quadraticCurveTo(50, 92, 62, 104); ctx.stroke(); }
     else { ctx.strokeStyle = '#2b1208'; ctx.lineWidth = 3.5; ctx.beginPath(); ctx.moveTo(38, 94); ctx.quadraticCurveTo(50, 106, 62, 94); ctx.stroke(); }
     }
+    // outfit, then what goes on the face
+    if (gear && has('face')) {
+      if (gear.wear && gear.wear !== 'cape' && gear.wear !== 'wings') { ctx.save(); ctx.translate(50, 93); ctx.scale(1.4, 1.4); G.wear(ctx, gear.wear); ctx.restore(); }
+      if (gear.face) { ctx.save(); ctx.translate(50.5, 81.6); ctx.scale(1.56, 1.56); G.face(ctx, gear.face); ctx.restore(); }
+    }
     // near arm
     if (has('bat')) {
     ctx.strokeStyle = P.dark; ctx.lineWidth = 8; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(76, 80); ctx.quadraticCurveTo(84, 92, 80, 78); ctx.stroke();
     ctx.fillStyle = P.mid; ctx.beginPath(); ctx.arc(80, 78, 7, 0, 7); ctx.fill(); ctx.strokeStyle = P.deep; ctx.lineWidth = 2; ctx.stroke();
     }
+    // a hat goes on last, on top of the log
+    if (gear && gear.hat && has('face')) { ctx.save(); ctx.translate(50, 22 + 29 * 1.45); ctx.scale(1.45, 1.45); G.hat(ctx, gear.hat, now); ctx.restore(); }
     ctx.restore();
   }
 

@@ -14,7 +14,7 @@
 
   // ---------------- simulation (solo player or room/match host) ----------------
   function makeSim(players, to) {
-    const s = { players: players.map((p, i) => ({ id: p.id, name: p.name, bot: !!p.bot, slot: i, x: CX, y: CY, vx: 0, vy: 0, alive: true, fall: 0, dashT: 0, cd: 0, face: 0, wins: 0, inp: { dx: 0, dy: 0, dash: 0 }, lastDash: 0, ai: { t: 0, tx: 0, ty: 0 } })), R: R0, phase: "ready", t: 0, tFight: 0, ready: 2.4, round: 1, to, ev: [], over: 0, winner: -1, matchOver: false, lastWinner: -1 };
+    const s = { players: players.map((p, i) => ({ id: p.id, name: p.name, gear: p.gear, bot: !!p.bot, slot: i, x: CX, y: CY, vx: 0, vy: 0, alive: true, fall: 0, dashT: 0, cd: 0, face: 0, wins: 0, inp: { dx: 0, dy: 0, dash: 0 }, lastDash: 0, ai: { t: 0, tx: 0, ty: 0 } })), R: R0, phase: "ready", t: 0, tFight: 0, ready: 2.4, round: 1, to, ev: [], over: 0, winner: -1, matchOver: false, lastWinner: -1 };
     startRound(s); return s;
   }
   function startRound(s) {
@@ -115,7 +115,7 @@
     ctx.fillStyle = "rgba(0,0,0,.28)"; ctx.beginPath(); ctx.ellipse(x, y0 + 6, PR * 0.95 * sc, PR * 0.4 * sc, 0, 0, 7); ctx.fill();
     const flip = Math.cos(p.face) < 0, dashing = p.dashT > 0;
     ctx.translate(x, y - 44 * sc); ctx.rotate(rot + (dashing ? Math.cos(p.face) * 0.25 : 0)); ctx.scale(sc * 1.25, sc * 1.25);
-    TA.draw(ctx, 0, 0, 82, { pal: col.pal, flip, bat: 0.8, mouth: dashing ? "open" : p.alive ? "smile" : "sad", eyes: p.alive ? "normal" : "x", look: [Math.cos(p.face), Math.sin(p.face) * 0.5], legs: performance.now() / 150 + idx, parts: { legs: true, armFar: true, face: true, bat: false } });
+    TA.draw(ctx, 0, 0, 82, { gear: p.gear, pal: col.pal, flip, bat: 0.8, mouth: dashing ? "open" : p.alive ? "smile" : "sad", eyes: p.alive ? "normal" : "x", look: [Math.cos(p.face), Math.sin(p.face) * 0.5], legs: performance.now() / 150 + idx, parts: { legs: true, armFar: true, face: true, bat: false } });
     ctx.fillStyle = col.belt; ctx.fillRect(-14, 18, 28, 8); // the mawashi belt in your colour
     ctx.restore();
     if (dashing) { ctx.strokeStyle = "rgba(255,255,255,.55)"; ctx.lineWidth = 3; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(x - Math.cos(p.face) * (34 + i * 12), y0 - 30 - Math.sin(p.face) * (14 + i * 6) + i * 6 - 6); ctx.lineTo(x - Math.cos(p.face) * (60 + i * 12), y0 - 30 - Math.sin(p.face) * (20 + i * 6) + i * 6 - 6); ctx.stroke(); } }
@@ -196,12 +196,12 @@
   function begin(newRole, players, to) {
     role = newRole; over = false; hideResult(); roundsTo = to; parts = []; pops = []; dashCount = 0; remoteIn.clear();
     sim = role === "guest" ? null : makeSim(players, to);
-    view = role === "guest" ? { players: players.map((p, i) => ({ id: p.id, name: p.name, slot: i, x: CX, y: CY, vx: 0, vy: 0, alive: true, fall: 0, dashT: 0, cd: 0, wins: 0, face: 0 })), target: players.map(() => ({ x: CX, y: CY, vx: 0, vy: 0 })), R: R0, phase: "ready", round: 1, ready: 3, lastWinner: -1 } : null;
+    view = role === "guest" ? { players: players.map((p, i) => ({ id: p.id, name: p.name, gear: p.gear, slot: i, x: CX, y: CY, vx: 0, vy: 0, alive: true, fall: 0, dashT: 0, cd: 0, wins: 0, face: 0 })), target: players.map(() => ({ x: CX, y: CY, vx: 0, vy: 0 })), R: R0, phase: "ready", round: 1, ready: 3, lastWinner: -1 } : null;
     myIdx = players.findIndex((p) => p.me); running = true; cancelAnimationFrame(raf); last = 0; raf = requestAnimationFrame(frame);
   }
   function startSolo() {
     level = $("level").value; const nb = Number($("bots").value), names = ["Tralalero", "Bombardiro", "Cappuccino"];
-    const players = [{ id: "me", name: (window.TungMP && TungMP.user ? TungMP.user.username : "You"), me: true }];
+    const players = [{ id: "me", name: (window.TungMP && TungMP.user ? TungMP.user.username : "You"), gear: TungGear.mine(), me: true }];
     for (let i = 0; i < nb; i++) players.push({ id: "bot" + i, name: names[i], bot: true });
     np.setPlaying(true); begin("solo", players, Number($("rounds").value));
   }
@@ -219,7 +219,7 @@
   TouchPad.mount($("pad"), { onMove: (x, y) => { joy = { x, y }; }, buttons: [{ label: "💥 Shove", onDown: () => { dashCount++; } }] });
 
   // ---------------- multiplayer ----------------
-  const asPlayers = (ctx) => ctx.players.map((p) => ({ id: p.id, name: p.name, me: p.id === ctx.me.id }));
+  const asPlayers = (ctx) => ctx.players.map((p) => ({ id: p.id, name: p.name, gear: TungGear.fromNums(p.gear), me: p.id === ctx.me.id }));
   np = NetPlay.attach({
     game: "sumo", rooms: true, panel: $("mpPanel"), menu: $("menu"), play: $("play"),
     onModeChange() { if (role === "solo") toMenu(); },

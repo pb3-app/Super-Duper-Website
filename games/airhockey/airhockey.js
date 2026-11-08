@@ -112,7 +112,9 @@
     ctx.lineWidth = 3; ctx.strokeStyle = "rgba(160,220,255,.3)"; ctx.strokeRect(6, 6, W - 12, H - 12);
     void dt;
   }
-  function paddle(x, y, col, dark, look) {
+  let padGear = [{}, {}]; // what the two players wear (shop items), by paddle: 0 is the host's
+  function paddle(x, y, col, dark, look, gear) {
+    gear = gear || {}; const ci = gear.color && window.TungShop ? TungShop.byId[gear.color] : null;
     ctx.save(); ctx.translate(x, y);
     ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.beginPath(); ctx.ellipse(6, 10, PR, PR * 0.96, 0, 0, 7); ctx.fill();
     const gr = ctx.createRadialGradient(-12, -14, 4, 0, 0, PR); gr.addColorStop(0, "#fff"); gr.addColorStop(0.18, col); gr.addColorStop(1, dark);
@@ -120,11 +122,13 @@
     ctx.strokeStyle = "rgba(0,0,0,.35)"; ctx.lineWidth = 3; ctx.stroke();
     ctx.fillStyle = "rgba(255,255,255,.22)"; ctx.beginPath(); ctx.arc(0, 0, PR * 0.62, 0, 7); ctx.fill();
     // a log slice with Tung's eyes looking at the puck
-    ctx.fillStyle = "#c58a4a"; ctx.beginPath(); ctx.arc(0, 0, PR * 0.5, 0, 7); ctx.fill(); ctx.strokeStyle = "#5e3a18"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = ci ? TungGear.skinFill(ctx, ci, PR) : "#c58a4a"; ctx.beginPath(); ctx.arc(0, 0, PR * 0.5, 0, 7); ctx.fill(); ctx.strokeStyle = "#5e3a18"; ctx.lineWidth = 2; ctx.stroke();
     ctx.strokeStyle = "rgba(94,58,24,.5)"; ctx.beginPath(); ctx.arc(0, 0, PR * 0.34, 0, 7); ctx.stroke();
     const lx = look[0], ly = look[1], d = Math.hypot(lx, ly) || 1, ox = (lx / d) * 3, oy = (ly / d) * 3;
     for (const sx of [-9, 9]) { ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(sx, -3, 7, 0, 7); ctx.fill(); ctx.fillStyle = "#111"; ctx.beginPath(); ctx.arc(sx + ox, -3 + oy, 3.6, 0, 7); ctx.fill(); }
     ctx.strokeStyle = "#2b1208"; ctx.lineWidth = 2.6; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(-7, 10); ctx.quadraticCurveTo(0, 15, 7, 10); ctx.stroke();
+    if (gear.face) { ctx.save(); ctx.translate(0, 7); ctx.scale(1.1, 1.1); TungGear.face(ctx, gear.face); ctx.restore(); }
+    if (gear.hat) { ctx.save(); ctx.translate(0, 12); ctx.scale(0.9, 0.9); TungGear.hat(ctx, gear.hat, performance.now() / 1000); ctx.restore(); }
     ctx.restore();
   }
   function puck(u) {
@@ -143,7 +147,7 @@
     const me = role === "guest" ? 1 : 0;
     const pU = s.puck;
     const gold = ["#ffcc33", "#b8860b"], blue = ["#4cc9f0", "#1b6a8a"], cols = mirror ? [blue, gold] : [gold, blue]; // my paddle is always gold
-    for (const i of [0, 1]) { const p = s.pad[i]; paddle(p.x, p.y, cols[i][0], cols[i][1], [pU.x - p.x, pU.y - p.y]); }
+    for (const i of [0, 1]) { const p = s.pad[i]; paddle(p.x, p.y, cols[i][0], cols[i][1], [pU.x - p.x, pU.y - p.y], padGear[i]); }
     puck(pU);
     for (const f of flashes) { const k = (performance.now() - f.t) / 300; ctx.strokeStyle = `rgba(255,255,255,${1 - k})`; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(f.x, f.y, UR + k * 40, 0, 7); ctx.stroke(); }
     flashes = flashes.filter((f) => performance.now() - f.t < 300);
@@ -225,7 +229,7 @@
     $("goalsEl").textContent = goalsTo;
   }
   function startSolo() {
-    level = $("level").value; goalsTo = Number($("goals").value); names = ["You", "Computer"];
+    level = $("level").value; goalsTo = Number($("goals").value); names = ["You", "Computer"]; padGear = [TungGear.mine(), {}];
     np.setPlaying(true); begin("solo");
   }
   function toMenu() { running = false; cancelAnimationFrame(raf); role = "idle"; hideResult(); np.setPlaying(false); }
@@ -244,7 +248,7 @@
   np = NetPlay.attach({
     game: "airhockey", rooms: false, panel: $("mpPanel"), menu: $("menu"), play: $("play"),
     onModeChange() { if (role === "solo") toMenu(); },
-    onPrepare(ctx) { goalsTo = ctx.opts.goals; names = ctx.host ? [ctx.me.name, ctx.players[1].name] : [ctx.me.name, ctx.players[0].name]; begin(ctx.host ? "host" : "guest"); running = false; if (sim) { sim.phase = "serve"; sim.resume = 3; } },
+    onPrepare(ctx) { const mg = TungGear.mine(), og = TungGear.fromNums((ctx.players.find((p) => p.id !== ctx.me.id) || {}).gear); padGear = ctx.host ? [mg, og] : [og, mg]; goalsTo = ctx.opts.goals; names = ctx.host ? [ctx.me.name, ctx.players[1].name] : [ctx.me.name, ctx.players[0].name]; begin(ctx.host ? "host" : "guest"); running = false; if (sim) { sim.phase = "serve"; sim.resume = 3; } },
     onStart(ctx) { running = true; if (sim) { sim.phase = "serve"; sim.resume = 0.9; } },
     onStop() { running = false; },
     onExit() { running = false; cancelAnimationFrame(raf); role = "idle"; hideResult(); },

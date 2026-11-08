@@ -5,6 +5,7 @@
   const scoreEl = document.getElementById("score"), bestEl = document.getElementById("best"), msgEl = document.getElementById("msg"), startBtn = document.getElementById("startBtn");
 
   const GROUND = 70, PIPE_W = 78, SPACING = 190, BX = 120, GRAV = 1500, FLAP = -430, FIRST = 420;
+  let oppGear = {}; // what the other tung wears (shop items); your own comes from TungGear.mine()
   let seed = "solo", mp = false, state = "idle"; // idle | run | dead
   let bird, pipes, score, scroll, dist = 0, tops = new Map(), opp = null, oppSent = 0, raf = 0, last = 0, flapT = 0, deadAt = 0, shake = 0, parts = [];
   let best = Number(localStorage.getItem("tungFlappyBest") || 0);
@@ -142,7 +143,7 @@
     ctx.globalAlpha = 1;
     // the bird: Tung Tung Sahur, bat flapping like a wing
     const wing = flapT > 0 ? 1.4 - (flapT / 0.18) * 1.2 : 0.2;
-    TA.draw(ctx, BX, bird.y, 56, { rot: bird.rot + 0.15, bat: -0.5 + wing * 0.9, eyes: state === "dead" ? "x" : "normal", mouth: state === "dead" ? "sad" : state === "run" && bird.vy < 0 ? "open" : "smile", look: [0.6, bird.vy / 900], legs: state === "run" ? performance.now() / 160 : 0 });
+    TA.draw(ctx, BX, bird.y, 56, { gear: TungGear.mine(), rot: bird.rot + 0.15, bat: -0.5 + wing * 0.9, eyes: state === "dead" ? "x" : "normal", mouth: state === "dead" ? "sad" : state === "run" && bird.vy < 0 ? "open" : "smile", look: [0.6, bird.vy / 900], legs: state === "run" ? performance.now() / 160 : 0 });
     // the opponent (multiplayer): same pipes, their own position along them
     if (mp && opp) {
       const name = (window.TungMP && TungMP.match && TungMP.match.opp && TungMP.match.opp.username) || "Opponent";
@@ -150,7 +151,7 @@
       if (ox < 28) { ox = 28; edge = -1; } else if (ox > W - 28) { ox = W - 28; edge = 1; }
       const wing = opp.flap > 0 ? 1.4 - (opp.flap / 0.18) * 1.2 : 0.2;
       ctx.save(); ctx.globalAlpha = opp.dead ? 0.45 : 0.62;
-      TA.draw(ctx, ox, opp.dy, edge ? 40 : 56, { rot: opp.dr + 0.15, bat: -0.5 + wing * 0.9, eyes: opp.dead ? "x" : "normal", mouth: opp.dead ? "sad" : "smile", look: [0.6, 0], legs: opp.dead ? 0 : performance.now() / 160 });
+      TA.draw(ctx, ox, opp.dy, edge ? 40 : 56, { gear: oppGear, rot: opp.dr + 0.15, bat: -0.5 + wing * 0.9, eyes: opp.dead ? "x" : "normal", mouth: opp.dead ? "sad" : "smile", look: [0.6, 0], legs: opp.dead ? 0 : performance.now() / 160 });
       ctx.globalAlpha = 1; ctx.font = "800 12px sans-serif"; ctx.textAlign = "center"; ctx.lineWidth = 4; ctx.strokeStyle = "#1b3a55"; ctx.fillStyle = "#ffd23f";
       const label = (edge < 0 ? "◀ " : "") + name + (opp.dead ? " 💀" : "") + (edge > 0 ? " ▶" : ""), ly = Math.max(16, opp.dy - 38);
       ctx.strokeText(label, Math.max(60, Math.min(W - 60, ox)), ly); ctx.fillText(label, Math.max(60, Math.min(W - 60, ox)), ly);
@@ -207,7 +208,7 @@
     if (first) { opp.dd = d.d; opp.dy = d.y; opp.dr = d.r; }
   });
   if (window.TungMP) TungMP.registerGame({
-    prepareMatch(m) { mp = true; seed = m.seed; reset(); opp = { dd: 0, dy: bird.y, dr: 0, fv: 0, flap: 0, d: 0, y: bird.y, r: 0, v: 0, dead: false, at: 0 }; msgEl.textContent = ""; },
+    prepareMatch(m) { mp = true; seed = m.seed; reset(); oppGear = TungGear.fromNums(m.opp.gear); opp = { dd: 0, dy: bird.y, dr: 0, fv: 0, flap: 0, d: 0, y: bird.y, r: 0, v: 0, dead: false, at: 0 }; msgEl.textContent = ""; },
     startMatch() { if (mp) { begin(); bird.vy = FLAP; } },
     stopMatch() { if (state === "run") { state = "dead"; deadAt = performance.now(); } },
     exitMatch() { mp = false; seed = "solo"; reset(); msgEl.textContent = "Press Space, click or tap to flap"; startBtn.textContent = "Start"; },

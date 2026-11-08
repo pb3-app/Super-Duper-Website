@@ -82,7 +82,7 @@
     T.on('msg:gr_go', (g) => {
       if (g.game !== cfg.game) return;
       finished = false;
-      const players = g.players.map((p) => ({ id: p.id, name: p.username, avatar: p.avatar, slot: p.slot }));
+      const players = g.players.map((p) => ({ id: p.id, name: p.username, avatar: p.avatar, gear: p.gear, slot: p.slot }));
       const host = players.find((p) => p.id === g.host) || players[0];
       players.sort((a, b) => (a.id === host.id ? -1 : b.id === host.id ? 1 : a.slot - b.slot)); // the host is always first
       net = { kind: 'room', host: g.host === g.you, hostId: host.id, me: players.find((p) => p.id === g.you), players, opts: g.opts, seed: g.seed };
@@ -97,7 +97,7 @@
     T.registerGame({
       prepareMatch(m) {
         finished = false;
-        const me = { id: m.you.id, name: m.you.username, avatar: m.you.avatar }, opp = { id: m.opp.id, name: m.opp.username, avatar: m.opp.avatar };
+        const me = { id: m.you.id, name: m.you.username, avatar: m.you.avatar, gear: m.you.gear }, opp = { id: m.opp.id, name: m.opp.username, avatar: m.opp.avatar, gear: m.opp.gear };
         const players = (m.idx === 0 ? [me, opp] : [opp, me]).map((p, i) => ({ ...p, slot: i }));
         net = { kind: 'match', host: m.idx === 0, hostId: players[0].id, oppId: opp.id, me: players.find((p) => p.id === me.id), players, opts: m.options, seed: m.seed };
         mode = 'multi'; playing = true; render(); cfg.onPrepare(net);

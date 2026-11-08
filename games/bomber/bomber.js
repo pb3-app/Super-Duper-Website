@@ -23,7 +23,7 @@
   }
   const SPIRAL = spiral();
   function makeSim(players, to, seed) {
-    const s = { players: players.map((p, i) => ({ id: p.id, name: p.name, bot: !!p.bot, slot: i, x: 0, y: 0, dir: 2, alive: true, bm: 1, rg: 2, spd: 0, shield: 0, inv: 0, wins: 0, pass: new Set(), inp: { dx: 0, dy: 0, bomb: 0 }, lastBomb: 0, ai: { t: 0, path: null, goal: null } })), grid: new Uint8Array(GW * GH), fl: new Float32Array(GW * GH), bombs: [], ups: new Map(), drops: [], phase: "ready", ready: 2.2, t: 0, tr: 0, round: 1, to, ev: [], over: 0, lastWinner: -1, winner: -1, matchOver: false, bid: 1, sd: 0, seed };
+    const s = { players: players.map((p, i) => ({ id: p.id, name: p.name, gear: p.gear, bot: !!p.bot, slot: i, x: 0, y: 0, dir: 2, alive: true, bm: 1, rg: 2, spd: 0, shield: 0, inv: 0, wins: 0, pass: new Set(), inp: { dx: 0, dy: 0, bomb: 0 }, lastBomb: 0, ai: { t: 0, path: null, goal: null } })), grid: new Uint8Array(GW * GH), fl: new Float32Array(GW * GH), bombs: [], ups: new Map(), drops: [], phase: "ready", ready: 2.2, t: 0, tr: 0, round: 1, to, ev: [], over: 0, lastWinner: -1, winner: -1, matchOver: false, bid: 1, sd: 0, seed };
     startRound(s); return s;
   }
   function startRound(s) {
@@ -195,7 +195,7 @@
     ctx.fillStyle = "rgba(0,0,0,.3)"; ctx.beginPath(); ctx.ellipse(x, y + 18, 15, 6, 0, 0, 7); ctx.fill();
     const blink = p.inv > 0 && Math.floor(t * 14) % 2;
     ctx.save(); if (blink) ctx.globalAlpha = 0.4;
-    TA.draw(ctx, x, y - 4, 54, { pal: col.pal, flip: p.dir === 3, bat: 0.7, mouth: "smile", look: [p.dir === 1 ? 1 : p.dir === 3 ? -1 : 0, p.dir === 2 ? 0.8 : p.dir === 0 ? -0.8 : 0], legs: performance.now() / 140 + i, parts: { legs: true, armFar: true, face: true, bat: false } });
+    TA.draw(ctx, x, y - 4, 54, { gear: p.gear, pal: col.pal, flip: p.dir === 3, bat: 0.7, mouth: "smile", look: [p.dir === 1 ? 1 : p.dir === 3 ? -1 : 0, p.dir === 2 ? 0.8 : p.dir === 0 ? -0.8 : 0], legs: performance.now() / 140 + i, parts: { legs: true, armFar: true, face: true, bat: false } });
     ctx.fillStyle = col.c; ctx.fillRect(x - 11, y + 5, 22, 5);
     ctx.restore();
     if (p.shield) { ctx.strokeStyle = "rgba(122,211,255,.9)"; ctx.lineWidth = 3; ctx.fillStyle = "rgba(122,211,255,.18)"; ctx.beginPath(); ctx.arc(x, y - 2, 25, 0, 7); ctx.fill(); ctx.stroke(); }
@@ -277,13 +277,13 @@
   const hideResult = () => { $("result").hidden = true; };
   function begin(newRole, players, to, seed) {
     role = newRole; over = false; hideResult(); roundsTo = to; parts = []; bombCount = 0; remoteIn.clear(); myIdx = players.findIndex((p) => p.me);
-    if (role === "guest") { sim = null; view = { players: players.map((p, i) => ({ id: p.id, name: p.name, slot: i, x: 0, y: 0, dir: 2, alive: true, bm: 1, rg: 2, spd: 0, shield: 0, wins: 0, inv: 0 })), target: [], grid: new Uint8Array(GW * GH), fl: new Float32Array(GW * GH), bombs: [], ups: new Map(), phase: "ready", ready: 3, round: 1, lastWinner: -1, tr: 0 }; }
+    if (role === "guest") { sim = null; view = { players: players.map((p, i) => ({ id: p.id, name: p.name, gear: p.gear, slot: i, x: 0, y: 0, dir: 2, alive: true, bm: 1, rg: 2, spd: 0, shield: 0, wins: 0, inv: 0 })), target: [], grid: new Uint8Array(GW * GH), fl: new Float32Array(GW * GH), bombs: [], ups: new Map(), phase: "ready", ready: 3, round: 1, lastWinner: -1, tr: 0 }; }
     else { sim = makeSim(players, to, seed); view = null; }
     running = true; cancelAnimationFrame(raf); last = 0; raf = requestAnimationFrame(frame);
   }
   function startSolo() {
     level = $("level").value; const nb = Number($("bots").value), names = ["Tralalero", "Bombardiro", "Cappuccino"];
-    const players = [{ id: "me", name: (window.TungMP && TungMP.user ? TungMP.user.username : "You"), me: true }];
+    const players = [{ id: "me", name: (window.TungMP && TungMP.user ? TungMP.user.username : "You"), gear: TungGear.mine(), me: true }];
     for (let i = 0; i < nb; i++) players.push({ id: "bot" + i, name: names[i], bot: true });
     np.setPlaying(true); begin("solo", players, Number($("rounds").value), "s" + Date.now());
   }
@@ -308,7 +308,7 @@
     view.phase = d.ph; view.rd = d.rd; view.round = d.rd; view.ready = d.rdy; view.lastWinner = d.lw; view.winner = d.w; view.tr = d.tr; handleEv(d.ev || [], view);
     if (d.ph === "end" && !over) endMatch();
   }
-  const asPlayers = (c) => c.players.map((p) => ({ id: p.id, name: p.name, me: p.id === c.me.id }));
+  const asPlayers = (c) => c.players.map((p) => ({ id: p.id, name: p.name, gear: TungGear.fromNums(p.gear), me: p.id === c.me.id }));
   np = NetPlay.attach({
     game: "bomber", rooms: true, panel: $("mpPanel"), menu: $("menu"), play: $("play"),
     onModeChange() { if (role === "solo") toMenu(); },

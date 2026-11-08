@@ -7,6 +7,7 @@
   const cv = $("view"), ctx = cv.getContext("2d"), msgEl = $("msg");
   const idx = (x, y) => y * GW + x;
 
+  let gearBy = []; // what each player (by slot) wears: the shop items they bought
   let mp = false, host = true, myId = 0, sim = null, view = null, running = false, raf = 0, ended = false;
   let best = Number(localStorage.getItem("tungPaperBest") || 0); $("bestEl").textContent = (best / 10).toFixed(1);
   let tickAt = 0, tickTimer = 0, myPeakSent = 0, lastMsg = "", audio;
@@ -205,7 +206,7 @@
       const x = (p.px + (p.x - p.px) * k + 0.5) * CELL, y = (p.py + (p.y - p.py) * k + 0.5) * CELL;
       ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(x, y, 9, 0, 7); ctx.fill();
       ctx.strokeStyle = p.id === myId ? "#fff" : "#000"; ctx.lineWidth = 2; ctx.stroke();
-      TA.draw(ctx, x, y - 2, 26, { look: [DX[p.dir], DY[p.dir]], mouth: "oh", parts: { face: true, bat: false, legs: false, armFar: false }, bat: 0 });
+      TA.draw(ctx, x, y - 2, 26, { gear: gearBy[p.id], look: [DX[p.dir], DY[p.dir]], mouth: "oh", parts: { face: true, bat: false, legs: false, armFar: false }, bat: 0 });
       if (p.id === myId) { ctx.font = "800 11px sans-serif"; ctx.textAlign = "center"; ctx.fillStyle = "#fff"; ctx.fillText("YOU", x, y - 16); }
     }
     ctx.strokeStyle = "rgba(255,255,255,.3)"; ctx.lineWidth = 2; ctx.strokeRect(1, 1, 598, 598);
@@ -230,6 +231,7 @@
 
   // =========================== modes ===========================
   function startSolo() {
+    gearBy = [TungGear.mine()];
     mp = false; host = true; myId = 0; botCount = Number($("bots").value);
     sim = makeSim(build(["You"]), Number($("time").value)); view = sim; begin(); hud();
   }
@@ -250,6 +252,7 @@
         roundSecs = m.options.time; botCount = m.options.bots;
         const hostName = host ? m.you.username : m.opp.username, guestName = host ? m.opp.username : m.you.username;
         names = [hostName, guestName];
+        const myG = TungGear.mine(), oppG = TungGear.fromNums(m.opp.gear); gearBy = host ? [myG, oppG] : [oppG, myG];
         sim = makeSim(build(names), roundSecs); view = sim;
         msgEl.textContent = "Get ready…"; $("startBtn").textContent = "Start"; hud();
         cancelAnimationFrame(raf); raf = requestAnimationFrame(frame);

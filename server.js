@@ -300,7 +300,8 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
 function avatarOf(u) {
   return u.avatar.type === 'emoji' ? 'emoji:' + u.avatar.value : '/avatars/' + u.key + '.jpg?v=' + u.avatar.v;
 }
-const publicUser = (u) => ({ id: u.key, username: u.username, avatar: avatarOf(u) });
+// gear: what the player wears from the shop, as numbers (see gearOf): the games draw it on their tung
+const publicUser = (u) => ({ id: u.key, username: u.username, avatar: avatarOf(u), gear: gearOf(u) });
 const emptyStats = () => ({ w: 0, l: 0, d: 0 });
 function statsFor(u, game) {
   if (game === 'all') {
@@ -712,6 +713,7 @@ async function handleApi(req, res, url) {
       saveDb();
       const p = arenaPlayers.get(key);
       if (p) p.q = gearOf(u); // everyone in the arena sees it straight away
+      sendUser(key, { t: 'profile', user: { ...publicUser(u), admin: isAdmin(key) } }); // and the player's other pages know what they wear
       return json(res, 200, shopState(u));
     }
 

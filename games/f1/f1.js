@@ -63,13 +63,13 @@
   function setupRace(opts) {
     loadTrack(opts.track); laps = opts.laps; cars = []; parts = []; ghost = null;
     if (opts.mp) {
-      me = newCar(opts.idx, { human: true, name: "You", color: "#ffcc33" });
-      ghost = newCar(1 - opts.idx, { name: opts.oppName, color: "#4cc9f0", ghost: true, tx: 0, ty: 0 });
+      me = newCar(opts.idx, { human: true, name: "You", color: "#ffcc33", gear: TungGear.mine() });
+      ghost = newCar(1 - opts.idx, { name: opts.oppName, color: "#4cc9f0", ghost: true, tx: 0, ty: 0, gear: TungGear.fromNums(opts.oppGear) });
       cars = [me, ghost];
     } else {
       const sk = Number($("skill").value);
       const rivals = [["Tralalero", "#2a8cff", 0.98], ["Bombardiro", "#3fcf5a", 1.0], ["Cappuccino", "#555566", 0.94]];
-      me = newCar(2, { human: true, name: "You", color: "#ffcc33" });
+      me = newCar(2, { human: true, name: "You", color: "#ffcc33", gear: TungGear.mine() });
       const slots = [0, 1, 3];
       cars = [me];
       rivals.forEach((r, i) => cars.push(newCar(slots[i], { name: r[0], color: r[1], ai: true, skill: sk * r[2], lane: (i - 1) * 0.28 })));
@@ -250,10 +250,12 @@
     ctx.fillStyle = "#222"; ctx.fillRect(18, -11, 4, 22); ctx.fillRect(-20, -10, 4, 20); // wings
     ctx.fillStyle = "rgba(255,255,255,.35)"; ctx.fillRect(-8, -1.5, 18, 3);
     // Tung Tung Sahur at the wheel: a log end with two big eyes
-    ctx.fillStyle = "#c58a4a"; ctx.beginPath(); ctx.arc(-1, 0, 6.5, 0, 7); ctx.fill(); ctx.strokeStyle = "#5e3a18"; ctx.lineWidth = 1.5; ctx.stroke();
+    const skin = c.gear && c.gear.color && window.TungShop ? TungShop.byId[c.gear.color] : null;
+    ctx.fillStyle = skin ? TungGear.skinFill(ctx, skin, 13) : "#c58a4a"; ctx.beginPath(); ctx.arc(-1, 0, 6.5, 0, 7); ctx.fill(); ctx.strokeStyle = "#5e3a18"; ctx.lineWidth = 1.5; ctx.stroke();
     ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(1.5, -2.4, 2.2, 0, 7); ctx.arc(1.5, 2.4, 2.2, 0, 7); ctx.fill();
     ctx.fillStyle = "#000"; ctx.beginPath(); ctx.arc(2.3, -2.4, 1, 0, 7); ctx.arc(2.3, 2.4, 1, 0, 7); ctx.fill();
     ctx.restore();
+    if (c.gear && c.gear.hat) { ctx.save(); if (c.ghost) ctx.globalAlpha = 0.8; ctx.translate(c.x, c.y - 4 + 29 * 0.55); ctx.scale(0.55, 0.55); TungGear.hat(ctx, c.gear.hat, performance.now() / 1000); ctx.restore(); } // the hat stays upright
     ctx.save(); ctx.font = "800 13px sans-serif"; ctx.textAlign = "center"; ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.7)";
     ctx.strokeText(c.name, c.x, c.y - 34); ctx.fillStyle = isMe ? "#ffe27a" : "#fff"; ctx.fillText(c.name, c.x, c.y - 34); ctx.restore();
   }
@@ -353,7 +355,7 @@
     TungMP.registerGame({
       prepareMatch(m) {
         stopEngine(); mp = true; myIdx = m.idx;
-        setupRace({ track: m.options.level, laps: m.options.laps, mp: true, idx: m.idx, oppName: m.opp.username });
+        setupRace({ track: m.options.level, laps: m.options.laps, mp: true, idx: m.idx, oppName: m.opp.username, oppGear: m.opp.gear });
         phase = "idle"; msgEl.textContent = "Get ready…";
       },
       startMatch() { if (mp) begin(); },

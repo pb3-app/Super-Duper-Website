@@ -32,7 +32,7 @@
     if (stageCount >= 6) {
       const parts = { legs: stageCount >= 10, armFar: stageCount >= 8, bat: stageCount >= 9, face: stageCount >= 7 };
       ctx.save(); ctx.translate(230, 80); ctx.rotate(sway); ctx.translate(-230, -80);
-      TA.draw(ctx, 230, 80 + 96, 190, { parts, eyes: lost ? "x" : "normal", mouth: lost ? "sad" : won ? "open" : stageCount >= 9 ? "oh" : "smile", look: [0.3, 0.5], bat: 0.45 });
+      TA.draw(ctx, 230, 80 + 96, 190, { gear: TungGear.mine(), parts, eyes: lost ? "x" : "normal", mouth: lost ? "sad" : won ? "open" : stageCount >= 9 ? "oh" : "smile", look: [0.3, 0.5], bat: 0.45 });
       ctx.restore();
     }
     if (lost) { ctx.fillStyle = "#ff8a80"; ctx.font = "900 26px sans-serif"; ctx.textAlign = "center"; ctx.fillText("TUNG TUNG... 💀", 180, 346); }
