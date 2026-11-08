@@ -129,3 +129,18 @@ kbd { display: inline-block; min-width: 1.9rem; padding: .22rem .5rem; text-alig
   .ctl .keys { min-width: 0; }
   .controls { padding-left: .7rem; padding-right: .7rem; }
 }
+
+/* Ambient background on every game page: the Tung Tung Sahur pattern, faint and drifting slowly behind everything */
+body::before {
+  content: "";
+  position: fixed;
+  inset: -1100px;
+  z-index: -1;
+  pointer-events: none;
+  background: url("../assets/tung-pattern.webp") 0 0 / 900px 503px repeat;
+  opacity: .15;
+  animation: tungDrift 180s linear infinite;
+  will-change: transform;
+}
+@keyframes tungDrift { to { transform: translate3d(900px, 503px, 0); } }
+@media (prefers-reduced-motion: reduce) { body::before { animation: none; } }

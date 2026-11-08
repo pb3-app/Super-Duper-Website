@@ -80,6 +80,7 @@
   }
 
   function draw() {
+    syncMine();
     const now = performance.now(), k = geo(), s = view;
     ctx.setTransform(dpr, 0, 0, dpr, 0, k.top * dpr);
     ctx.clearRect(0, -k.top, S, S + k.top);
@@ -136,6 +137,16 @@
       ctx.fillStyle = "#fff3d6"; ctx.textAlign = "center"; ctx.font = `900 ${S * 0.085}px Nunito, sans-serif`;
       ctx.fillText(s.winner === my ? "🏆 You win!" : mp ? names[s.winner] + " wins" : "Computer wins", S / 2, S / 2 + S * 0.03);
     }
+  }
+  // who I am and what I wear can arrive after the page opens (the account loads a moment later), so look again as it changes
+  let mineKey = "";
+  function syncMine() {
+    if (mp || !view || !TG) return;
+    const u = window.TungMP && TungMP.user, key = JSON.stringify([u && u.username, u && u.gear]);
+    if (key === mineKey) return;
+    mineKey = key; gears[my] = TG.mine();
+    const nm = (u && u.username) || "You"; if (names[my] !== nm) names[my] = nm;
+    portraits(); render();
   }
   (function loop() { draw(); requestAnimationFrame(loop); })();
   window.__walls = { draw, state: () => view, setTool: (t) => setTool(t) }; // for testing
@@ -271,7 +282,7 @@
         mp = true; my = m.idx; hint = null; setTool(null); $("hintBtn").hidden = true; $("twHint").textContent = "";
         names = m.idx === 0 ? [m.you.username, m.opp.username] : [m.opp.username, m.you.username];
         gears = [{}, {}]; pals = [undefined, undefined];
-        gears[my] = TG ? TG.fromNums(m.you.gear) : {}; gears[1 - my] = TG ? TG.fromNums(m.opp.gear) : {};
+        gears[my] = TG ? (Array.isArray(m.you.gear) && m.you.gear.some(Boolean) ? TG.fromNums(m.you.gear) : TG.mine()) : {}; gears[1 - my] = TG ? TG.fromNums(m.opp.gear) : {};
         pals[1 - my] = Object.keys(gears[1 - my]).length ? undefined : "blue";
         anim[0] = anim[1] = null;
         view = W.newGame(); busy = true; render(); portraits(); setStatus("Waiting for the game to start…");
