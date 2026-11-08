@@ -314,6 +314,7 @@
     if (!S.user) { drawer.hidden = true; return; }
     drawer.append(
       h('div', { class: 'mp-me' }, avatarNode(S.user.avatar, 40), h('span', { class: 'grow' }, S.user.username),
+        h('button', { class: 'mp-btn small ghost', onclick: openProfile }, '✏️ Edit'),
         h('button', { class: 'mp-btn small ghost', onclick: logout }, 'Log out')),
       h('h3', null, '👥 Online now'),
       playerList(null),
@@ -482,33 +483,79 @@
         setTimeout(() => user.focus(), 0);
       };
 
-      function avatarPicker() {
-        const grid = h('div', { class: 'mp-emoji-grid' });
-        const preview = h('span');
-        const refresh = () => {
-          [...grid.children].forEach((b) => b.classList.toggle('sel', avatar && avatar.type === 'emoji' && avatar.value === b.textContent));
-          preview.replaceChildren(avatar ? avatarNode(avatar.type === 'image' ? avatar.data : 'emoji:' + avatar.value, 48) : h('span', { class: 'mp-hint' }, 'None yet'));
-        };
-        for (const em of S.cfg.avatars) grid.append(h('button', { type: 'button', onclick: () => { avatar = { type: 'emoji', value: em }; refresh(); } }, em));
-        const file = h('input', { type: 'file', accept: 'image/*', hidden: true });
-        file.addEventListener('change', async () => {
-          const f = file.files[0];
-          if (!f) return;
-          try { uploaded = await resizeImage(f); avatar = { type: 'image', data: uploaded }; refresh(); }
-          catch { showToast({ title: 'Could not read that image', ttl: 3000 }); }
-        });
-        const wrap = h('div', { class: 'mp-field' }, 'Profile picture', grid,
-          h('div', { class: 'mp-pic-row' }, preview,
-            h('button', { type: 'button', class: 'mp-btn small ghost', onclick: () => file.click() }, '📷 Upload photo'), file));
-        refresh();
-        return wrap;
-      }
+      const avatarPicker = () => buildAvatarPicker(() => avatar, (a) => { avatar = a; });
 
       const modal = openModal(body, { dismiss: true, onClose: () => { authModal = null; reject(new Error('cancelled')); } });
       authModal = modal;
       render();
     }).catch(() => null);
   }
+
+  // the profile picture chooser (emoji or an uploaded photo), used when signing up and when editing the profile
+  // get() returns the current choice ({type:'emoji', value} | {type:'image', data} | null); set(choice) stores a new one
+  function buildAvatarPicker(get, set) {
+    const grid = h('div', { class: 'mp-emoji-grid' });
+    const preview = h('span');
+    const refresh = () => {
+      const avatar = get();
+      [...grid.children].forEach((b) => b.classList.toggle('sel', !!avatar && avatar.type === 'emoji' && avatar.value === b.textContent));
+      preview.replaceChildren(avatar ? avatarNode(avatar.type === 'image' ? (avatar.data || avatar.src) : 'emoji:' + avatar.value, 48) : h('span', { class: 'mp-hint' }, 'None yet'));
+    };
+    for (const em of S.cfg.avatars) grid.append(h('button', { type: 'button', onclick: () => { set({ type: 'emoji', value: em }); refresh(); } }, em));
+    const file = h('input', { type: 'file', accept: 'image/*', hidden: true });
+    file.addEventListener('change', async () => {
+      const f = file.files[0];
+      if (!f) return;
+      try { set({ type: 'image', data: await resizeImage(f) }); refresh(); }
+      catch { showToast({ title: 'Could not read that image', ttl: 3000 }); }
+    });
+    const wrap = h('div', { class: 'mp-field' }, 'Profile picture', grid,
+      h('div', { class: 'mp-pic-row' }, preview,
+        h('button', { type: 'button', class: 'mp-btn small ghost', onclick: () => file.click() }, '📷 Upload photo'), file));
+    refresh();
+    return wrap;
+  }
+
+  // ---------- edit your name and profile picture ----------
+  let profileModal = null;
+  function openProfile() {
+    if (!S.user || profileModal) return;
+    const startAv = S.user.avatar || '';
+    // what the account has now: an emoji ("emoji:🥁") or a picture on the server; picking nothing new keeps it
+    let avatar = startAv.startsWith('emoji:') ? { type: 'emoji', value: startAv.slice(6) } : { type: 'image', src: startAv, keep: true };
+    const body = h('div');
+    const err = h('div', { class: 'mp-error', role: 'alert' });
+    const name = h('input', { type: 'text', maxlength: '16', autocomplete: 'off', autocapitalize: 'none', spellcheck: 'false', value: S.user.username });
+    const save = h('button', { class: 'mp-btn', type: 'submit' }, 'Save');
+    const form = h('form', { novalidate: true },
+      h('label', { class: 'mp-field' }, 'Name', name),
+      buildAvatarPicker(() => avatar, (a) => { avatar = a; }),
+      h('p', { class: 'mp-hint' }, 'Your old name still works to log in. Your wins, losses and items stay with you.'),
+      err, h('div', { class: 'row' }, h('button', { class: 'mp-btn ghost', type: 'button', onclick: () => modal.close() }, 'Cancel'), save));
+    let busy = false;
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (busy) return;
+      err.textContent = '';
+      const username = name.value.trim();
+      if (!/^[A-Za-z0-9_]{3,16}$/.test(username)) return (err.textContent = 'Name: 3-16 letters, numbers or _');
+      const payload = {};
+      if (username !== S.user.username) payload.username = username;
+      if (!avatar.keep) payload.avatar = avatar.type === 'image' ? { type: 'image', data: avatar.data } : avatar;
+      if (!Object.keys(payload).length) return modal.close();
+      busy = true; save.disabled = true;
+      try {
+        const r = await api('/api/profile', { method: 'POST', body: payload });
+        S.user = r.user; renderSlot(); renderDrawer(); emit('profile'); showToast({ title: 'Profile saved ✔', ttl: 2500 });
+        modal.close();
+      } catch (ex) { err.textContent = ex.message; busy = false; save.disabled = false; }
+    });
+    body.append(h('h2', null, '✏️ Edit profile'), form);
+    const modal = openModal(body, { dismiss: true, onClose: () => { profileModal = null; } });
+    profileModal = modal;
+    setTimeout(() => name.focus(), 0);
+  }
+  on('msg:profile', (m) => { if (m.user) { S.user = m.user; renderSlot(); renderDrawer(); emit('profile'); } }); // another tab changed it
 
   function resizeImage(file) {
     return new Promise((resolve, reject) => {

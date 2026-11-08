@@ -396,6 +396,19 @@ function saveImageAvatar(key, dataUrl) {
   if (REMOTE) sbPut('avatar:' + key, buf.toString('base64')).catch((e) => console.error('Could not save the avatar to Supabase:', e.message));
 }
 
+// A player's key (their id everywhere) is the lowercase name they signed up with and never changes. They can later change the
+// name that is shown (u.username): the old name keeps working to log in, and neither can be taken by somebody else.
+const NAME_RE = /^[A-Za-z0-9_]{3,16}$/;
+function userByName(lower) {
+  const u = db.users[lower] || Object.values(db.users).find((x) => x.username.toLowerCase() === lower);
+  return u || null;
+}
+const nameTaken = (lower, exceptKey) => {
+  if (ADMINS.has(lower) && exceptKey !== lower) return true;
+  const u = userByName(lower);
+  return !!(u && u.key !== exceptKey);
+};
+
 const DUMMY_SALT = crypto.randomBytes(16);
 
 // Behind a host's proxy (Render, Caddy, nginx) every request arrives from the proxy's own address, so the visitor's
@@ -465,14 +478,14 @@ async function handleApi(req, res, url) {
       const username = String(b.username || '').trim();
       if (!/^[A-Za-z0-9_]{3,16}$/.test(username)) throw httpErr(400, 'Username must be 3-16 letters, numbers or underscores');
       const key = username.toLowerCase();
-      if (db.users[key]) throw httpErr(409, 'That username is taken');
+      if (nameTaken(key)) throw httpErr(409, 'That username is taken');
       const pin = String(b.pin || '');
       if (!/^\d{4}$/.test(pin)) throw httpErr(400, 'PIN must be exactly 4 digits');
       const av = b.avatar || {};
       if (av.type === 'emoji' ? !AVATARS.includes(av.value) : av.type !== 'image') throw httpErr(400, 'Pick a profile picture');
       const salt = crypto.randomBytes(16);
       const hash = await scrypt(pin, salt, 32);
-      if (db.users[key]) throw httpErr(409, 'That username is taken');
+      if (nameTaken(key)) throw httpErr(409, 'That username is taken');
       let avatar;
       if (av.type === 'emoji') avatar = { type: 'emoji', value: av.value };
       else { saveImageAvatar(key, av.data); avatar = { type: 'image', v: Date.now() }; }
@@ -487,7 +500,7 @@ async function handleApi(req, res, url) {
     case 'POST /api/login': {
       rateLimit(ip, 'login', 40, 10 * 60e3);
       const b = await readJson(req);
-      let u = db.users[String(b.username || '').trim().toLowerCase()];
+      let u = userByName(String(b.username || '').trim().toLowerCase());
       if (u && u.removed) u = null;
       const pin = String(b.pin || '');
       if (!u) {
@@ -627,6 +640,39 @@ async function handleApi(req, res, url) {
       if (isAdmin(target)) throw httpErr(400, 'You cannot remove another admin');
       removeUser(target);
       return json(res, 200, { ok: true, removed: db.users[target].username });
+    }
+
+    case 'POST /api/profile': { // change the name shown and / or the profile picture
+      rateLimit(ip, 'profile', 20, 3600e3);
+      const key = sessionKey(bearer(req) || '');
+      if (!key) throw httpErr(401, 'Log in first');
+      const b = await readJson(req, 160 * 1024);
+      const u = db.users[key];
+      let changed = false;
+      if (b.username !== undefined) {
+        const name = String(b.username || '').trim();
+        if (!NAME_RE.test(name)) throw httpErr(400, 'Username must be 3-16 letters, numbers or underscores');
+        if (name !== u.username) {
+          if (nameTaken(name.toLowerCase(), key)) throw httpErr(409, 'That username is taken');
+          u.username = name; changed = true;
+        }
+      }
+      if (b.avatar !== undefined) {
+        const av = b.avatar || {};
+        if (av.type === 'emoji') {
+          if (!AVATARS.includes(av.value)) throw httpErr(400, 'Pick a profile picture');
+          u.avatar = { type: 'emoji', value: av.value }; changed = true;
+        } else if (av.type === 'image') {
+          saveImageAvatar(key, av.data); u.avatar = { type: 'image', v: Date.now() }; changed = true;
+        } else throw httpErr(400, 'Pick a profile picture');
+      }
+      if (changed) {
+        saveDb();
+        const ap = arenaPlayers.get(key); if (ap) ap.name = u.username;
+        sendUser(key, { t: 'profile', user: { ...publicUser(u), admin: isAdmin(key) } });
+        schedulePresence();
+      }
+      return json(res, 200, { user: { ...publicUser(u), admin: isAdmin(key) } });
     }
 
     case 'GET /api/shop': {
