@@ -448,6 +448,9 @@ const DAILY_PRIZES = [
   { k: 'b1', w: 28, b: 1 }, { k: 'b2', w: 24, b: 2 }, { k: 'b3', w: 14, b: 3 }, { k: 'b5', w: 8, b: 5 }, { k: 'b10', w: 2, b: 10 },
   { k: 't1', w: 12, t: 1 }, { k: 't2', w: 7, t: 2 }, { k: 't3', w: 4, t: 3 }, { k: 't4', w: 1, t: 4 },
 ];
+// the wheel stands in Tung Arena: the order of its slices (the page draws the same order), and where it is turned now
+const DAILY_WHEEL = ['b1', 't1', 'b2', 'b3', 't2', 'b1', 'b5', 'b2', 't3', 'b3', 'b10', 't4'];
+const arenaWheel = { x: 1050, y: 1700, r: 130, rot: 0, until: 0 };
 const prevDay = (d) => new Date(Date.parse(d + 'T00:00:00Z') - 864e5).toISOString().slice(0, 10);
 const dailyOf = (u) => u.daily || (u.daily = { last: '', streak: 0, best: 0, spun: '', pending: [], weeks: 0 });
 function touchDaily(u) { // log in = check in. Returns true if something changed
@@ -753,11 +756,22 @@ async function handleApi(req, res, url) {
       if (d.spun === day) throw httpErr(409, 'You already spun today. The next spin comes at 8:00 AM Eastern.');
       let roll = Math.random() * DAILY_PRIZES.reduce((n, p) => n + p.w, 0), pick = DAILY_PRIZES[0];
       for (const p of DAILY_PRIZES) { if (roll < p.w) { pick = p; break; } roll -= p.w; }
+      // which slice it lands on, and (if you are in the arena) the big wheel turns for everybody
+      const ids = DAILY_WHEEL.map((k, i) => (k === pick.k ? i : -1)).filter((i) => i >= 0), idx = ids[Math.floor(Math.random() * ids.length)];
+      const inArena = arenaPlayers.has(key);
+      if (inArena && arenaWheel.until > Date.now()) throw httpErr(409, 'The wheel is still spinning. Wait a moment.');
       d.spun = day;
       const prize = dailyAward(u, pick);
       saveDb();
       sendUser(key, { t: 'profile', user: { ...publicUser(u), admin: isAdmin(key) } });
-      return json(res, 200, { slice: pick.k, prize, state: dailyState(u) });
+      if (inArena) {
+        const sa = 360 / DAILY_WHEEL.length, from = arenaWheel.rot;
+        const to = from + 360 * 6 + ((360 - ((from % 360) + idx * sa + (Math.random() - 0.5) * sa * 0.6) % 360) % 360);
+        arenaWheel.rot = to; arenaWheel.until = Date.now() + 5200;
+        const text = prize.kind === 'item' ? `${prize.name} (${prize.tierName} ${prize.slotName.toLowerCase()})` : `${prize.n} tung buck${prize.n === 1 ? '' : 's'}`;
+        arenaBroadcast({ t: 'arena_event', type: 'wheel', name: u.username, from, to, ms: 4600, text, big: pick.t >= 3 || pick.b >= 10 });
+      }
+      return json(res, 200, { slice: pick.k, idx, prize, state: dailyState(u) });
     }
     case 'POST /api/daily/claim': { // the prize for a week in a row
       rateLimit(ip, 'daily', 60, 3600e3);
@@ -2267,7 +2281,7 @@ function sdFall(p) {
 }
 
 const arenaInfo = () => ({
-  arena: { w: AR.w, h: AR.h }, radius: AR.r, hold: AR.hold, safe: arenaSafe, showdown: SD, board: sdBoard(),
+  arena: { w: AR.w, h: AR.h }, radius: AR.r, hold: AR.hold, safe: arenaSafe, showdown: SD, board: sdBoard(), wheel: { x: arenaWheel.x, y: arenaWheel.y, r: arenaWheel.r, rot: arenaWheel.rot },
   logs: arenaLogs.map((l) => ({ id: l.id, game: l.game, kind: l.kind, group: !!l.group, max: l.max || 0, need: l.need, x: l.x, y: l.y, w: l.w, h: l.h, title: arenaGameMeta(l.game).title, icon: arenaGameMeta(l.game).icon })),
 });
 const arenaSpawn = () => ({ x: AR.w * 0.3 + Math.random() * AR.w * 0.2, y: AR.h * 0.45 + Math.random() * AR.h * 0.17 });

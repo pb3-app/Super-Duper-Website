@@ -540,21 +540,23 @@
       }
     } catch (_) {}
   }
+  // the prize wheel, drawn at any size (the daily window and the wheel standing in Tung Arena use the same picture)
+  function paintWheel(c, size) {
+    const k = size / 280, R = 134 * k, cx = size / 2, cy = size / 2, sa = 360 / WHEEL.length; c.clearRect(0, 0, size, size);
+    WHEEL.forEach((kind, i) => {
+      const a0 = (-90 + i * sa - sa / 2) * Math.PI / 180, a1 = a0 + sa * Math.PI / 180;
+      c.beginPath(); c.moveTo(cx, cy); c.arc(cx, cy, R, a0, a1); c.closePath(); c.fillStyle = WHEEL_STYLE[kind][0]; c.fill(); c.strokeStyle = '#2b1a0e'; c.lineWidth = 3 * k; c.stroke();
+      c.save(); c.translate(cx, cy); c.rotate((-90 + i * sa) * Math.PI / 180); c.textAlign = 'right'; c.textBaseline = 'middle'; c.fillStyle = '#fff'; c.font = `800 ${19 * k}px Nunito, sans-serif`; c.shadowColor = '#000'; c.shadowBlur = 3 * k; c.fillText(WHEEL_STYLE[kind][1], R - 12 * k, 0); c.restore();
+    });
+    c.beginPath(); c.arc(cx, cy, 20 * k, 0, 7); c.fillStyle = '#2b1a0e'; c.fill(); c.strokeStyle = '#ff8c2a'; c.lineWidth = 4 * k; c.stroke(); c.fillStyle = '#ff8c2a'; c.font = `${22 * k}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('🥁', cx, cy + k);
+  }
   let dailyModal = null;
   function openDaily() {
     if (!S.user || dailyModal) return;
     const body = h('div', { class: 'mp-daily' }), wheel = h('canvas', { width: 280, height: 280, class: 'wheel', 'aria-label': 'Prize wheel' });
     let busy = false, rot = 0, msg = null;
     const slices = WHEEL.length, sa = 360 / slices;
-    function drawWheel() {
-      const c = wheel.getContext('2d'), R = 134, cx = 140, cy = 140; c.clearRect(0, 0, 280, 280);
-      WHEEL.forEach((k, i) => {
-        const a0 = (-90 + i * sa - sa / 2) * Math.PI / 180, a1 = a0 + sa * Math.PI / 180;
-        c.beginPath(); c.moveTo(cx, cy); c.arc(cx, cy, R, a0, a1); c.closePath(); c.fillStyle = WHEEL_STYLE[k][0]; c.fill(); c.strokeStyle = '#2b1a0e'; c.lineWidth = 3; c.stroke();
-        c.save(); c.translate(cx, cy); c.rotate((-90 + i * sa) * Math.PI / 180); c.textAlign = 'right'; c.textBaseline = 'middle'; c.fillStyle = '#fff'; c.font = '800 19px Nunito, sans-serif'; c.shadowColor = '#000'; c.shadowBlur = 3; c.fillText(WHEEL_STYLE[k][1], R - 12, 0); c.restore();
-      });
-      c.beginPath(); c.arc(cx, cy, 20, 0, 7); c.fillStyle = '#2b1a0e'; c.fill(); c.strokeStyle = '#ff8c2a'; c.lineWidth = 4; c.stroke(); c.fillStyle = '#ff8c2a'; c.font = '22px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('🥁', cx, cy + 1);
-    }
+    function drawWheel() { paintWheel(wheel.getContext('2d'), 280); }
     drawWheel();
     const prizeText = (p) => (p.kind === 'item' ? `${p.name} (${p.tierName} ${p.slotName.toLowerCase()})` : `${p.n} tung buck${p.n === 1 ? '' : 's'}`) + (p.note ? '. ' + p.note : '');
     function left(ms) { const m = Math.max(1, Math.floor(ms / 60000)); return `${Math.floor(m / 60)}h ${m % 60}m`; }
@@ -580,7 +582,7 @@
       busy = true; msg = null; render();
       try {
         const r = await api('/api/daily/spin', { method: 'POST' });
-        const idx = (() => { const ids = WHEEL.map((k, i) => (k === r.slice ? i : -1)).filter((i) => i >= 0); return ids[Math.floor(Math.random() * ids.length)]; })();
+        const idx = typeof r.idx === 'number' ? r.idx : WHEEL.indexOf(r.slice);
         rot += 360 * 6 + ((360 - ((rot % 360) + idx * sa + (Math.random() - 0.5) * sa * 0.6) % 360) % 360);
         wheel.style.transition = 'transform 4.6s cubic-bezier(.08,.6,.12,1)'; wheel.style.transform = `rotate(${rot}deg)`;
         for (let i = 0; i < 9; i++) setTimeout(() => tung(200 + i * 40, 0.05), i * 480);
@@ -1069,6 +1071,11 @@
     rt(d) { if (S.shell && S.shell.match && S.shell.running) send({ t: 'rt', matchId: S.shell.match.id, d }); },
     get match() { return S.shell ? S.shell.match : null; },
     fmtTime,
+    get daily() { return S.daily; },
+    applyDaily(d) { S.daily = d; renderSlot(); renderDrawer(); emit('daily'); },
+    loadDaily: () => loadDaily(false),
+    openDaily,
+    wheelFace(size) { const c = document.createElement('canvas'); c.width = c.height = size; paintWheel(c.getContext('2d'), size); return c; },
     registerGame(api) { if (S.shell) S.shell.api = api; else S.pendingGame = api; },
     progress(v) { if (S.shellApi) S.shellApi.progress(v); },
     finish(p) { if (S.shellApi) S.shellApi.finish(p); },
