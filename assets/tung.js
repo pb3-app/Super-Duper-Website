@@ -58,10 +58,9 @@
     ctx.beginPath(); ctx.moveTo(24, 78); ctx.quadraticCurveTo(10, 90, 8, 108); ctx.stroke();
     }
     // what is worn behind the body: a cape or wings
-    if (gear && has('face') && (gear.wear === 'cape' || gear.wear === 'wings')) {
-      ctx.save(); ctx.translate(50, 73); ctx.scale(gear.wear === 'wings' ? 1.2 : 1.4, gear.wear === 'wings' ? 1.2 : 1.4);
-      if (gear.wear === 'cape') G.cape(ctx, now); else G.wings(ctx, now);
-      ctx.restore();
+    if (gear && has('face') && gear.wear && G.isBehind(gear.wear)) {
+      const k = gear.wear === 'wings' ? 1.2 : gear.wear === 'jetpack' ? 1.25 : 1.4;
+      ctx.save(); ctx.translate(50, 73); ctx.scale(k, k); G.behind(ctx, gear.wear, now); ctx.restore();
     }
     // bat (held in the near hand, swings around the hand at (80,78))
     if (has('bat') && gear && gear.bat) {
@@ -119,7 +118,7 @@
     }
     // outfit, then what goes on the face
     if (gear && has('face')) {
-      if (gear.wear && gear.wear !== 'cape' && gear.wear !== 'wings') { ctx.save(); ctx.translate(50, 93); ctx.scale(1.4, 1.4); G.wear(ctx, gear.wear); ctx.restore(); }
+      if (gear.wear && !G.isBehind(gear.wear)) { ctx.save(); ctx.translate(50, 93); ctx.scale(1.4, 1.4); G.wear(ctx, gear.wear); ctx.restore(); }
       if (gear.face) { ctx.save(); ctx.translate(50.5, 81.6); ctx.scale(1.56, 1.56); G.face(ctx, gear.face); ctx.restore(); }
     }
     // near arm

@@ -92,14 +92,15 @@
   // ---------- Back to Tung Arena: a game started from the arena sends you back 10 seconds after it ends ----------
   // The arena page sets window.__tungArena, and a game it starts (a match or a solo game) leaves a flag in sessionStorage.
   const ArenaReturn = (() => {
-    let timer = null, toast = null;
+    let timer = null, toast = null, clickWatch = null;
     const flagged = () => { try { return sessionStorage.getItem('tungArenaReturn') === '1'; } catch { return false; } };
     function cancel() {
       clearInterval(timer); timer = null;
+      if (clickWatch) { document.removeEventListener('click', clickWatch, true); clickWatch = null; }
       if (toast) { toast.remove(); toast = null; }
       try { sessionStorage.removeItem('tungArenaReturn'); } catch {}
     }
-    function go() { clearInterval(timer); location.href = '/arena.html'; }
+    function go() { clearInterval(timer); if (clickWatch) { document.removeEventListener('click', clickWatch, true); clickWatch = null; } location.href = '/arena.html'; }
     return {
       flag() { try { sessionStorage.setItem('tungArenaReturn', '1'); } catch {} },
       cancel,
@@ -108,6 +109,12 @@
         let left = 10;
         const words = () => 'Back to Tung Arena in ' + left + '…';
         toast = showToast({ title: words(), actions: [{ label: 'Go now', fn: go }, { label: 'Stay here', kind: 'ghost', fn: cancel }] });
+        // starting another game (Rematch, Play again, Restart…) means you want to stay: no teleport back to the arena
+        clickWatch = (e) => {
+          const b = e.target && e.target.closest ? e.target.closest('button, a') : null;
+          if (b && !b.closest('.mp-toasts') && /rematch|play again|again|restart|retry|new game|rack the cups|tip off/i.test(b.textContent)) cancel();
+        };
+        document.addEventListener('click', clickWatch, true);
         timer = setInterval(() => {
           left--;
           if (left <= 0) return go();
@@ -927,6 +934,7 @@
           `Your ${gameTitle(m.game)} record: ${m.stats.game.w}W - ${m.stats.game.l}L - ${m.stats.game.d}D`),
         h('div', { class: 'row' },
           m.result === 'cancelled' ? null : h('button', { class: 'mp-btn', onclick: () => {
+            ArenaReturn.cancel();
             send({ t: 'challenge', to: opp.id, game: m.game, options: m.options }); modal.close();
           } }, '🔁 Rematch'),
           h('button', { class: 'mp-btn ghost', onclick: () => { modal.close(); leaveMatch('multi'); } }, 'Back to lobby'),

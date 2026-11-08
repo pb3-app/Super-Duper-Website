@@ -309,15 +309,14 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   function drawTung(p) {
     const r = radius, g = gearIds(p), t = performance.now() / 1000;
     ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.beginPath(); ctx.ellipse(0, r * 0.9, r, r * 0.35, 0, 0, Math.PI * 2); ctx.fill();
-    if (g.wear === "cape") G.cape(ctx, t);
-    if (g.wear === "wings") G.wings(ctx, t);
+    if (g.wear && G.isBehind(g.wear)) G.behind(ctx, g.wear, t);
     ctx.save(); ctx.rotate(p.f + (p.s ? -1.2 : 0.6)); G.bat(ctx, r, g.bat); ctx.restore();
     const bw = r * 1.5, bh = r * 2.1, ci = g.color && Shop.byId[g.color];
     ctx.fillStyle = p.st ? "#ffcf99" : ci ? G.skinFill(ctx, ci, bh) : p.c; ctx.strokeStyle = INK; ctx.lineWidth = 3; rr(-bw / 2, -bh / 2, bw, bh, 12); ctx.fill(); ctx.stroke();
     if (ci && ci.pattern && !p.st) G.skin(ctx, ci.pattern, bw, bh, t);
     ctx.strokeStyle = "rgba(61, 36, 18, 0.35)"; ctx.lineWidth = 2;
     for (const gx of [-bw * 0.25, bw * 0.22]) { ctx.beginPath(); ctx.moveTo(gx, -bh * 0.4); ctx.lineTo(gx + 2, bh * 0.4); ctx.stroke(); }
-    if (g.wear && g.wear !== "cape" && g.wear !== "wings") G.wear(ctx, g.wear);
+    if (g.wear && !G.isBehind(g.wear)) G.wear(ctx, g.wear);
     const lx = Math.cos(p.f) * 3, ly = Math.sin(p.f) * 3;
     for (const ex of [-8, 8]) {
       ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(ex, -10, 7, 0, Math.PI * 2); ctx.fill();
@@ -350,7 +349,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     if (!g.trail) { delete lastAt[p.id]; return; }
     const l = lastAt[p.id];
     if (l && Math.hypot(p.x - l.x, p.y - l.y) > 5 && trailBits.length < 400) {
-      trailBits.push({ kind: g.trail, x: p.x + (Math.random() - 0.5) * 14, y: p.y + radius * 0.7 + (Math.random() - 0.5) * 8, vx: (Math.random() - 0.5) * 20, vy: g.trail === "flames" || g.trail === "bubbles" || g.trail === "hearts" || g.trail === "music" ? -30 - Math.random() * 30 : (Math.random() - 0.5) * 20, life: 0.8, max: 0.8 });
+      trailBits.push({ kind: g.trail, x: p.x + (Math.random() - 0.5) * 14, y: p.y + radius * 0.7 + (Math.random() - 0.5) * 8, vx: (Math.random() - 0.5) * 20, vy: G.trailRise(g.trail) < 0 ? -30 - Math.random() * 30 : G.trailRise(g.trail) > 0 ? 20 + Math.random() * 30 : (Math.random() - 0.5) * 20, life: 0.8, max: 0.8 });
     }
     lastAt[p.id] = { x: p.x, y: p.y };
   }
