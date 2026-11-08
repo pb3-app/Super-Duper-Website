@@ -72,5 +72,7 @@ window.TUNG_GAMES = [
   { id: "cuppong", title: "Tung Tung Cup Pong", description: "Arc the ball into the cups. Sink two and throw again.", icon: "🥤", players: "1 or 2 players", url: "games/cuppong/index.html" },
   { id: "boxing", title: "Tung Boxing", description: "First-person boxing: dodge, counter, parry. 6 tungs, 5 opponents, or online 1v1.", icon: "🥊", players: "1 player or 2 online", url: "games/boxing/index.html" },
   { id: "dizzy", title: "Dizzy Tungs", description: "One button! Your tung never stops spinning. Throw bats, last tung standing wins.", icon: "🌀", players: "1-4 players, same screen or online", url: "games/dizzy/index.html" },
+  { id: "uno", title: "Tung Tung Uno", description: "Match colours and numbers, skip and reverse, and shout UNO. Up to 6 players online or against the computer.", icon: "🃏", players: "1 player or 2-6 online", url: "games/uno/index.html" },
+  { id: "phase10", title: "Tung Tung Phase 10", description: "Lay down sets, runs and colours across ten phases. Be the first to finish.", icon: "🔟", players: "1 player or 2-6 online", url: "games/phase10/index.html" },
   // Add more games here
 ];

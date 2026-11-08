@@ -28,6 +28,7 @@ const TB = { // turn-based games whose rules run on the server (see games/<id>/r
   go: require('./games/go/rules.js'),
 };
 const PicWords = require('./games/pictionary/words.js');
+const CardGames = { uno: require('./games/uno/engine.js'), phase10: require('./games/phase10/engine.js') }; // card games where the server holds the hands
 const Shop = require('./assets/shop-items.js'); // the tung shop: the items, and which six are for sale today
 const GOLF_COURSES = ['meadow', 'neon'];
 const GOLF_HOLES = 6, GOLF_MAXSTROKES = 8;
@@ -153,6 +154,17 @@ const GAMES = {
     options: { lives: { label: 'Lives each', values: [1, 2, 3, 5, 7, 10], default: 3 } },
   },
   pictionary: { title: 'Tung Tung Pictionary', icon: '🎨', progressLabel: 'Points', rooms: true, picRooms: true },
+  uno: {
+    title: 'Tung Tung Uno', icon: '🃏', progressLabel: 'Wins', rooms: true, cardRooms: true, soloWL: true,
+    options: { bots: { label: 'Computer players', values: [0, 1, 2, 3], default: 0 } },
+  },
+  phase10: {
+    title: 'Tung Tung Phase 10', icon: '🔟', progressLabel: 'Wins', rooms: true, cardRooms: true, soloWL: true,
+    options: {
+      phases: { label: 'Phases to finish', values: [2, 3, 5, 10], default: 3 },
+      bots: { label: 'Computer players', values: [0, 1, 2, 3], default: 0 },
+    },
+  },
   paper: {
     title: 'Tung Paper.io', icon: '📄', progressLabel: 'Peak land', judge: 'score', realtime: true,
     options: {
@@ -1362,6 +1374,7 @@ function arenaHoldUser(key) {
 }
 function onUserOffline(key) {
   if (arenaHold.has(key)) return;
+  crLeave(key, true);
   tuLeave(key, true);
   grLeave(key, true);
   picLeave(key, true);
@@ -1377,6 +1390,7 @@ function onUserOnline(ws) {
   if (arenaHold.has(ws.key)) { clearTimeout(arenaHold.get(ws.key)); arenaHold.delete(ws.key); }
   { const gr = grRooms.get(grUserRoom.get(ws.key)); if (gr) wsSend(ws, { t: 'gr_room', room: grView(gr) }); const pr = picRooms.get(picUserRoom.get(ws.key)); if (pr) { wsSend(ws, { t: 'pic_room', room: picView(pr, ws.key) }); } }
   { const tr = tuRooms.get(tuUserRoom.get(ws.key)); if (tr) wsSend(ws, { t: 'tu_room', room: tuView(tr) }); }
+  { const cr = crRooms.get(crUserRoom.get(ws.key)); if (cr) wsSend(ws, { t: 'cr_room', room: crView(cr, ws.key) }); }
   const room = rooms.get(userRoom.get(ws.key));
   if (!room) return;
   if (room.game) Imposter.setConnected(room.game, ws.key, true, Date.now());
@@ -1538,6 +1552,143 @@ function onGr(ws, msg) {
     case 'gr_result': { // only the host's browser runs the simulation, so only the host can say who won
       if (!r || r.state !== 'running' || r.host !== ws.key || !Array.isArray(msg.ranking)) return;
       grEnd(r, msg.ranking.map(String), 'done'); return;
+    }
+  }
+}
+
+// ---------- Card rooms (Tung Tung Uno and Phase 10): the server holds the hands, so nobody can peek ----------
+// The rules live in games/<id>/engine.js (the same file the page uses to play the computer).
+const crRooms = new Map(), crUserRoom = new Map();
+const CR_MAX = 6, CR_AFK_MS = 45000, CR_BOT_MS = [800, 1500], CR_NEXT_MS = 15000, CR_BACK_MS = 60000;
+const CR_BOT_NAMES = ['Tralalero', 'Bombardiro', 'Cappuccina', 'Lirili', 'Ballerina', 'Brr Brr'];
+const crPub = (k) => publicUser(db.users[k]);
+function crView(r, key) {
+  const E = CardGames[r.game];
+  return {
+    id: r.id, game: r.game, host: r.host, state: r.state, opts: r.opts, max: CR_MAX, notice: r.notice || null,
+    members: r.members.map(crPub),
+    g: r.g ? E.view(r.g, key) : null, turnMs: r.turnEnds ? Math.max(0, r.turnEnds - Date.now()) : 0,
+    seatNames: r.g ? Object.fromEntries(r.g.players.map((p) => [p.id, p.name])) : null,
+    result: r.result || null,
+  };
+}
+const crSend = (r) => { for (const k of r.members) sendUser(k, { t: 'cr_room', room: crView(r, k) }); };
+function crList(game) { return [...crRooms.values()].filter((r) => r.game === game && r.state === 'lobby').map((r) => ({ id: r.id, game: r.game, host: crPub(r.host), count: r.members.length, max: CR_MAX, opts: r.opts })); }
+function crBroadcastList(game) { const msg = JSON.stringify({ t: 'cr_rooms', game, rooms: crList(game) }); for (const ws of wss.clients) if (ws.crWatch === game && ws.readyState === 1) ws.send(msg); }
+function crClear(r) { clearTimeout(r.timer); r.timer = null; r.turnEnds = 0; }
+function crStart(r) {
+  const E = CardGames[r.game], humans = r.members.length;
+  const bots = Math.max(0, Math.min(Number(r.opts.bots) || 0, CR_MAX - humans));
+  const players = r.members.map((k) => ({ id: k, name: db.users[k].username, bot: false }));
+  for (let i = 0; i < bots; i++) players.push({ id: 'bot' + i, name: CR_BOT_NAMES[i] + ' 🤖', bot: true });
+  r.g = E.create(players, { phases: r.opts.phases });
+  r.state = 'playing'; r.counted = true; r.result = null; r.notice = null; r.left = new Set();
+  crBroadcastList(r.game); crSend(r); crSchedule(r);
+}
+// whoever has to act next: the computer after a short think, a person after 45 seconds (then the computer plays for them)
+function crSchedule(r) {
+  const E = CardGames[r.game];
+  crClear(r);
+  if (r.state !== 'playing') return;
+  if (r.g.stage === 'over' || r.g.phase === 'over') return crFinish(r);
+  const who = E.turnOf(r.g);
+  if (who === null) { // between hands (Phase 10): the next one starts when everybody is ready, or after a while
+    r.turnEnds = Date.now() + CR_NEXT_MS;
+    r.timer = setTimeout(() => { for (const p of r.g.players) if (!p.bot) E.act(r.g, p.id, { t: 'next' }); crSend(r); crSchedule(r); }, CR_NEXT_MS);
+    return;
+  }
+  const seat = r.g.players.find((p) => p.id === who);
+  const botPlays = seat.bot || r.left.has(who);
+  const delay = botPlays ? CR_BOT_MS[0] + Math.random() * (CR_BOT_MS[1] - CR_BOT_MS[0]) : CR_AFK_MS;
+  r.turnEnds = Date.now() + delay;
+  r.timer = setTimeout(() => {
+    if (r.state !== 'playing') return;
+    const res = E.act(r.g, who, E.botAct(r.g, who));
+    if (!res.ok) E.act(r.g, who, { t: 'draw', from: 'deck' }); // never get stuck
+    crSend(r); crSchedule(r);
+  }, delay);
+  if (!botPlays) crSend(r); // so the clock on their screen starts
+}
+function crFinish(r) {
+  const E = CardGames[r.game];
+  const order = E.ranking(r.g), rows = order.map((id, i) => { const seat = r.g.players.find((p) => p.id === id); return { id, name: seat.name, place: i + 1, bot: seat.bot, user: crPub0(id) }; });
+  if (r.counted) {
+    for (const row of rows) if (db.users[row.id] && !r.left.has(row.id)) recordResult(row.id, r.game, row.place === 1 ? 'w' : 'l');
+    saveDb();
+  }
+  r.state = 'over'; r.result = rows.map((x) => ({ id: x.id, name: x.name, place: x.place, bot: x.bot, avatar: x.user ? x.user.avatar : null }));
+  crClear(r);
+  for (const k of r.members) sendUser(k, { t: 'cr_end', game: r.game, result: r.result, you: k, stats: { game: statsFor(db.users[k], r.game), all: statsFor(db.users[k], 'all') } });
+  crSend(r);
+  r.timer = setTimeout(() => { if (r.state === 'over') crToLobby(r); }, CR_BACK_MS);
+}
+const crPub0 = (id) => (db.users[id] ? crPub(id) : null);
+function crToLobby(r) {
+  if (r.state !== 'over') return;
+  crClear(r); r.state = 'lobby'; r.g = null; r.result = null; r.counted = false;
+  crSend(r); crBroadcastList(r.game);
+}
+function crLeave(key, offline) {
+  const r = crRooms.get(crUserRoom.get(key));
+  if (!r) return;
+  const doIt = () => {
+    if (crUserRoom.get(key) !== r.id) return;
+    r.members = r.members.filter((k) => k !== key);
+    crUserRoom.delete(key); if (userMatch.get(key) === r.id) userMatch.delete(key);
+    sendUser(key, { t: 'cr_room', room: null });
+    if (r.state === 'playing' && r.counted) { recordResult(key, r.game, 'l'); r.left.add(key); saveDb(); }
+    if (!r.members.length) { crClear(r); crRooms.delete(r.id); }
+    else {
+      if (r.host === key) r.host = r.members[0];
+      if (r.state === 'playing') {
+        const seat = r.g.players.find((p) => p.id === key); if (seat) { seat.bot = true; seat.name += ' 🤖'; }
+        if (r.members.length < 1) crFinish(r);
+        else { crSend(r); crSchedule(r); }
+      } else crSend(r);
+    }
+    crBroadcastList(r.game); schedulePresence();
+  };
+  if (offline && r.state === 'playing') { setTimeout(() => { if (!online.has(key)) doIt(); }, 15000).unref(); return; }
+  if (offline && !online.has(key)) return doIt();
+  doIt();
+}
+function onCr(ws, msg) {
+  const err = (message) => wsSend(ws, { t: 'error', message });
+  const r = crRooms.get(crUserRoom.get(ws.key));
+  switch (msg.t) {
+    case 'cr_watch': { const g = String(msg.game || ''); if (!CardGames[g]) return; ws.crWatch = g; wsSend(ws, { t: 'cr_rooms', game: g, rooms: crList(g) }); if (r) wsSend(ws, { t: 'cr_room', room: crView(r, ws.key) }); return; }
+    case 'cr_unwatch': ws.crWatch = null; return;
+    case 'cr_create': {
+      const g = String(msg.game || ''); if (!CardGames[g]) return err('Unknown game');
+      if (r) return err('You are already in a room');
+      if (userMatch.has(ws.key)) return err('Finish your current match first');
+      const room = { id: crypto.randomBytes(4).toString('hex'), game: g, host: ws.key, members: [ws.key], state: 'lobby', opts: sanitizeOptions(g, msg.opts), g: null, counted: false, left: new Set(), timer: null };
+      crRooms.set(room.id, room); crUserRoom.set(ws.key, room.id); userMatch.set(ws.key, room.id);
+      crSend(room); crBroadcastList(g); schedulePresence(); return;
+    }
+    case 'cr_join': {
+      const room = crRooms.get(String(msg.id));
+      if (r) return err('You are already in a room');
+      if (userMatch.has(ws.key)) return err('Finish your current match first');
+      if (!room || room.state !== 'lobby') return err('That room is not open any more');
+      if (room.members.length >= CR_MAX) return err('That room is full');
+      room.members.push(ws.key); crUserRoom.set(ws.key, room.id); userMatch.set(ws.key, room.id);
+      crSend(room); crBroadcastList(room.game); schedulePresence(); return;
+    }
+    case 'cr_leave': return crLeave(ws.key, false);
+    case 'cr_config': { if (!r || r.host !== ws.key || r.state !== 'lobby') return; r.opts = sanitizeOptions(r.game, Object.assign({}, r.opts, msg.opts)); crSend(r); crBroadcastList(r.game); return; }
+    case 'cr_start': {
+      if (!r || r.host !== ws.key || r.state !== 'lobby') return;
+      if (r.members.length < 2) return err('You need at least 2 players (the computer players only fill the empty seats)');
+      return crStart(r);
+    }
+    case 'cr_lobby': { if (r && r.host === ws.key) crToLobby(r); return; }
+    case 'cr_act': {
+      if (!r || r.state !== 'playing') return;
+      const E = CardGames[r.game];
+      const res = E.act(r.g, ws.key, msg.action);
+      if (!res.ok) return wsSend(ws, { t: 'cr_reject', error: res.error });
+      crSend(r); crSchedule(r); return;
     }
   }
 }
@@ -1913,6 +2064,7 @@ wss.on('connection', (ws) => {
       case 'rt': return onRt(ws, msg);
       case 'vote_cast': return voteCast(ws, msg);
       case 'pick_ready': return onPickReady(ws);
+      case 'cr_watch': case 'cr_unwatch': case 'cr_create': case 'cr_join': case 'cr_leave': case 'cr_config': case 'cr_start': case 'cr_lobby': case 'cr_act': return onCr(ws, msg);
       case 'imp_watch': case 'imp_unwatch': case 'imp_create': case 'imp_join': case 'imp_leave':
       case 'imp_start': case 'imp_act': case 'imp_again': return onImp(ws, msg);
       case 'join_match': return onJoin(ws, msg, false);
@@ -1951,8 +2103,8 @@ const bonkBoost = (bonks) => Math.min(1, Math.floor((bonks || 0) / 10) / 10);
 const AR_COLORS = ['#c8874a', '#a86b35', '#d9a066', '#8b5a2b', '#e0b07a', '#b5793f'];
 const arenaPlayers = new Map(); // key -> player
 let arenaTimer = null, arenaTickNo = 0;
-const ARENA_GROUP = ['bomber', 'sumo', 'dizzy', 'pictionary', 'tungup', 'imposter']; // games with open rooms for more than 2 players
-const arenaRoomMax = (g) => (g === 'pictionary' ? PIC_MAX : g === 'tungup' ? TU_MAX : g === 'imposter' ? Imposter.MAX_PLAYERS : GAMES[g].groomMax);
+const ARENA_GROUP = ['bomber', 'sumo', 'dizzy', 'pictionary', 'tungup', 'imposter', 'uno', 'phase10']; // games with open rooms for more than 2 players
+const arenaRoomMax = (g) => (g === 'uno' || g === 'phase10' ? CR_MAX : g === 'pictionary' ? PIC_MAX : g === 'tungup' ? TU_MAX : g === 'imposter' ? Imposter.MAX_PLAYERS : GAMES[g].groomMax);
 const arenaRoomMin = (g) => (g === 'imposter' ? Imposter.MIN_PLAYERS : 3);
 const arenaGameMeta = (g) => ({ title: GAMES[g].title, icon: GAMES[g].icon });
 const arenaLogs = (() => {
@@ -2195,6 +2347,10 @@ function arenaGroupLaunch(l, keys) {
     const room = { id: mk(), host: keys[0], members: keys.slice(), state: 'lobby', map: 'junkyard', chaos: 'normal', prog: {}, fin: {}, counted: false, capTimer: null, startTimer: null, startAt: 0 };
     tuRooms.set(room.id, room); for (const k of keys) { tuUserRoom.set(k, room.id); userMatch.set(k, room.id); }
     tuBroadcastList(); id = room.id;
+  } else if (CardGames[g]) {
+    const room = { id: mk(), game: g, host: keys[0], members: keys.slice(), state: 'lobby', opts: sanitizeOptions(g, {}), g: null, counted: false, left: new Set(), timer: null };
+    crRooms.set(room.id, room); for (const k of keys) { crUserRoom.set(k, room.id); userMatch.set(k, room.id); }
+    crBroadcastList(g); id = room.id;
   } else if (g === 'imposter') {
     const room = { id: mk(), host: keys[0], members: [], state: 'lobby', game: null, recorded: false, notice: null };
     rooms.set(room.id, room); for (const k of keys) addToRoom(room, k);

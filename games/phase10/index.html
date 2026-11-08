@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Tung Tung Phase 10</title>
+  <link rel="stylesheet" href="../game.css" />
+  <link rel="stylesheet" href="../../mp.css" />
+  <link rel="stylesheet" href="../cards.css" />
+</head>
+<body data-game="phase10" data-custom="1">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="game-page cards-page">
+    <div class="game-top">
+      <a class="back" href="../../index.html#games">← Games</a>
+      <h1>🔟 Tung Tung Phase 10</h1>
+      <div id="mpSlot"></div>
+    </div>
+    <div class="mode-switch" id="modeSwitch">
+      <button class="btn secondary active" data-mode="single">🎮 Single Player</button>
+      <button class="btn secondary" data-mode="multi">👥 Multiplayer</button>
+    </div>
+    <div class="mp-lobby" id="mpLobby" hidden></div>
+    <div class="mp-matchbar" id="mpMatchBar" hidden></div>
+
+    <div id="gameArea">
+      <div id="menu" class="np-sec menu-card">
+        <h2>Play the computer</h2>
+        <div class="opts">
+          <label>Computer players <select id="bots"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></label>
+          <label>Phases to finish <select id="phases"><option value="2">2</option><option value="3" selected>3</option><option value="5">5</option><option value="10">10 (the full game)</option></select></label>
+        </div>
+        <div class="btn-row"><button class="btn" id="startBtn" style="font-size:1.15rem;padding:.7rem 1.8rem">🔟 Deal the cards</button></div>
+        <p class="np-hint">Playing the computer never counts toward the leaderboard (solo wins and losses have their own board).</p>
+      </div>
+      <div id="mpPanel" hidden></div>
+
+      <div id="play" hidden>
+        <div class="table" id="table">
+          <div class="t-bar" id="bar"></div>
+          <div class="msg" id="phaseMsg"></div>
+          <div class="opps" id="opps"></div>
+          <div class="laidwrap" id="laid"></div>
+          <div class="center">
+            <div class="pile"><div id="drawPile"></div><div class="lab">Draw pile</div></div>
+            <div class="pile"><div id="discPile"></div><div class="lab">Discard pile</div></div>
+          </div>
+          <div class="msg" id="msg"></div>
+          <div class="acts" id="acts"></div>
+          <div class="hand mine" id="hand"></div>
+          <div class="sortbar"><span>Sort:</span><button id="sortNum">by number</button><button id="sortCol">by colour</button></div>
+          <div class="clog" id="log"></div>
+          <div class="acts"><button class="btn secondary" id="quitBtn">☰ Menu</button></div>
+          <div class="result" id="result" hidden></div>
+        </div>
+      </div>
+
+      <section class="controls" aria-label="How to play">
+        <h2>🎮 How to play</h2>
+        <div class="ctl-grid">
+          <div class="ctl"><span class="keys"><kbd class="mouse">Draw</kbd></span><span class="act">Start your turn by clicking the <b>draw pile</b> or the top of the <b>discard pile</b> (you can't take a Skip).</span></div>
+          <div class="ctl"><span class="keys"><kbd class="mouse">Lay down</kbd></span><span class="act">When your hand makes your <b>phase</b>, press <b>Lay down phase</b> (or select the exact cards first). You do it once per hand.</span></div>
+          <div class="ctl"><span class="keys"><kbd class="mouse">Hit</kbd></span><span class="act">After you laid down, select a card and click a glowing group (any player's) to add it. On runs use the ◀ ▶ ends.</span></div>
+          <div class="ctl"><span class="keys"><kbd class="mouse">Discard</kbd></span><span class="act">End your turn by discarding one card. A <b>Skip</b> makes the player you pick lose their next turn.</span></div>
+        </div>
+        <p class="ctl-extra"><b>Phases:</b> 1) 2 sets of 3 · 2) set of 3 + run of 4 · 3) set of 4 + run of 4 · 4) run of 7 · 5) run of 8 · 6) run of 9 · 7) 2 sets of 4 · 8) 7 cards of one colour · 9) set of 5 + set of 2 · 10) set of 5 + set of 3. A <b>set</b> is the same number, a <b>run</b> is consecutive numbers (1 to 12), and Wilds stand in for anything. Go out first to end the hand: everyone else scores their cards (1-9 = 5, 10-12 = 10, Skip = 15, Wild = 25). Only players who laid down move on to the next phase. First to finish the chosen number of phases wins (lowest score breaks a tie). Online, the server deals and keeps every hand secret; after 45 seconds of waiting the computer plays your turn.</p>
+      </section>
+    </div>
+    <div id="gameLeaderboard"></div>
+  </div>
+
+  <div class="picker" id="picker" hidden><div class="box"><h3>Skip who?</h3><div class="row" id="skipWho"></div></div></div>
+
+  <script src="../../mp.js"></script>
+  <script src="../netplay.js"></script>
+  <script src="../cardroom.js"></script>
+  <script src="engine.js"></script>
+  <script src="phase10.js"></script>
+</body>
+</html>
