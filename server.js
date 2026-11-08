@@ -441,6 +441,51 @@ function clientIp(req) {
 
 // ---------- Tung shop: one tung buck for every multiplayer win, spent on cosmetics for the arena ----------
 // The balance is worked out, never stored: every multiplayer win ever recorded, less what the player has spent.
+// ---------- Daily reward: a wheel to spin every day and a login streak with a prize every week ----------
+// A "day" is the shop day (it changes at 8:00 AM Eastern, like the shop). Logging in on consecutive days builds the streak;
+// every 7th day in a row earns a big prize that you claim from the daily window.
+const DAILY_PRIZES = [
+  { k: 'b1', w: 28, b: 1 }, { k: 'b2', w: 24, b: 2 }, { k: 'b3', w: 14, b: 3 }, { k: 'b5', w: 8, b: 5 }, { k: 'b10', w: 2, b: 10 },
+  { k: 't1', w: 12, t: 1 }, { k: 't2', w: 7, t: 2 }, { k: 't3', w: 4, t: 3 }, { k: 't4', w: 1, t: 4 },
+];
+const prevDay = (d) => new Date(Date.parse(d + 'T00:00:00Z') - 864e5).toISOString().slice(0, 10);
+const dailyOf = (u) => u.daily || (u.daily = { last: '', streak: 0, best: 0, spun: '', pending: [], weeks: 0 });
+function touchDaily(u) { // log in = check in. Returns true if something changed
+  const d = dailyOf(u), day = Shop.todayStr();
+  if (d.last === day) return false;
+  d.streak = d.last === prevDay(day) ? d.streak + 1 : 1;
+  d.last = day; d.best = Math.max(d.best || 0, d.streak);
+  if (d.streak % 7 === 0) { d.pending = d.pending || []; if (!d.pending.includes(d.streak)) d.pending.push(d.streak); }
+  return true;
+}
+function dailyGrantItem(u, tier) { // an item you do not own yet, from this tier or the next one down; its price in bucks if there is none
+  const sh = shopOf(u);
+  for (let t = tier; t >= 1; t--) {
+    const pool = Shop.ITEMS.filter((i) => i.tier === t && !sh.owned.includes(i.id));
+    if (pool.length) { const it = pool[Math.floor(Math.random() * pool.length)]; sh.owned.push(it.id); return { item: it, bucks: 0 }; }
+  }
+  return { item: null, bucks: Shop.PRICE[tier] };
+}
+function dailyAward(u, p) { // p: { b } bucks or { t } item tier. Returns what to show
+  const sh = shopOf(u);
+  if (p.t) {
+    const g = dailyGrantItem(u, p.t);
+    if (g.item) return { kind: 'item', id: g.item.id, name: g.item.name, tier: g.item.tier, tierName: Shop.TIERS[g.item.tier], slot: g.item.slot, slotName: Shop.SLOT_NAMES[g.item.slot] };
+    sh.bonus = (sh.bonus || 0) + g.bucks; return { kind: 'bucks', n: g.bucks, note: 'You already own everything in that tier, so here is its price in tung bucks.' };
+  }
+  sh.bonus = (sh.bonus || 0) + p.b; return { kind: 'bucks', n: p.b };
+}
+const weeklyPrize = (week) => ({ t: week % 2 === 1 ? 3 : 4, b: Math.min(20, 5 * week) });
+function dailyState(u) {
+  const d = dailyOf(u), day = Shop.todayStr();
+  const nextWeek = Math.floor(d.streak / 7) + 1, wp = weeklyPrize(nextWeek);
+  return {
+    today: day, canSpin: d.spun !== day, streak: d.streak, best: d.best || 0, pending: d.pending || [],
+    nextMilestone: nextWeek * 7, daysLeft: nextWeek * 7 - d.streak, nextPrize: { tier: wp.t, tierName: Shop.TIERS[wp.t], bucks: wp.b, week: nextWeek },
+    resetsIn: Shop.msUntilReset(), odds: DAILY_PRIZES.map((p) => ({ k: p.k, w: p.w })), balance: shopState(u).balance,
+  };
+}
+
 function shopOf(u) { return u.shop || (u.shop = { owned: [], equipped: {}, spent: 0 }); }
 function shopState(u) {
   const sh = u.shop || { owned: [], equipped: {}, spent: 0 }, wins = statsFor(u, 'all').w, bonus = sh.bonus || 0;
@@ -693,6 +738,41 @@ async function handleApi(req, res, url) {
       return json(res, 200, { user: { ...publicUser(u), admin: isAdmin(key) } });
     }
 
+    case 'GET /api/daily': {
+      const key = sessionKey(bearer(req) || '');
+      if (!key) throw httpErr(401, 'Log in for your daily reward');
+      const u = db.users[key]; if (touchDaily(u)) saveDb();
+      return json(res, 200, dailyState(u));
+    }
+    case 'POST /api/daily/spin': {
+      rateLimit(ip, 'daily', 60, 3600e3);
+      const key = sessionKey(bearer(req) || '');
+      if (!key) throw httpErr(401, 'Log in to spin');
+      const u = db.users[key], d = dailyOf(u), day = Shop.todayStr();
+      touchDaily(u);
+      if (d.spun === day) throw httpErr(409, 'You already spun today. The next spin comes at 8:00 AM Eastern.');
+      let roll = Math.random() * DAILY_PRIZES.reduce((n, p) => n + p.w, 0), pick = DAILY_PRIZES[0];
+      for (const p of DAILY_PRIZES) { if (roll < p.w) { pick = p; break; } roll -= p.w; }
+      d.spun = day;
+      const prize = dailyAward(u, pick);
+      saveDb();
+      sendUser(key, { t: 'profile', user: { ...publicUser(u), admin: isAdmin(key) } });
+      return json(res, 200, { slice: pick.k, prize, state: dailyState(u) });
+    }
+    case 'POST /api/daily/claim': { // the prize for a week in a row
+      rateLimit(ip, 'daily', 60, 3600e3);
+      const key = sessionKey(bearer(req) || '');
+      if (!key) throw httpErr(401, 'Log in first');
+      const u = db.users[key], d = dailyOf(u);
+      touchDaily(u);
+      if (!d.pending || !d.pending.length) throw httpErr(409, 'No weekly prize to claim yet');
+      const streak = d.pending.shift(), week = streak / 7, wp = weeklyPrize(week);
+      const item = dailyAward(u, { t: wp.t }); shopOf(u).bonus = (shopOf(u).bonus || 0) + wp.b;
+      d.weeks = (d.weeks || 0) + 1;
+      saveDb();
+      sendUser(key, { t: 'profile', user: { ...publicUser(u), admin: isAdmin(key) } });
+      return json(res, 200, { week, item, bucks: wp.b, state: dailyState(u) });
+    }
     case 'GET /api/shop': {
       const key = sessionKey(bearer(req) || '');
       if (!key) throw httpErr(401, 'Log in to see the shop');
@@ -2046,6 +2126,7 @@ wss.on('connection', (ws) => {
       ws.key = key;
       ws.token = msg.token;
       addOnline(ws);
+      if (touchDaily(db.users[key])) saveDb();
       wsSend(ws, { t: 'hello', user: { ...publicUser(db.users[key]), admin: isAdmin(key) } });
       onUserOnline(ws);
       return;

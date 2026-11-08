@@ -150,3 +150,17 @@
 .mp-vote .cnt { background: rgba(0,0,0,.45); border-radius: 999px; padding: 0 .5rem; font-size: .85rem; min-width: 1.4rem; text-align: center; }
 .mp-vote .who { display: inline-flex; gap: 2px; }
 .mp-vote-res { text-align: center; margin-top: .3rem; font-weight: 800; color: var(--accent); }
+
+/* the daily reward */
+.mp-daily { text-align: center; }
+.mp-daily .streak { font-size: 1.15rem; margin: .2rem 0 .5rem; } .mp-daily .streak small { opacity: .7; }
+.mp-daily .dots { display: flex; gap: .4rem; justify-content: center; margin-bottom: .4rem; }
+.mp-daily .dot { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; border: 2px solid var(--wood-dark); background: rgba(0,0,0,.3); font-weight: 800; font-size: .9rem; }
+.mp-daily .dot.on { background: #ff8c2a; color: #2b1a0e; border-color: #ffd23f; }
+.mp-daily .dot.big { width: 40px; height: 40px; font-size: 1.2rem; }
+.mp-daily .wheelbox { position: relative; width: 280px; max-width: 100%; margin: .8rem auto .4rem; }
+.mp-daily .wheel { width: 100%; height: auto; border-radius: 50%; box-shadow: 0 0 0 6px #6b4423, 0 8px 24px rgba(0,0,0,.5); }
+.mp-daily .pointer { position: absolute; left: 50%; top: -14px; transform: translateX(-50%); font-size: 30px; color: #ffd23f; text-shadow: 0 2px 0 #000; z-index: 2; line-height: 1; }
+.mp-daily .spin { font-size: 1.15rem; padding: .7rem 1.8rem; margin: .6rem 0; }
+.mp-daily .mp-result { min-height: 1.4em; font-weight: 800; color: #ffd23f; }
+.mp-dailybtn { width: 100%; margin-bottom: .6rem; }

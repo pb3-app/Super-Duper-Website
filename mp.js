@@ -237,7 +237,7 @@
     switch (m.t) {
       case 'hello':
         S.user = m.user; S.retry = 0;
-        renderSlot(); emit('ready');
+        renderSlot(); emit('ready'); loadDaily(true);
         break;
       case 'removed':
         showToast({ title: 'Your account was removed by an admin.', ttl: 8000 });
@@ -296,7 +296,7 @@
       slot.append(h('span', { class: 'mp-chip warn', title: 'Start the server with: npm start' }, '⚠️ Offline'));
     } else if (S.user) {
       slot.append(h('button', { class: 'mp-btn ghost', onclick: toggleDrawer, title: 'Online players' },
-        avatarNode(S.user.avatar, 24), S.user.username, ' · 👥 ' + others().length));
+        avatarNode(S.user.avatar, 24), S.user.username, ' · 👥 ' + others().length, dailyReady() ? ' · 🎁' : ''));
     } else if (S.token) {
       slot.append(h('span', { class: 'mp-chip' }, 'Connecting…'));
     } else {
@@ -324,6 +324,7 @@
       h('div', { class: 'mp-me' }, avatarNode(S.user.avatar, 40), h('span', { class: 'grow' }, S.user.username),
         h('button', { class: 'mp-btn small ghost', onclick: openProfile }, '✏️ Edit'),
         h('button', { class: 'mp-btn small ghost', onclick: logout }, 'Log out')),
+      h('button', { class: 'mp-btn small mp-dailybtn', onclick: () => { closeDrawer(); openDaily(); } }, '🎁 Daily reward' + (dailyReady() ? ' (ready!)' : '')),
       h('h3', null, '👥 Online now'),
       playerList(null),
     );
@@ -522,6 +523,82 @@
         h('button', { type: 'button', class: 'mp-btn small ghost', onclick: () => file.click() }, '📷 Upload photo'), file));
     refresh();
     return wrap;
+  }
+
+  // ---------- the daily reward: a wheel to spin every day, and a streak with a prize every week ----------
+  const WHEEL = ['b1', 't1', 'b2', 'b3', 't2', 'b1', 'b5', 'b2', 't3', 'b3', 'b10', 't4'];
+  const WHEEL_STYLE = { b1: ['#8a5a30', '1 🪙'], b2: ['#a86b35', '2 🪙'], b3: ['#7a4a1f', '3 🪙'], b5: ['#c8873a', '5 🪙'], b10: ['#e0a91a', '10 🪙'], t1: ['#6c7480', '★'], t2: ['#2f8f55', '★★'], t3: ['#2f6fe0', '★★★'], t4: ['#e8a000', '👑'] };
+  const dailyReady = () => !!(S.daily && (S.daily.canSpin || (S.daily.pending && S.daily.pending.length)));
+  async function loadDaily(announce) {
+    if (!S.user) return;
+    try {
+      S.daily = await api('/api/daily'); renderSlot(); renderDrawer();
+      if (announce && dailyReady()) {
+        const key = 'tungDailyToast:' + S.daily.today;
+        if (store.get(key)) return; store.set(key, '1');
+        showToast({ title: S.daily.pending.length ? '🎁 You earned a weekly streak prize!' : '🎁 Your daily spin is ready!', ttl: 12000, actions: [{ label: 'Open', fn: (t) => { t.remove(); openDaily(); } }] });
+      }
+    } catch (_) {}
+  }
+  let dailyModal = null;
+  function openDaily() {
+    if (!S.user || dailyModal) return;
+    const body = h('div', { class: 'mp-daily' }), wheel = h('canvas', { width: 280, height: 280, class: 'wheel', 'aria-label': 'Prize wheel' });
+    let busy = false, rot = 0, msg = null;
+    const slices = WHEEL.length, sa = 360 / slices;
+    function drawWheel() {
+      const c = wheel.getContext('2d'), R = 134, cx = 140, cy = 140; c.clearRect(0, 0, 280, 280);
+      WHEEL.forEach((k, i) => {
+        const a0 = (-90 + i * sa - sa / 2) * Math.PI / 180, a1 = a0 + sa * Math.PI / 180;
+        c.beginPath(); c.moveTo(cx, cy); c.arc(cx, cy, R, a0, a1); c.closePath(); c.fillStyle = WHEEL_STYLE[k][0]; c.fill(); c.strokeStyle = '#2b1a0e'; c.lineWidth = 3; c.stroke();
+        c.save(); c.translate(cx, cy); c.rotate((-90 + i * sa) * Math.PI / 180); c.textAlign = 'right'; c.textBaseline = 'middle'; c.fillStyle = '#fff'; c.font = '800 19px Nunito, sans-serif'; c.shadowColor = '#000'; c.shadowBlur = 3; c.fillText(WHEEL_STYLE[k][1], R - 12, 0); c.restore();
+      });
+      c.beginPath(); c.arc(cx, cy, 20, 0, 7); c.fillStyle = '#2b1a0e'; c.fill(); c.strokeStyle = '#ff8c2a'; c.lineWidth = 4; c.stroke(); c.fillStyle = '#ff8c2a'; c.font = '22px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('🥁', cx, cy + 1);
+    }
+    drawWheel();
+    const prizeText = (p) => (p.kind === 'item' ? `${p.name} (${p.tierName} ${p.slotName.toLowerCase()})` : `${p.n} tung buck${p.n === 1 ? '' : 's'}`) + (p.note ? '. ' + p.note : '');
+    function left(ms) { const m = Math.max(1, Math.floor(ms / 60000)); return `${Math.floor(m / 60)}h ${m % 60}m`; }
+    function render() {
+      const d = S.daily; if (!d) return;
+      const pos = d.streak % 7 === 0 && d.streak > 0 ? 7 : d.streak % 7, dots = [];
+      for (let i = 1; i <= 7; i++) dots.push(h('span', { class: 'dot' + (i <= pos ? ' on' : '') + (i === 7 ? ' big' : '') }, i === 7 ? '🎁' : String(i)));
+      const claim = d.pending && d.pending.length ? h('button', { class: 'mp-btn', onclick: claimWeekly, disabled: busy }, `🎉 Claim your week ${d.pending[0] / 7} prize!`) : null;
+      body.replaceChildren(
+        h('h2', null, '🎁 Daily reward'),
+        h('div', { class: 'streak' }, h('b', null, `🔥 ${d.streak} day${d.streak === 1 ? '' : 's'} in a row`), h('small', null, ` · best ${d.best}`)),
+        h('div', { class: 'dots' }, dots),
+        h('p', { class: 'mp-hint', style: 'text-align:center' }, `Log in every day (it changes at 8:00 AM Eastern). ${d.daysLeft > 0 ? d.daysLeft + ' more day' + (d.daysLeft === 1 ? '' : 's') : 'Today'} until the week ${d.nextPrize.week} prize: a ${d.nextPrize.tierName} item and ${d.nextPrize.bucks} 🪙. Miss a day and the streak starts over.`),
+        ...(claim ? [claim] : []),
+        h('div', { class: 'wheelbox' }, h('div', { class: 'pointer' }, '▼'), wheel),
+        h('button', { class: 'mp-btn spin', onclick: spin, disabled: busy || !d.canSpin }, d.canSpin ? '🎡 SPIN!' : `Next spin in ${left(d.resetsIn)}`),
+        h('p', { class: 'mp-result', role: 'status' }, msg || ''),
+        h('p', { class: 'mp-hint', style: 'text-align:center' }, '1 🪙 to 10 🪙 tung bucks, or an item you do not have yet: ★ Tung · ★★ Tung Tung · ★★★ Tung Tung Tung · 👑 Triple T Sahur. Higher prizes come up less often.'),
+        h('div', { class: 'row' }, h('button', { class: 'mp-btn ghost', onclick: () => modal.close() }, 'Close')));
+    }
+    async function spin() {
+      if (busy || !S.daily || !S.daily.canSpin) return;
+      busy = true; msg = null; render();
+      try {
+        const r = await api('/api/daily/spin', { method: 'POST' });
+        const idx = (() => { const ids = WHEEL.map((k, i) => (k === r.slice ? i : -1)).filter((i) => i >= 0); return ids[Math.floor(Math.random() * ids.length)]; })();
+        rot += 360 * 6 + ((360 - ((rot % 360) + idx * sa + (Math.random() - 0.5) * sa * 0.6) % 360) % 360);
+        wheel.style.transition = 'transform 4.6s cubic-bezier(.08,.6,.12,1)'; wheel.style.transform = `rotate(${rot}deg)`;
+        for (let i = 0; i < 9; i++) setTimeout(() => tung(200 + i * 40, 0.05), i * 480);
+        await new Promise((res) => setTimeout(res, 4800));
+        S.daily = r.state; msg = '🎉 You won ' + prizeText(r.prize) + '!'; tung(520, 0.4); emit('daily');
+      } catch (ex) { msg = ex.message; }
+      busy = false; renderSlot(); render();
+    }
+    async function claimWeekly() {
+      if (busy) return; busy = true; render();
+      try {
+        const r = await api('/api/daily/claim', { method: 'POST' });
+        S.daily = r.state; msg = `🎉 Week ${r.week} streak prize: ${prizeText(r.item)} and ${r.bucks} tung bucks!`; tung(620, 0.5); emit('daily');
+      } catch (ex) { msg = ex.message; }
+      busy = false; renderSlot(); render();
+    }
+    const modal = openModal(body, { dismiss: true, onClose: () => { dailyModal = null; } });
+    dailyModal = modal; render(); loadDaily().then(render);
   }
 
   // ---------- edit your name and profile picture ----------

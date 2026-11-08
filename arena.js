@@ -650,7 +650,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   }
   function renderShop() {
     const d = shopData; if (!d) return;
-    $("shopBalance").textContent = `🪙 ${d.balance} tung buck${d.balance === 1 ? "" : "s"} · ${d.wins} multiplayer win${d.wins === 1 ? "" : "s"}${d.bonus ? ` + ${d.bonus} from the Showdown` : ""}`;
+    $("shopBalance").textContent = `🪙 ${d.balance} tung buck${d.balance === 1 ? "" : "s"} · ${d.wins} multiplayer win${d.wins === 1 ? "" : "s"}${d.bonus ? ` + ${d.bonus} from the Showdown and daily prizes` : ""}`;
     document.querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("on", b.dataset.tab === shopTab));
     const body = $("shopBody");
     if (shopTab === "shop") {
@@ -721,6 +721,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     renderShop();
   });
   setInterval(loadShop, 60000);
+  if (T) T.on("daily", loadShop); // a daily prize changes what you own
 
   window.__arena = { msg: onMsg, draw, logs: () => logs, myId: () => myId, setShop: (d) => { shopData = d; renderBucks(); }, openShop, previewItem, wear: (g) => { for (const p of snapshots[snapshots.length - 1].players) if (p.id === myId) p.g = g; } };
 })();
