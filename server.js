@@ -26,6 +26,7 @@ const TB = { // turn-based games whose rules run on the server (see games/<id>/r
   battleship: require('./games/battleship/rules.js'),
   hangman: require('./games/hangman/rules.js'),
   go: require('./games/go/rules.js'),
+  walls: require('./games/walls/rules.js'),
 };
 const PicWords = require('./games/pictionary/words.js');
 const CardGames = { uno: require('./games/uno/engine.js'), phase10: require('./games/phase10/engine.js') }; // card games where the server holds the hands
@@ -89,6 +90,7 @@ const GAMES = {
     options: { size: { label: 'Board (boxes per side)', values: [3, 4, 5, 6], default: 4 } },
   },
   uttt: { title: 'Tung Super Tic-Tac-Toe', icon: '❌', progressLabel: 'Boards won', turnBased: true, soloWL: true },
+  walls: { title: 'Tung Walls', icon: '🧱', progressLabel: 'Rows crossed', turnBased: true, soloWL: true },
   hangman: {
     title: 'Tung Hangman', icon: '🪢', progressLabel: 'Wrong guesses', turnBased: true, soloWL: true,
     options: { chances: { label: 'Wrong guesses allowed', values: [6, 8, 10], default: 8 } },

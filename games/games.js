@@ -75,5 +75,6 @@ window.TUNG_GAMES = [
   { id: "uno", title: "Tung Tung Uno", description: "Match colours and numbers, skip and reverse, and shout UNO. Up to 6 players online or against the computer.", icon: "🃏", players: "1 player or 2-6 online", url: "games/uno/index.html" },
   { id: "phase10", title: "Tung Tung Phase 10", description: "Lay down sets, runs and colours across ten phases. Be the first to finish.", icon: "🔟", players: "1 player or 2-6 online", url: "games/phase10/index.html" },
   { id: "football", title: "Tung Tung Football", description: "Pixel football with offence and defence: call the plays, throw, run and tackle.", icon: "🏈", players: "1 player or 1v1 online", url: "games/football/index.html" },
+  { id: "walls", title: "Tung Walls", description: "Race across the board and build walls to block the other tung. Your cosmetics show on your tung.", icon: "🧱", players: "1 or 2 players", url: "games/walls/index.html" },
   // Add more games here
 ];

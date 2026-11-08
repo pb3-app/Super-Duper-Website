@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tung Walls</title>
+  <link rel="stylesheet" href="../game.css" />
+  <link rel="stylesheet" href="../../mp.css" />
+  <style>
+    .tw { display: grid; grid-template-columns: minmax(170px, 230px) minmax(0, 560px) minmax(170px, 230px); grid-template-areas: "opp board me"; gap: 18px; justify-content: center; align-items: start; margin: .4rem auto 0; max-width: 1060px; }
+    .tw__opp { grid-area: opp; } .tw__board { grid-area: board; min-width: 0; } .tw__me { grid-area: me; display: grid; gap: 12px; }
+    #board { display: block; width: 100%; height: auto; border-radius: 18px; touch-action: manipulation; cursor: pointer; }
+    .card { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; background: rgba(40, 22, 10, .78); border: 2px solid #5a3517; transition: box-shadow .2s, border-color .2s; }
+    .card.turn { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(255, 201, 51, .35), 0 0 22px rgba(255, 201, 51, .35); }
+    .card img { width: 56px; height: 80px; object-fit: contain; flex: none; }
+    .card .who { min-width: 0; flex: 1; } .card .nm { font-weight: 900; font-size: 1.05rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .card .sub { font-size: .8rem; opacity: .75; margin-bottom: 6px; }
+    .pips { display: flex; gap: 3px; } .pips i { width: 9px; height: 20px; border-radius: 3px; background: #e8c48a; box-shadow: inset 0 -3px 0 rgba(0,0,0,.2); } .pips i.used { background: rgba(255,255,255,.12); box-shadow: none; }
+    .wl { font-size: .82rem; margin-top: 4px; opacity: .85; }
+    .tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .tools .btn { padding: .5rem .8rem; } .tools .btn.on { outline: 3px solid var(--accent); }
+    .tw__hint { font-size: .85rem; opacity: .8; min-height: 1.2em; }
+    .rules { max-width: 640px; margin: 1rem auto 0; text-align: left; opacity: .92; }
+    .rules summary { cursor: pointer; font-weight: 800; }
+    @media (max-width: 920px) {
+      .tw { grid-template-columns: minmax(0, 560px); grid-template-areas: "opp" "board" "me"; gap: 10px; }
+      .card img { width: 40px; height: 58px; }
+    }
+  </style>
+</head>
+<body class="wide" data-game="walls">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="game-page">
+    <div class="game-top">
+      <a class="back" href="../../index.html#games">← Games</a>
+      <h1>🧱 Tung Walls</h1>
+      <div id="mpSlot"></div>
+    </div>
+
+    <div class="mode-switch" id="modeSwitch">
+      <button class="btn secondary active" data-mode="single">🎮 Single Player</button>
+      <button class="btn secondary" data-mode="multi">👥 Multiplayer</button>
+    </div>
+    <div class="mp-lobby" id="mpLobby" hidden></div>
+    <div class="mp-matchbar" id="mpMatchBar" hidden></div>
+
+    <div id="gameArea">
+      <div class="opts solo-only" id="soloOpts">
+        <label>Computer <select id="level"><option value="easy">Shortest Path (no walls)</option><option value="medium" selected>Wall Builder</option><option value="hard">Wall Master</option></select></label>
+        <label>You play <select id="side"><option value="0">first</option><option value="1">second</option></select></label>
+        <button class="btn secondary" id="newBtn">New game</button>
+      </div>
+      <div class="status-line" id="status"></div>
+      <div class="tw">
+        <div class="tw__opp"><div class="card" id="cardOpp"><img id="imgOpp" alt="" /><div class="who"><div class="nm" id="nmOpp"></div><div class="sub" id="subOpp"></div><div class="pips" id="pipsOpp"></div></div></div></div>
+        <div class="tw__board"><canvas id="board" aria-label="Tung Walls board"></canvas></div>
+        <div class="tw__me">
+          <div class="card" id="cardMe"><img id="imgMe" alt="" /><div class="who"><div class="nm" id="nmMe"></div><div class="sub" id="subMe"></div><div class="pips" id="pipsMe"></div></div></div>
+          <div class="tools">
+            <button class="btn secondary" id="wallH" title="Place a flat wall (press H)">▬ Wall</button>
+            <button class="btn secondary" id="wallV" title="Place an upright wall (press V)">▮ Wall</button>
+            <button class="btn secondary" id="hintBtn">💡 Hint</button>
+          </div>
+          <div class="tw__hint" id="twHint"></div>
+        </div>
+      </div>
+      <details class="rules" open>
+        <summary>How to play</summary>
+        <p class="help" style="text-align:left">Be first to get your tung across the board to the far edge (the glowing row on top). On your turn you either <b>step</b> one square (click a glowing circle) or <b>put down a wall</b> to slow the other tung (click a gap between squares, or pick ▬ / ▮ first and then click; on a phone tap once to preview and again to place). You get 10 walls. A wall can never close off the last way through, and if the other tung is in your way you can hop over it. Your cosmetics from the Tung Shop show on your tung.</p>
+      </details>
+    </div>
+    <div id="gameLeaderboard"></div>
+  </div>
+  <script src="../../mp.js"></script>
+  <script src="../../assets/shop-items.js"></script>
+  <script src="../../assets/tung-gear.js"></script>
+  <script src="../../assets/tung.js"></script>
+  <script src="rules.js"></script>
+  <script src="walls.js"></script>
+</body>
+</html>
