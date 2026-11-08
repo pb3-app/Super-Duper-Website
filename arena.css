@@ -61,9 +61,13 @@ canvas { display: block; width: 100vw; height: 100vh; }
 .shop__card canvas { width: 132px; height: 132px; border-radius: 10px; }
 .shop__name { font-weight: 700; font-size: 16px; }
 .shop__meta { font-size: 13px; opacity: 0.8; }
-.rar-uncommon { border-color: #3fae6a; }
-.rar-rare { border-color: #4a90ff; }
-.rar-epic { border-color: #ffb000; box-shadow: 0 0 16px rgba(255, 176, 0, 0.25); }
+/* the four tiers: Tung, Tung Tung, Tung Tung Tung, Triple T Sahur */
+.tier-1 { border-color: #8a8a8a; }
+.tier-2 { border-color: #3fae6a; }
+.tier-3 { border-color: #4a90ff; box-shadow: 0 0 10px rgba(74, 144, 255, 0.2); }
+.tier-4 { border-color: #ffb000; box-shadow: 0 0 18px rgba(255, 176, 0, 0.35); }
+.tierbadge { font-weight: 800; }
+.tierbadge.t1 { color: #c8c8c8; } .tierbadge.t2 { color: #62d68c; } .tierbadge.t3 { color: #7fb3ff; } .tierbadge.t4 { color: #ffc933; text-shadow: 0 0 8px rgba(255, 176, 0, 0.6); }
 .shop__btn { width: 100%; background: #5a381c; color: #fff3e0; border: none; border-radius: 10px; padding: 10px 8px; font: 700 14px "Nunito", sans-serif; cursor: pointer; }
 .shop__btn.buy { background: #ff8c2a; color: #2b1a0e; }
 .shop__btn:disabled { opacity: 0.55; cursor: default; }
