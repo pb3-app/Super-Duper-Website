@@ -89,7 +89,7 @@ const GAMES = {
     title: 'Tung Hangman', icon: '🪢', progressLabel: 'Wrong guesses', turnBased: true, soloWL: true,
     options: { chances: { label: 'Wrong guesses allowed', values: [6, 8, 10], default: 8 } },
   },
-  flappy: { title: 'Flappy Tung', icon: '🪵', progressLabel: 'Pipes', judge: 'score' },
+  flappy: { title: 'Flappy Tung', icon: '🪵', progressLabel: 'Pipes', judge: 'score', realtime: true }, // realtime: the two tungs are shown on each other's screen
   whack: { title: 'Whack-a-Tung', icon: '🔨', progressLabel: 'Score', judge: 'score' },
   basketball: {
     title: 'Tung 2x2 Basketball', icon: '🏀', progressLabel: 'Points', judge: 'score', realtime: true, soloWL: true,
@@ -160,7 +160,7 @@ const SCORE_CAP = {
   snake: (ms) => Math.min(SNAKE_GRID * SNAKE_GRID, Math.floor(ms / 50) + 2),
   slope: (ms) => Math.floor((ms / 1000) * 45) + 40,
   brainrot: (ms) => Math.floor(ms / 1000) * 220 + 400,
-  flappy: (ms) => Math.floor(ms / 1100) + 3,
+  flappy: (ms) => Math.floor(ms / 600) + 3,
   whack: (ms) => Math.floor(ms / 1000) * 130 + 120,
   basketball: (ms) => Math.floor(ms / 2200) * 3 + 8,
   paper: (ms) => Math.min(1000, Math.floor(ms / 1000) * 30 + 40),

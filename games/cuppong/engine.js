@@ -33,6 +33,10 @@
     const dev = Math.abs(meter - 0.5) * 2;
     return 0.4 + 19 * dev * Math.sqrt(dev);
   }
+  // the sights never sit still: they drift side to side and front to back (cm), on top of the meter's spread
+  function wobble(t) {
+    return { x: 6 * Math.sin(2.3 * t) + 3 * Math.sin(4.1 * t + 1), z: 7 * Math.sin(1.7 * t + 0.6) + 3 * Math.sin(3.3 * t + 2) };
+  }
   function meterAt(t) { const k = (t / 0.62) % 2; return k < 1 ? k : 2 - k; }
 
   // ---- the ball ----
@@ -96,6 +100,6 @@
     return { p: s.p, v: s.v };
   }
 
-  const api = { L, HW, BR, RT, RB, CH, G, DT, SP, AIM_Y, rackLayout, farRack, solve, spread, meterAt, newBall, step, playOut, scatter, makeThrow, wallR, release };
+  const api = { L, HW, BR, RT, RB, CH, G, DT, SP, AIM_Y, rackLayout, farRack, solve, spread, wobble, meterAt, newBall, step, playOut, scatter, makeThrow, wallR, release };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.CupEngine = api;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -76,9 +76,11 @@
     tone(300, 0.1, "triangle", 0.05, 1.6);
     hud();
   }
+  // where the sights are right now: your aim point plus the wobble
+  function aimNow() { const w = E.wobble(t0); return { x: clamp(aim.x + w.x, -HW + 4, HW - 4), z: clamp(aim.z + w.z, L * 0.4, L + 4) }; }
   function fire(meter) {
     if (phase !== "aim" || turn !== me) return;
-    const t = E.makeThrow(aim.x, aim.z, meter, Math.random);
+    const a = aimNow(), t = E.makeThrow(a.x, a.z, meter, Math.random);
     if (mode === "match") np.send({ k: "t", p: t.p, v: t.v });
     launch(me, t.p, t.v);
   }
@@ -277,14 +279,14 @@
     if (phase !== "aim" || turn !== me) return;
     const meter = charging ? E.meterAt(chargeT) : 0.5, r = charging ? E.spread(meter) : E.spread(0.5);
     // preview of the arc
-    const s = E.solve(aim.x, aim.z), step = s.tf / 22;
+    const a0 = aimNow(), s = E.solve(a0.x, a0.z), step = s.tf / 22;
     ctx.fillStyle = "rgba(255,255,255,.55)";
     for (let i = 1; i < 22; i++) { const t = i * step, x = s.p.x + s.v.x * t, y = s.p.y + s.v.y * t - 0.5 * E.G * t * t, z = s.p.z + s.v.z * t, p = P(x, y, z); if (p) { ctx.globalAlpha = 0.25 + 0.5 * (i / 22); ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(1.4, 1.3 * p.k * 1.2), 0, 7); ctx.fill(); } }
     ctx.globalAlpha = 1;
     const dev = Math.abs(meter - 0.5) * 2, col = dev < 0.3 ? "#7df08f" : dev < 0.55 ? "#ffd23f" : "#ff6b5e";
-    const ring = (rad, w, c, dash) => { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.setLineDash(dash || []); ctx.beginPath(); for (let i = 0; i <= 36; i++) { const a = (i / 36) * 6.2832, p = P(aim.x + Math.cos(a) * rad, E.AIM_Y, aim.z + Math.sin(a) * rad); i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); } ctx.stroke(); ctx.setLineDash([]); };
+    const ring = (rad, w, c, dash) => { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.setLineDash(dash || []); ctx.beginPath(); for (let i = 0; i <= 36; i++) { const a = (i / 36) * 6.2832, p = P(a0.x + Math.cos(a) * rad, E.AIM_Y, a0.z + Math.sin(a) * rad); i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); } ctx.stroke(); ctx.setLineDash([]); };
     ring(r, 2.2, charging ? col : "rgba(255,255,255,.8)", charging ? [] : [5, 5]);
-    ring(2.2, 2.6, "#ffffff"); const c = P(aim.x, E.AIM_Y, aim.z); ctx.fillStyle = col; ctx.beginPath(); ctx.arc(c.x, c.y, 2.6, 0, 7); ctx.fill();
+    ring(2.2, 2.6, "#ffffff"); const c = P(a0.x, E.AIM_Y, a0.z); ctx.fillStyle = col; ctx.beginPath(); ctx.arc(c.x, c.y, 2.6, 0, 7); ctx.fill();
     // meter
     const bx = W / 2 - 150, by = H - 40, bw = 300;
     ctx.fillStyle = "rgba(8,12,24,.7)"; ctx.beginPath(); ctx.roundRect(bx - 12, by - 22, bw + 24, 46, 14); ctx.fill();
