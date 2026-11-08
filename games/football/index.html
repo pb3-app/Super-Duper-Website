@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Tung Tung Football</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../game.css" />
+  <link rel="stylesheet" href="../../mp.css" />
+  <style>
+    body .game-page { max-width: 1040px; }
+    .menu-card { max-width: 640px; margin: 1rem auto; text-align: left; } .menu-card h2 { margin: 0 0 .6rem; color: var(--accent); }
+    .fbwrap { position: relative; max-width: 960px; margin: .6rem auto; }
+    #view { width: 100%; aspect-ratio: 16 / 9; display: block; image-rendering: pixelated; image-rendering: crisp-edges; background: #0b3d16; border-radius: 10px; border: 4px solid #1a1a1a; box-shadow: 0 10px 0 #0a0a0a, 0 20px 40px rgba(0,0,0,.55); touch-action: none; cursor: crosshair; }
+    .fbpanel { position: absolute; left: 50%; bottom: 3%; transform: translateX(-50%); width: min(98%, 900px); background: rgba(8, 14, 10, .93); border: 4px solid #fff; border-radius: 6px; padding: 10px 12px; font-family: "Press Start 2P", monospace; text-align: center; z-index: 5; box-shadow: 0 0 0 4px #000; }
+    .fbpanel[hidden] { display: none; }
+    .fbpanel h3 { margin: 0 0 6px; font-size: clamp(9px, 1.7vw, 14px); color: #ffd23f; font-weight: 400; line-height: 1.5; }
+    .fbpanel .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 6px; }
+    .fbpanel button.play { font-family: inherit; font-size: clamp(7px, 1.2vw, 10px); line-height: 1.5; background: #14301c; color: #fff; border: 3px solid #fff; border-radius: 4px; padding: 6px 4px 8px; cursor: pointer; display: grid; gap: 5px; justify-items: center; }
+    .fbpanel button.play:hover, .fbpanel button.play:focus-visible { background: #1f5a2c; border-color: #ffd23f; outline: none; }
+    .fbpanel button.play.rec { border-color: #ffd23f; }
+    .fbpanel button.play small { font-size: 0.8em; opacity: .8; }
+    .fbpanel canvas { width: 100%; max-width: 84px; aspect-ratio: 8 / 5; image-rendering: pixelated; background: #1d6b2e; border: 2px solid #0a2a12; }
+    .fbpanel .wait { font-size: clamp(8px, 1.4vw, 11px); line-height: 1.8; padding: 6px; }
+    .fbresult { position: absolute; inset: 0; z-index: 8; background: rgba(0, 0, 0, .82); border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .8rem; text-align: center; font-family: "Press Start 2P", monospace; padding: 1rem; }
+    .fbresult[hidden] { display: none; }
+    .fbresult h2 { font-size: clamp(14px, 3vw, 26px); color: #ffd23f; font-weight: 400; line-height: 1.6; }
+    .fbresult p { font-size: clamp(9px, 1.6vw, 13px); line-height: 1.8; }
+    .fbtop { display: flex; gap: .5rem; justify-content: center; flex-wrap: wrap; margin: .4rem 0; }
+    kbd { background: #fff3e0; color: #2b1a0e; border-radius: 5px; padding: 1px 7px; font-weight: 800; font-size: 13px; }
+  </style>
+</head>
+<body data-game="football" data-custom="1">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="game-page">
+    <div class="game-top">
+      <a class="back" href="../../index.html#games">← Games</a>
+      <h1>🏈 Tung Tung Football</h1>
+      <div id="mpSlot"></div>
+    </div>
+    <div class="mode-switch" id="modeSwitch">
+      <button class="btn secondary active" data-mode="single">🎮 Single Player</button>
+      <button class="btn secondary" data-mode="multi">👥 Multiplayer</button>
+    </div>
+    <div class="mp-lobby" id="mpLobby" hidden></div>
+    <div class="mp-matchbar" id="mpMatchBar" hidden></div>
+
+    <div id="gameArea">
+      <div id="menu" class="np-sec menu-card">
+        <h2>Play the computer</h2>
+        <div class="opts">
+          <label>Opponent <select id="level"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option></select></label>
+          <label>Quarter length <select id="qlen"><option value="60">1:00</option><option value="90" selected>1:30</option><option value="120">2:00</option></select></label>
+        </div>
+        <div class="btn-row"><button class="btn" id="startBtn" style="font-size:1.15rem;padding:.7rem 1.8rem">🏈 Kick off</button></div>
+        <p class="np-hint">You play both sides: call the plays and run the offence, then switch to defence when the other team has the ball. Playing the computer never counts toward the leaderboard (solo wins and losses have their own board).</p>
+      </div>
+      <div id="mpPanel" hidden></div>
+
+      <div id="play" hidden>
+        <div class="fbwrap">
+          <canvas id="view" width="384" height="216" aria-label="Football field"></canvas>
+          <div class="fbpanel" id="callPanel" hidden></div>
+          <div class="fbresult" id="result" hidden></div>
+        </div>
+        <div class="fbtop"><button class="btn secondary" id="pauseBtn">⏸ Pause (P)</button><button class="btn secondary" id="quitBtn">☰ Menu</button></div>
+        <div id="pad"></div>
+        <section class="controls" aria-label="Controls">
+          <h2>🎮 Controls</h2>
+          <div class="ctl-grid">
+            <div class="ctl"><span class="keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></span><span class="act">Move the QB, the ball carrier or your defender</span></div>
+            <div class="ctl"><span class="keys"><kbd>1</kbd>–<kbd>5</kbd> or <kbd class="mouse">Click a receiver</kbd></span><span class="act">Offence: throw to that receiver (the numbers float over their heads)</span></div>
+            <div class="ctl"><span class="keys"><kbd>Space</kbd></span><span class="act">Ball carrier: juke (dodge tackles). Defence: dive tackle</span></div>
+            <div class="ctl"><span class="keys"><kbd>E</kbd> / <kbd>Shift</kbd></span><span class="act">Defence: switch to the defender closest to the ball</span></div>
+          </div>
+          <p class="ctl-extra"><b>Offence:</b> pick a play, then throw before the pass rush gets to you. Four downs to move 10 yards; on 4th down punt or kick a field goal. <b>Defence:</b> pick a coverage, then control one defender (ringed in yellow) to tackle, sack the QB or pick off the pass. A touchdown is worth 7. Quarters are short, and the clock only runs while the ball is live.</p>
+        </section>
+      </div>
+    </div>
+    <div id="gameLeaderboard"></div>
+  </div>
+  <script src="../../mp.js"></script>
+  <script src="../netplay.js"></script>
+  <script src="../touchpad.js"></script>
+  <script src="sim.js"></script>
+  <script src="football.js"></script>
+</body>
+</html>

@@ -201,6 +201,7 @@
     laps: (v) => v + ' laps', bots: (v) => (v ? v + ' bots' : 'no bots'), rule: (v) => (v === 'streak' ? 'Hit again' : 'Classic'),
     variant: (v) => (v === 'crazyhouse' ? 'Crazyhouse' : 'Standard'),
     rounds: (v) => v + (v === 1 ? ' round' : ' rounds'), goals: (v) => v + ' goals',
+    quarter: (v) => Math.floor(v / 60) + ':' + String(v % 60).padStart(2, '0') + ' quarters',
   };
   const fmtOpt = (k, v) => (OPT_FMT[k] ? OPT_FMT[k](v) : v === 'misere' ? 'Misère' : String(v)[0].toUpperCase() + String(v).slice(1));
   const fmtTime = (ms) => { const m = Math.floor(ms / 60000), s = (ms % 60000) / 1000; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(3); };

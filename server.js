@@ -165,6 +165,10 @@ const GAMES = {
       bots: { label: 'Computer players', values: [0, 1, 2, 3], default: 0 },
     },
   },
+  football: {
+    title: 'Tung Tung Football', icon: '🏈', progressLabel: 'Points', judge: 'score', realtime: true, soloWL: true,
+    options: { quarter: { label: 'Quarter length', values: [60, 90, 120], default: 90 } },
+  },
   paper: {
     title: 'Tung Paper.io', icon: '📄', progressLabel: 'Peak land', judge: 'score', realtime: true,
     options: {
@@ -190,6 +194,7 @@ const SCORE_CAP = {
   cuppong: (ms) => Math.min(10, Math.floor(ms / 1200) + 2),
   boxing: () => 1,
   dizzy: () => 1,
+  football: (ms) => Math.floor(ms / 6000) * 7 + 14,
 };
 const SOLO_MAX = { snake: SNAKE_GRID * SNAKE_GRID, slope: 99999, brainrot: 999999, flappy: 999, whack: 9999, paper: 1000, archery: 150 };
 const isAuth = (g) => g === 'sprouts' || g === 'pool' || !!GAMES[g].turnBased; // server decides these, clients do not report scores
