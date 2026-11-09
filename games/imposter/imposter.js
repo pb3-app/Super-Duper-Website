@@ -7,6 +7,7 @@
   let mode = "single";
   let solo = null;          // solo game: {g, bots, humanName, reported}
   let soloSize = 5;
+  let soloLevel = "medium";
   let room = null;          // server room view (multiplayer)
   let rooms = [];           // open rooms
   let roomAt = 0;           // when `room` arrived (performance.now)
@@ -72,7 +73,8 @@
       [4, 5, 6, 7, 8].map((n) => h("option", { value: n, selected: n === soloSize }, `${n} players (you + ${n - 1} computer)`)));
     return card("🕵️ Play against the computer",
       h("p", null, "One player is secretly the Imposter and doesn’t know the word. Everyone gives a one-word clue (twice around), then you vote. Computer players might be the Imposter, too!"),
-      h("div", { class: "imp-setup" }, h("label", null, "Players", sel)),
+      h("div", { class: "imp-setup" }, h("label", null, "Players", sel),
+        h("label", null, "Computer level", h("select", { id: "impLevel", onchange: (e) => (soloLevel = e.target.value) }, ["easy", "medium", "hard"].map((l) => h("option", { value: l, selected: l === soloLevel }, l[0].toUpperCase() + l.slice(1)))))),
       h("div", { class: "imp-row" }, h("button", { class: "mp-btn", onclick: () => startSolo(soloSize) }, "▶ Start game")),
       h("p", { class: "imp-hint" }, "Solo games count on the Solo leaderboard (log in to save), never on win/loss records."));
   }
@@ -266,6 +268,7 @@
   setInterval(tickTimer, 250);
 
   // ---------- solo game with computer players ----------
+  // easy: vague clues and wild guesses. medium: as before. hard: sharp clues, the imposter works out the word fast, and votes are almost always right
   function startSolo(n) {
     const humanName = TM.user ? TM.user.username : "You";
     const humanAvatar = TM.user ? TM.user.avatar : "emoji:🙂";
@@ -280,7 +283,7 @@
     const word = pick(Object.keys(WORDS));
     const imposter = pick(players).id;
     const g = E.createGame(players, word, imposter, shuffle(players.map((p) => p.id)), Date.now());
-    solo = { g, bots, reported: false, onChange: () => { afterSolo(); render(); } };
+    solo = { g, bots, level: soloLevel, reported: false, onChange: () => { afterSolo(); render(); } };
     render();
   }
 
@@ -309,15 +312,18 @@
   function botClue(id) {
     const g = solo.g;
     const used = new Set(g.clues.map((c) => norm(c.word)));
+    const lv = solo.level || "medium";
     if (id !== g.imposter) {
+      if (lv === "easy" && Math.random() < 0.35) { const free = GENERIC.filter((w) => !used.has(w)); return pick(free.length ? free : GENERIC); } // a clue that does not really help
       const pool = WORDS[g.word].filter((w) => !used.has(w));
       return pick(pool.length ? pool : WORDS[g.word]);
     }
+    if (lv === "easy") { const free = GENERIC.filter((w) => !used.has(w)); return pick(free.length ? free : GENERIC); }
     const clues = g.clues.filter((c) => !c.skipped).map((c) => norm(c.word));
     const free = GENERIC.filter((w) => !used.has(w));
     if (!clues.length) return pick(free.length ? free : GENERIC);
     const best = bestGuessWord(clues);
-    if (best.s < 0.8) return pick(free.length ? free : GENERIC);
+    if (best.s < (lv === "hard" ? 0.5 : 0.8)) return pick(free.length ? free : GENERIC);
     const pool = WORDS[best.w].filter((w) => !used.has(w));
     return pick(pool.length ? pool : free.length ? free : GENERIC);
   }
@@ -335,8 +341,9 @@
     const g = solo.g;
     const others = g.players.filter((p) => !p.left && p.id !== id);
     if (id === g.imposter) return pick(others).id;
-    const ranked = others.map((p) => ({ id: p.id, s: suspicion(p.id) + Math.random() * 0.7 })).sort((a, b) => b.s - a.s);
-    return (Math.random() < 0.85 ? ranked[0] : pick(ranked)).id;
+    const lv = solo.level || "medium", noise = lv === "hard" ? 0.2 : lv === "easy" ? 1.4 : 0.7, sure = lv === "hard" ? 0.97 : lv === "easy" ? 0.45 : 0.85;
+    const ranked = others.map((p) => ({ id: p.id, s: suspicion(p.id) + Math.random() * noise })).sort((a, b) => b.s - a.s);
+    return (Math.random() < sure ? ranked[0] : pick(ranked)).id;
   }
   function botChat(id) {
     const g = solo.g;

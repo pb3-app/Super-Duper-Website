@@ -194,8 +194,11 @@
   }
 
   // ---------- computer player ----------
-  function aiShot(g, noise) {
-    noise = noise == null ? 0.02 : noise;
+  // level: 'easy' mostly lines up any ball and often misses, 'medium' as before, 'hard' looks at far more shots and aims very straight
+  const AI_LEVELS = { easy: { noise: 0.07, cap: 14, random: 0.35, powers: [0.5, 0.75] }, medium: { noise: 0.02, cap: 60, random: 0, powers: [0.5, 0.75, 1] }, hard: { noise: 0.004, cap: 160, random: 0, powers: [0.3, 0.5, 0.65, 0.8, 1] } };
+  function aiShot(g, noise, level) {
+    const L = AI_LEVELS[level] || AI_LEVELS.medium;
+    noise = noise == null ? L.noise : noise;
     const p = g.turn;
     const own = g.groups[p];
     let targets;
@@ -219,7 +222,7 @@
         const ax = gx - cx, ay = gy - cy, al = sqrt(ax * ax + ay * ay) || 1;
         if ((ax / al) * (tx / tl) + (ay / al) * (ty / tl) < 0.25) continue; // too thin a cut
         const ang = Math.atan2(ay, ax);
-        for (const pw of [0.5, 0.75, 1]) cands.push({ angle: ang + (Math.random() - 0.5) * 0.012, power: pw });
+        for (const pw of L.powers) cands.push({ angle: ang + (Math.random() - 0.5) * 0.012, power: pw });
       }
     }
     // fallback: hit the target ball more or less head on (nudges it about), plus a few random shots
@@ -231,7 +234,11 @@
     // shuffle and cap the work
     for (let i = cands.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [cands[i], cands[j]] = [cands[j], cands[i]]; }
     let best = null, bestScore = -1e9;
-    for (const c of cands.slice(0, 60)) {
+    if (Math.random() < L.random) { // a beginner just hits something
+      const t = targets[Math.floor(Math.random() * targets.length)] || g.balls[1];
+      return { angle: Math.atan2(t.y - cy, t.x - cx) + (Math.random() - 0.5) * 0.3, power: 0.35 + Math.random() * 0.5, cue: cueAt || undefined };
+    }
+    for (const c of cands.slice(0, L.cap)) {
       const t = clone(g);
       const shot = { angle: c.angle, power: c.power };
       if (cueAt) shot.cue = cueAt;

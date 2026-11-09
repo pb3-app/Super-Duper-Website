@@ -59,7 +59,11 @@
     for (let j = 0; j < s.owner.length; j++) if (!seen[j] && s.owner[j] !== me) { s.owner[j] = me; got++; }
     return got;
   }
+  // computer level: easy = short wandering loops, medium as before, hard = big loops that also go after your trail
+  let aiLevel = "medium";
+  const AI_L = { easy: { trail: 5, flip: 0.22, hunt: false }, medium: { trail: 12, flip: 0.1, hunt: false }, hard: { trail: 18, flip: 0.03, hunt: true } };
   function aiPick(s, p) {
+    const L = AI_L[aiLevel] || AI_L.medium;
     const safe = (d) => {
       const nx = p.x + DX[d], ny = p.y + DY[d];
       if (nx < 0 || ny < 0 || nx >= GW || ny >= GH) return false;
@@ -74,7 +78,15 @@
       a.tx = Math.max(1, Math.min(GW - 2, p.x + DX[ang] * dist + (Math.floor(Math.random() * 7) - 3)));
       a.ty = Math.max(1, Math.min(GH - 2, p.y + DY[ang] * dist + (Math.floor(Math.random() * 7) - 3)));
     }
-    if (a.phase === "out" && !onHome && (p.trail.length > 12 + Math.floor(Math.random() * 6) || (Math.abs(p.x - a.tx) + Math.abs(p.y - a.ty) < 2))) a.phase = "home";
+    if (a.phase === "out" && !onHome && (p.trail.length > L.trail + Math.floor(Math.random() * 6) || (Math.abs(p.x - a.tx) + Math.abs(p.y - a.ty) < 2))) a.phase = "home";
+    if (L.hunt && a.phase === "out" && !onHome && p.trail.length < 9) { // spot an enemy trail close by and go and cut it
+      let bj = -1, bd = 8;
+      for (let yy = Math.max(0, p.y - 7); yy <= Math.min(GH - 1, p.y + 7); yy++) for (let xx = Math.max(0, p.x - 7); xx <= Math.min(GW - 1, p.x + 7); xx++) {
+        const m = s.mark[idx(xx, yy)]; if (!m || m === p.id + 1 || !s.players[m - 1].alive) continue;
+        const d = Math.abs(xx - p.x) + Math.abs(yy - p.y); if (d < bd) { bd = d; bj = idx(xx, yy); }
+      }
+      if (bj >= 0) { a.tx = bj % GW; a.ty = (bj / GW) | 0; }
+    }
     if (a.phase === "home" && !onHome) {
       let bx = -1, by = -1, bd = 1e9;
       for (let j = 0; j < s.owner.length; j += 1) if (s.owner[j] === p.id + 1) { const x = j % GW, y = (j / GW) | 0, d = Math.abs(x - p.x) + Math.abs(y - p.y); if (d < bd) { bd = d; bx = x; by = y; } }
@@ -83,7 +95,7 @@
     const dxs = a.tx - p.x, dys = a.ty - p.y;
     const prefs = [];
     if (Math.abs(dxs) >= Math.abs(dys)) { prefs.push(dxs > 0 ? 1 : 3, dys > 0 ? 2 : 0); } else { prefs.push(dys > 0 ? 2 : 0, dxs > 0 ? 1 : 3); }
-    if (Math.random() < 0.1) prefs.reverse();
+    if (Math.random() < L.flip) prefs.reverse();
     prefs.push(p.dir, (p.dir + 1) % 4, (p.dir + 3) % 4);
     for (const d of prefs) if (d !== opp && safe(d)) return d;
     for (let d = 0; d < 4; d++) if (d !== opp && safe(d)) return d;
@@ -232,7 +244,7 @@
   // =========================== modes ===========================
   function startSolo() {
     gearBy = [TungGear.mine()];
-    mp = false; host = true; myId = 0; botCount = Number($("bots").value);
+    mp = false; host = true; myId = 0; botCount = Number($("bots").value); aiLevel = $("level").value;
     sim = makeSim(build(["You"]), Number($("time").value)); view = sim; begin(); hud();
   }
   $("startBtn").addEventListener("click", () => { if (!mp) startSolo(); });
@@ -249,7 +261,7 @@
     TungMP.registerGame({
       prepareMatch(m) {
         mp = true; host = m.idx === 0; myId = m.idx; ended = false; running = false; clearInterval(tickTimer);
-        roundSecs = m.options.time; botCount = m.options.bots;
+        roundSecs = m.options.time; botCount = m.options.bots; aiLevel = m.options.level || "medium";
         const hostName = host ? m.you.username : m.opp.username, guestName = host ? m.opp.username : m.you.username;
         names = [hostName, guestName];
         const myG = TungGear.mine(), oppG = TungGear.fromNums(m.opp.gear); gearBy = host ? [myG, oppG] : [oppG, myG];

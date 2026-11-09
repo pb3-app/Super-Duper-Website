@@ -97,11 +97,18 @@
     tech: ['KEYBOARD', 'INTERNET', 'ALGORITHM', 'JAVASCRIPT', 'DATABASE', 'BROWSER', 'PIXEL', 'ROUTER', 'FIREWALL', 'COMPILER', 'PROCESSOR', 'BLUETOOTH', 'SATELLITE', 'HOLOGRAM', 'ROBOTICS', 'SOFTWARE', 'NETWORK', 'ENCRYPTION', 'BANDWIDTH', 'CURSOR'],
     games: ['MINESWEEPER', 'CHECKMATE', 'BASKETBALL', 'BATTLESHIP', 'SCOREBOARD', 'TOURNAMENT', 'CONTROLLER', 'ARCADE', 'JOYSTICK', 'DUNGEON', 'SPEEDRUN', 'MULTIPLAYER', 'LEADERBOARD', 'CHAMPION', 'CHECKPOINT', 'RESPAWN', 'COMBO', 'BOSSFIGHT', 'POWERUP', 'SIDEQUEST'],
   };
-  function randomWord(cat) {
-    const keys = Object.keys(BANK);
+  // level: easy = short words, medium = middling ones, hard = long words
+  function randomWord(cat, level) {
+    const keys = Object.keys(BANK), want = { easy: (n) => n <= 7, medium: (n) => n >= 6 && n <= 9, hard: (n) => n >= 9 }[level];
     const k = BANK[cat] ? cat : keys[Math.floor(Math.random() * keys.length)];
-    const list = BANK[k];
-    return { word: list[Math.floor(Math.random() * list.length)], category: k };
+    let list = BANK[k];
+    if (want) {
+      let fit = list.filter((w) => want(w.length));
+      if (!fit.length) fit = keys.flatMap((x) => BANK[x]).filter((w) => want(w.length)); // nothing fits in this category: take from all of them
+      if (fit.length) list = fit;
+    }
+    const word = list[Math.floor(Math.random() * list.length)];
+    return { word, category: BANK[k].includes(word) ? k : keys.find((x) => BANK[x].includes(word)) || k };
   }
   // letter frequency used by the optional "hint" feature
   const FREQ = 'ETAOINSHRDLCUMWFGYPBVKJXQZ';

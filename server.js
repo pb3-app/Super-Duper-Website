@@ -31,7 +31,7 @@ const TB = { // turn-based games whose rules run on the server (see games/<id>/r
 const PicWords = require('./games/pictionary/words.js');
 const CardGames = { uno: require('./games/uno/engine.js'), phase10: require('./games/phase10/engine.js') }; // card games where the server holds the hands
 const Shop = require('./assets/shop-items.js'); // the tung shop: the items, and which six are for sale today
-const GOLF_COURSES = ['meadow', 'neon'];
+const GOLF_COURSES = ['meadow', 'neon', 'frost', 'desert', 'candy'];
 const GOLF_HOLES = 6, GOLF_MAXSTROKES = 8;
 
 const ROOT = __dirname;
@@ -158,13 +158,14 @@ const GAMES = {
   pictionary: { title: 'Tung Tung Pictionary', icon: '🎨', progressLabel: 'Points', rooms: true, picRooms: true },
   uno: {
     title: 'Tung Tung Uno', icon: '🃏', progressLabel: 'Wins', rooms: true, cardRooms: true, soloWL: true,
-    options: { bots: { label: 'Computer players', values: [0, 1, 2, 3], default: 0 } },
+    options: { bots: { label: 'Computer players', values: [0, 1, 2, 3], default: 0 }, level: { label: 'Computer level', values: ['easy', 'medium', 'hard'], default: 'medium' } },
   },
   phase10: {
     title: 'Tung Tung Phase 10', icon: '🔟', progressLabel: 'Wins', rooms: true, cardRooms: true, soloWL: true,
     options: {
       phases: { label: 'Phases to finish', values: [2, 3, 5, 10], default: 3 },
       bots: { label: 'Computer players', values: [0, 1, 2, 3], default: 0 },
+      level: { label: 'Computer level', values: ['easy', 'medium', 'hard'], default: 'medium' },
     },
   },
   football: {
@@ -176,6 +177,7 @@ const GAMES = {
     options: {
       time: { label: 'Round length (seconds)', values: [60, 120, 180], default: 120 },
       bots: { label: 'Computer players', values: [0, 2, 4], default: 2 },
+      level: { label: 'Computer level', values: ['easy', 'medium', 'hard'], default: 'medium' },
     },
   },
 };
@@ -1682,7 +1684,7 @@ function crStart(r) {
   const bots = Math.max(0, Math.min(Number(r.opts.bots) || 0, CR_MAX - humans));
   const players = r.members.map((k) => ({ id: k, name: db.users[k].username, bot: false }));
   for (let i = 0; i < bots; i++) players.push({ id: 'bot' + i, name: CR_BOT_NAMES[i] + ' 🤖', bot: true });
-  r.g = E.create(players, { phases: r.opts.phases });
+  r.g = E.create(players, { phases: r.opts.phases, level: r.opts.level });
   r.state = 'playing'; r.counted = true; r.result = null; r.notice = null; r.left = new Set();
   crBroadcastList(r.game); crSend(r); crSchedule(r);
 }

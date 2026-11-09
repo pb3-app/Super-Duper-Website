@@ -32,7 +32,7 @@
     const rng = opts.rng || Math.random;
     const s = {
       players: players.map((p) => ({ id: p.id, name: p.name, bot: !!p.bot, hand: [] })),
-      draw: shuffle(makeDeck(), rng), disc: [], dir: 1, turn: 0, color: 'R', phase: 'play', drawn: -1, winner: null, log: [], seq: 0, rng,
+      draw: shuffle(makeDeck(), rng), disc: [], dir: 1, turn: 0, color: 'R', phase: 'play', drawn: -1, winner: null, log: [], seq: 0, rng, level: ['easy', 'medium', 'hard'].includes(opts.level) ? opts.level : 'medium',
     };
     for (let r = 0; r < HAND; r++) for (const p of s.players) p.hand.push(s.draw.pop());
     // the first card is a plain number card
@@ -120,12 +120,15 @@
   }
 
   // ---- the computer ----
+  // easy: plays any card it can and picks colours at random. medium: sensible. hard: also watches EVERYONE'S hand size, keeps its wilds for when they count,
+  // and picks the colour that is best for its own hand
   function botAct(s, id) {
-    const p = s.players.find((x) => x.id === id);
-    if (s.phase === 'drawn') { const c = p.hand[s.drawn]; return canPlay(s, c) ? { t: 'play', i: s.drawn, color: pickColor(p, s.drawn) } : { t: 'pass' }; }
+    const p = s.players.find((x) => x.id === id), level = s.level || 'medium';
+    if (s.phase === 'drawn') { const c = p.hand[s.drawn]; return canPlay(s, c) ? { t: 'play', i: s.drawn, color: level === 'easy' ? COLORS[Math.floor(s.rng() * 4)] : pickColor(p, s.drawn) } : { t: 'pass' }; }
     const ok = playableIdx(s, p);
     if (!ok.length) return { t: 'draw' };
-    const nextP = s.players[nextIndex(s, s.turn, 1)], danger = nextP.hand.length <= 2;
+    if (level === 'easy' || (level === 'medium' && s.rng() < 0.22)) { const i = ok[Math.floor(s.rng() * ok.length)]; return { t: 'play', i, color: level === 'easy' ? COLORS[Math.floor(s.rng() * 4)] : pickColor(p, i) }; } // medium has an off moment now and then
+    const nextP = s.players[nextIndex(s, s.turn, 1)], danger = level === 'hard' ? s.players.some((q) => q !== p && q.hand.length <= 2) : nextP.hand.length <= 2;
     const count = {}; for (const c of p.hand) if (c.c !== 'W') count[c.c] = (count[c.c] || 0) + 1;
     const score = (i) => {
       const c = p.hand[i]; let v = 0;
@@ -133,7 +136,7 @@
       else if (['skip', 'rev', '+2'].includes(c.v)) v = danger ? 8 : 3;
       else v = 1 + (/^\d$/.test(c.v) ? Number(c.v) / 10 : 0);
       if (c.c !== 'W') v += (count[c.c] || 0) * 0.3;
-      return v + s.rng() * 0.2;
+      return v + s.rng() * (level === 'hard' ? 0.05 : 0.2);
     };
     const best = ok.slice().sort((a, b) => score(b) - score(a))[0];
     return { t: 'play', i: best, color: pickColor(p, best) };

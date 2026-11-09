@@ -268,7 +268,7 @@
 
   function aiMove() {
     if (over || anim) return;
-    const shot = P.aiShot(game);
+    const shot = P.aiShot(game, undefined, document.getElementById("level").value);
     const mine = game.balls[0];
     aim = shot.angle;
     launch(shot, null);
@@ -282,6 +282,7 @@
     draw();
   }
   document.getElementById("newBtn").addEventListener("click", newSolo);
+  document.getElementById("level").addEventListener("change", newSolo);
 
   // ---------- multiplayer ----------
   if (window.TungMP) {

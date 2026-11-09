@@ -44,18 +44,18 @@
         <h2>Pick a course</h2>
         <div class="courses" id="courses"></div>
         <div class="btn-row"><button class="btn" id="startBtn" style="font-size:1.15rem;padding:.7rem 1.8rem">⛳ Tee off</button></div>
-        <p class="np-hint">Six holes. Fewest strokes wins. Your best total on each course goes on the solo leaderboard (log in to appear on it).</p>
+        <p class="np-hint">Six holes, picked and shuffled for every round. Fewest strokes wins. Your best total on each course goes on the solo leaderboard (log in to appear on it).</p>
       </div>
       <div id="mpPanel" hidden></div>
       <div id="play" hidden>
-        <div class="hud"><span class="chip" id="chipHole">Hole 1 / 6</span><span class="chip">Par <b id="parEl">2</b></span><span class="chip">Strokes <b id="strokeEl">0</b></span><span class="chip">Total <b id="totalEl">0</b></span><span class="chip" id="bestChip">🏆 Best <b id="bestEl">-</b></span><button class="btn secondary" id="quitBtn">☰ Menu (Esc)</button></div>
+        <div class="hud"><span class="chip" id="chipHole">Hole 1 / 6</span><span class="chip">Par <b id="parEl">2</b></span><span class="chip">Strokes <b id="strokeEl">0</b></span><span class="chip">Total <b id="totalEl">0</b></span><span class="chip" title="Power-ups you are holding">🎒 <b id="invEl">none</b></span><span class="chip" id="bestChip">🏆 Best <b id="bestEl">-</b></span><button class="btn secondary" id="quitBtn">☰ Menu (Esc)</button></div>
         <section class="controls" aria-label="Controls">
           <h2>🎮 Controls</h2>
           <div class="ctl-grid">
             <div class="ctl"><span class="keys"><kbd class="mouse">Mouse</kbd> drag</span><span class="act">Press anywhere, pull <b>back</b> from the ball (the further, the harder), then let go to putt</span></div>
             <div class="ctl"><span class="keys"><kbd>Esc</kbd></span><span class="act">Cancel a putt you are lining up / back to the menu (solo)</span></div>
           </div>
-          <p class="ctl-extra">📱 <b>Touch:</b> drag back on the course with your finger and lift to putt. <b>Goal:</b> sink the ball in the fewest strokes. Water costs a stroke and sends you back; 8 strokes and you pick up.</p>
+          <p class="ctl-extra">📱 <b>Touch:</b> drag back on the course with your finger and lift to putt. <b>Goal:</b> sink the ball in the fewest strokes. Water costs a stroke and sends you back; 8 strokes and you pick up.<br><b>Every round is shuffled</b> (holes, direction and moving parts change). <b>Power-ups</b> float on the course, roll over them and they go off on your next putt: 🔥 Power shot (hits 50% harder), 🧲 Magnet (the cup pulls the ball in), 👻 Ghost (passes through bumpers and moving bars), 🛡️ Shield (saves you one water penalty). <b>Ice</b> makes the ball slide, <b>mud</b> and sand slow it, and <b>belts</b> carry it along.</p>
         </section>
         <div class="playwrap"><canvas id="view" width="900" height="500"></canvas><div id="result" class="np-result" hidden></div></div>
         <div class="oppline" id="oppLine"></div>

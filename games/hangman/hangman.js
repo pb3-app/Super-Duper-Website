@@ -122,13 +122,13 @@
   // ---- solo (against the computer's word) ----
   function newSolo() {
     mp = false; busy = false; names = ["You", "Computer"];
-    const cat = $("cat").value, pick = H.randomWord(cat === "any" ? null : cat);
+    const cat = $("cat").value, level = $("level").value, pick = H.randomWord(cat === "any" ? null : cat, level);
     const lives = Number($("lives").value);
     solo = { g: H.newGame({ chances: lives }), cat: pick.category };
     const g = solo.g;
     // The computer is the setter; run the shared rules so solo and multiplayer behave the same.
     g.setter = 1; g.round = 1; // a single round, with the computer (player 1) as the setter
-    H.play(g, { t: "word", word: pick.word, hint: "Category: " + pick.category }, 1);
+    H.play(g, { t: "word", word: pick.word, hint: level === "hard" ? "" : "Category: " + pick.category }, 1); // no clue on hard
     v = viewSolo();
     render();
   }

@@ -41,7 +41,7 @@
     const s = {
       players: players.map((p) => ({ id: p.id, name: p.name, bot: !!p.bot, hand: [], phase: 1, done: 0, score: 0, laid: null, skipMe: false })),
       draw: [], disc: [], turn: 0, stage: 'draw', handNo: 0, target: [2, 3, 5, 10].includes(opts.phases) ? opts.phases : 5, winner: null, log: [], seq: 0,
-      rng: opts.rng || Math.random, ready: [], result: null, first: -1,
+      rng: opts.rng || Math.random, ready: [], result: null, first: -1, level: ['easy', 'medium', 'hard'].includes(opts.level) ? opts.level : 'medium',
     };
     startHand(s);
     return s;
@@ -251,18 +251,19 @@
     const without = hand.filter((c) => c !== card);
     return usefulness(hand, phase) - usefulness(without, phase);
   }
+  // easy: mostly draws from the deck, discards at random-ish and sometimes forgets to lay down. medium: sensible. hard: takes any card that helps and never wastes a turn
   function botAct(s, id) {
-    const p = s.players.find((x) => x.id === id);
+    const p = s.players.find((x) => x.id === id), level = s.level || 'medium';
     if (s.stage === 'handEnd') return { t: 'next' };
     if (s.stage === 'draw') {
       const t = top(s);
-      if (t && t.c !== 'S') {
-        const wanted = t.c === 'W' || (p.laid ? s.players.some((q) => q.laid && q.laid.some((g) => hitSpot(g, t))) : (!solve(p.hand, PHASES[p.phase - 1]) && solve(p.hand.concat([t]), PHASES[p.phase - 1])) || usefulness(p.hand.concat([t]), p.phase) - usefulness(p.hand, p.phase) >= 3);
+      if (t && t.c !== 'S' && !(level === 'easy' && s.rng() < 0.6) && !(level === 'medium' && s.rng() < 0.4)) {
+        const wanted = t.c === 'W' || (p.laid ? s.players.some((q) => q.laid && q.laid.some((g) => hitSpot(g, t))) : (!solve(p.hand, PHASES[p.phase - 1]) && solve(p.hand.concat([t]), PHASES[p.phase - 1])) || usefulness(p.hand.concat([t]), p.phase) - usefulness(p.hand, p.phase) >= (level === 'hard' ? 1.4 : 3));
         if (wanted) return { t: 'draw', from: 'disc' };
       }
       return { t: 'draw', from: 'deck' };
     }
-    if (!p.laid && solve(p.hand, PHASES[p.phase - 1])) return { t: 'lay' };
+    if (!p.laid && solve(p.hand, PHASES[p.phase - 1]) && !((level === 'easy' && s.rng() < 0.3) || (level === 'medium' && s.rng() < 0.1))) return { t: 'lay' };
     if (p.laid) {
       for (const c of p.hand) for (const q of s.players) if (q.laid) for (let g = 0; g < q.laid.length; g++) {
         if (hitSpot(q.laid[g], c)) return { t: 'hit', card: c.id, pid: q.id, g, end: 'hi' };
@@ -276,7 +277,7 @@
     }
     let best = null, bv = Infinity;
     for (const c of p.hand) {
-      const v = (p.laid ? 0 : cardKeepValue(p.hand, c, p.phase)) - points(c) * 0.12 + s.rng() * 0.05;
+      const v = (p.laid ? 0 : cardKeepValue(p.hand, c, p.phase)) - points(c) * (level === 'hard' ? 0.2 : 0.12) + s.rng() * (level === 'easy' ? 1.4 : level === 'hard' ? 0.01 : 0.6);
       if (v < bv) { bv = v; best = c; }
     }
     return { t: 'discard', card: best.id };

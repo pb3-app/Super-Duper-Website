@@ -233,17 +233,20 @@
 
   function aiMove() {
     if (over) return;
-    let cands = Rules.candidateMoves(state, 12);
+    // easy plays any legal move, medium weighs 8 moves by how few replies you are left with, hard weighs more of them more carefully
+    const level = document.getElementById("level").value, P = { easy: { n: 6, look: 0, tries: 0, noise: 99 }, medium: { n: 12, look: 6, tries: 8, noise: 1.5 }, hard: { n: 24, look: 14, tries: 16, noise: 0.25 } }[level] || { n: 12, look: 6, tries: 8, noise: 1.5 };
+    let cands = Rules.candidateMoves(state, P.n);
     if (!cands.length) return endSolo(state.misere ? false : true);
     for (let i = cands.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [cands[i], cands[j]] = [cands[j], cands[i]]; }
     let pick = cands[0], bestScore = -Infinity;
-    for (const mv of cands.slice(0, 8)) {
+    for (const mv of cands.slice(0, P.tries || 1)) {
+      if (!P.tries) break;
       const t = Rules.clone(state);
       Rules.play(t, mv, 1);
-      const left = Rules.candidateMoves(t, 6).length;
+      const left = Rules.candidateMoves(t, P.look).length;
       // stuck opponent: great in normal play, a loss in misere
       let score = left === 0 ? (state.misere ? -100 : 100) : (state.misere ? left : -left);
-      score += Math.random() * 1.5;
+      score += Math.random() * P.noise;
       if (score > bestScore) { bestScore = score; pick = mv; }
     }
     playMove(Rules.curve(state, pick), "ai");
@@ -251,6 +254,7 @@
 
   document.getElementById("newBtn").addEventListener("click", newSolo);
   dotSel.addEventListener("change", newSolo);
+  document.getElementById("level").addEventListener("change", newSolo);
   modeSel.addEventListener("change", newSolo);
 
   // ---------- multiplayer ----------

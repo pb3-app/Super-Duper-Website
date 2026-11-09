@@ -121,7 +121,7 @@
     const n = Number($('bots').value), names = ['Tralalero', 'Bombardiro', 'Cappuccina', 'Lirili', 'Ballerina'];
     const players = [{ id: 'me', name: window.TungMP && TungMP.user ? TungMP.user.username : 'You' }];
     for (let i = 0; i < n; i++) players.push({ id: 'bot' + i, name: names[i] + ' 🤖', bot: true });
-    local = { s: E.create(players, { phases: Number($('phases').value) }), done: false }; cr.setSolo(true);
+    local = { s: E.create(players, { phases: Number($('phases').value), level: $('level').value }), done: false }; cr.setSolo(true);
     renderLocal(); botLoop();
   }
   function renderLocal() { if (local) render(E.view(local.s, 'me')); }
