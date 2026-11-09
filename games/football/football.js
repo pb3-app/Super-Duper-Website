@@ -94,6 +94,25 @@
       ctx.stroke(); const e = pts[pts.length - 1]; ctx.fillStyle = "#3be86b"; ctx.fillRect(sx(e[0]) - 1, sy(e[1]) - 1, 3, 3);
     }
   }
+  // the catch ring: the ball has to come down inside it, and you go for it (click / space) when the shrinking ring meets the green one
+  function drawCatch(v, t) {
+    const c = v.catch; if (!c) return;
+    let id = null;
+    if (myTeam === v.off && c.ho) id = c.r; else if (myTeam !== v.off && c.hd && c.d != null) id = c.d;
+    if (id == null) return;
+    const p = v.pl[id], X = sx(p[0]), Y = sy(p[1]) + 1, rx = c.R * PXX, ry = c.R * PXY, open = c.tl <= 0.24 && c.tl >= -0.2;
+    const ell = (k, color, w) => { ctx.strokeStyle = color; ctx.lineWidth = w; ctx.beginPath(); ctx.ellipse(X, Y, Math.max(1, rx * k), Math.max(1, ry * k), 0, 0, 7); ctx.stroke(); };
+    // where the ball is coming down
+    const lx = sx(c.lx), ly = sy(c.ly); ctx.strokeStyle = "rgba(255,255,255,.8)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(lx - 3, ly - 1); ctx.lineTo(lx + 3, ly + 2); ctx.moveTo(lx + 3, ly - 1); ctx.lineTo(lx - 3, ly + 2); ctx.stroke();
+    ctx.save();
+    ctx.globalAlpha = 0.9; ell(1, c.in ? (open ? "#3be86b" : "#d8ffd8") : "#ff6b5e", c.in ? 2 : 1);
+    ell(0.3, "rgba(59,232,107,.9)", 2);                                   // the spot to click on
+    const k = 0.3 + 0.7 * Math.max(0, Math.min(1, (c.tl - 0.04) / 0.5));  // the shrinking ring
+    ell(k, c.tl < -0.06 ? "#ff6b5e" : "#ffd23f", 1.5);
+    ctx.restore();
+    if (c.tl > 0.24) text(myTeam === v.off ? "get under it" : "get to the ball", X, Y - 22, "#fff", 6, "center");
+    else if (open) text(c.in ? "CLICK!" : "MOVE INTO THE RING", X, Y - 22, c.in ? "#ffd23f" : "#ff6b5e", 7, "center");
+  }
   function drawLabels(v) {
     if (myTeam !== v.off || v.thrown || (v.phase !== "live" && v.phase !== "presnap")) return; // the numbers are there as soon as the team lines up
     S.RECEIVERS.forEach((slot, k) => {
@@ -129,12 +148,16 @@
     // everyone, back to front
     const order = v.pl.map((p, i) => i).sort((a, b) => v.pl[a][1] - v.pl[b][1]);
     for (const i of order) sprite(v.pl[i], v, t);
-    drawBall(v); drawLabels(v); hud(v, t);
+    drawBall(v); drawCatch(v, t); drawLabels(v); hud(v, t);
   }
 
   // ------------- play calling -------------
   const STARTS = { 7: [-0.6, -20], 8: [-0.6, 19], 9: [-1.8, 9.5], 10: [-0.9, -5.6], 1: [-4.6, 2.8] };
-  const DEF_INFO = { cover2: ["Cover 2 Zone", "Safe vs the deep ball. Short passes are open."], man: ["Man Coverage", "Everyone sticks to a receiver."], blitz: ["Blitz", "Send everybody after the QB. Risky!"], prevent: ["Prevent Deep", "Nobody gets behind you."] };
+  const DEF_INFO = {
+    cover2: ["Cover 2 Zone", "Safe vs the deep ball. Short passes are open."], man: ["Man Coverage", "Everyone sticks to a receiver."], blitz: ["Blitz", "Send everybody after the QB. Risky!"], prevent: ["Prevent Deep", "Nobody gets behind you."],
+    cover3: ["Cover 3 Zone", "Three deep, four short. Hard to throw over."], zblitz: ["Zone Blitz", "Two random players rush, the rest drop into zones."], cblitz: ["Corner Blitz", "A corner and a linebacker come off the edge."],
+    spy: ["QB Spy", "A linebacker shadows the QB. Good vs scramblers."], goalline: ["Goal Line Stack", "Everyone crowds the line. Weak to deep passes."], runstop: ["Run Stop", "Eight in the box. Great vs runs, thin deep."],
+  };
   function diagram(cv, id) {
     const c = cv.getContext("2d"); c.imageSmoothingEnabled = false; cv.width = 64; cv.height = 40;
     c.fillStyle = "#1d6b2e"; c.fillRect(0, 0, 64, 40);
@@ -148,7 +171,8 @@
       c.strokeStyle = "#3be86b"; c.lineWidth = 1; c.beginPath(); c.moveTo(X(l0), Y(f0)); for (const [f, l] of pts) c.lineTo(X(l0 + l), Y(f0 + f)); c.stroke();
       c.fillStyle = "#fff"; c.fillRect(X(l0) - 1, Y(f0) - 1, 3, 3);
     } else {
-      c.strokeStyle = "#3be86b"; c.beginPath(); const side = id === "runL" ? -1 : id === "runR" ? 1 : 0; c.moveTo(X(2.8), Y(-4.6)); c.lineTo(X(side * 8), Y(2)); c.lineTo(X(side * 8), Y(12)); c.stroke();
+      c.strokeStyle = "#3be86b"; c.beginPath(); const side = id === "runL" || id === "sweepL" ? -1 : id === "runR" || id === "sweepR" ? 1 : 0, wide = id.startsWith("sweep") ? 17 : 8;
+      c.moveTo(X(2.8), Y(-4.6)); if (id === "draw") { c.setLineDash([2, 2]); c.lineTo(X(0), Y(-9)); c.stroke(); c.setLineDash([]); c.beginPath(); c.moveTo(X(0), Y(-9)); c.lineTo(X(4), Y(2)); c.lineTo(X(4), Y(12)); } else { c.lineTo(X(side * wide), Y(2)); c.lineTo(X(side * wide), Y(12)); } c.stroke();
       c.fillStyle = "#fff"; c.fillRect(X(2.8) - 1, Y(-4.6) - 1, 3, 3);
     }
   }
@@ -164,7 +188,7 @@
       const toGoal = Math.abs(S.goalOf({ off: v.off }, v.off) - v.los), fgd = Math.round(toGoal + 17), fgp = fgd <= 30 ? 96 : fgd <= 40 ? 84 : fgd <= 48 ? 66 : fgd <= 55 ? 40 : 12;
       const rec = v.down === 4 ? (toGoal <= 38 ? "fg" : "punt") : null;
       const btn = (id, name, sub) => `<button class="play${rec === id ? " rec" : ""}" data-call="${id}"><canvas></canvas><span>${name}</span>${sub ? `<small>${sub}</small>` : ""}</button>`;
-      p.innerHTML = `<h3>Call a play · <span class="tm">${v.callT}</span></h3><div class="grid">${["quick", "mixed", "deep", "runL", "runM", "runR"].map((id) => btn(id, S.OFF_PLAYS[id].name)).join("")}${`<button class="play${rec === "fg" ? " rec" : ""}" data-call="fg"><span>Field Goal</span><small>${fgd} yds · ${fgp}%</small></button><button class="play${rec === "punt" ? " rec" : ""}" data-call="punt"><span>Punt</span><small>flip the field</small></button>`}</div>`;
+      p.innerHTML = `<h3>Call a play · <span class="tm">${v.callT}</span> <small>(routes change a little every snap)</small></h3><div class="grid">${["quick", "slant", "curl", "mixed", "flood", "screen", "deep", "hail", "runL", "runM", "runR", "sweepL", "sweepR", "draw"].map((id) => btn(id, S.OFF_PLAYS[id].name)).join("")}${`<button class="play${rec === "fg" ? " rec" : ""}" data-call="fg"><span>Field Goal</span><small>${fgd} yds · ${fgp}%</small></button><button class="play${rec === "punt" ? " rec" : ""}" data-call="punt"><span>Punt</span><small>flip the field</small></button>`}</div>`;
       p.querySelectorAll("button.play").forEach((b) => { const cv = b.querySelector("canvas"); if (cv) diagram(cv, b.dataset.call); });
     } else {
       p.innerHTML = `<h3>Call your defence · <span class="tm">${v.callT}</span></h3><div class="grid">${Object.keys(S.DEF_PLAYS).map((id) => `<button class="play" data-call="${id}"><span>${DEF_INFO[id][0]}</span><small>${DEF_INFO[id][1]}</small></button>`).join("")}</div>`;
@@ -193,13 +217,15 @@
   // tap or click a receiver to throw to him
   canvas.addEventListener("pointerdown", (e) => {
     if (role === "idle") return; e.preventDefault();
-    const v = currentView(); if (!v || v.off !== myTeam || v.thrown || v.phase !== "live") return;
+    const v = currentView(); if (!v) return;
+    if (v.catch && v.phase === "live") { myIn.actN++; return; } // the ball is in the air: this click is the catch
+    if (v.off !== myTeam || v.thrown || v.phase !== "live") return;
     const r = canvas.getBoundingClientRect(), px = ((e.clientX - r.left) / r.width) * IW, py = ((e.clientY - r.top) / r.height) * IH;
     let best = -1, bd = 1e9;
     S.RECEIVERS.forEach((slot, k) => { const p = v.pl[v.off * 11 + slot], d = Math.hypot(sx(p[0]) - px, sy(p[1]) - 6 - py); if (d < bd) { bd = d; best = k; } });
     if (best >= 0 && bd < 40) throwKey(best);
   });
-  if (window.TouchPad) TouchPad.mount($("pad"), { onMove: (x, y) => { joy = { x, y }; }, buttons: [{ label: "Juke / Dive", onDown: () => { myIn.actN++; } }, { label: "Switch", onDown: () => { myIn.swN++; } }] });
+  if (window.TouchPad) TouchPad.mount($("pad"), { onMove: (x, y) => { joy = { x, y }; }, buttons: [{ label: "Juke / Dive / Catch", onDown: () => { myIn.actN++; } }, { label: "Switch", onDown: () => { myIn.swN++; } }] });
   function togglePause() { paused = !paused; $("pauseBtn").textContent = paused ? "▶ Resume (P)" : "⏸ Pause (P)"; }
   $("pauseBtn").addEventListener("click", () => { if (role === "solo") togglePause(); });
 

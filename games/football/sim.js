@@ -16,23 +16,42 @@
   const BALL_SPEED = 27, CLOCK_RATE = 2.5; // the game clock runs 2.5 times faster than real time, so a quarter is about 35 seconds of live play
   const OFF_PLAYS = {
     quick: { name: 'Quick Pass', kind: 'pass' }, mixed: { name: 'Mixed Routes', kind: 'pass' }, deep: { name: 'Deep Bombs', kind: 'pass' },
+    slant: { name: 'Slants', kind: 'pass' }, curl: { name: 'Curls', kind: 'pass' }, flood: { name: 'Flood', kind: 'pass' }, screen: { name: 'Screen Pass', kind: 'pass' }, hail: { name: 'Hail Mary', kind: 'pass' },
     runL: { name: 'Run Left', kind: 'run' }, runM: { name: 'Run Middle', kind: 'run' }, runR: { name: 'Run Right', kind: 'run' },
+    sweepL: { name: 'Sweep Left', kind: 'run' }, sweepR: { name: 'Sweep Right', kind: 'run' }, draw: { name: 'Draw Play', kind: 'run' },
     fg: { name: 'Field Goal', kind: 'kick' }, punt: { name: 'Punt', kind: 'kick' },
   };
-  const DEF_PLAYS = { cover2: { name: 'Cover 2 Zone' }, man: { name: 'Man Coverage' }, blitz: { name: 'Blitz' }, prevent: { name: 'Prevent Deep' } };
+  const DEF_PLAYS = {
+    cover2: { name: 'Cover 2 Zone' }, man: { name: 'Man Coverage' }, blitz: { name: 'Blitz' }, prevent: { name: 'Prevent Deep' },
+    cover3: { name: 'Cover 3 Zone' }, zblitz: { name: 'Zone Blitz' }, cblitz: { name: 'Corner Blitz' }, spy: { name: 'QB Spy' }, goalline: { name: 'Goal Line Stack' }, runstop: { name: 'Run Stop' },
+  };
+  // catching: the ball has to come down inside the ring around the player, and he has to go for it (click / space) at the right moment
+  const CATCH_R = 3.2, WIN_OPEN = 0.24, WIN_LATE = 0.2, PERFECT = 0.1, CATCH_AT = 0.04;
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
   // routes: [forward yards, sideways yards]; `in` is +1 when the player starts on the side where the middle is toward +y
-  function routeFor(play, slot, inn) {
+  // rnd (optional) = { r: random function, side: +1 or -1 }: every snap the routes are a little different (and the flood / screen go to a random side)
+  function routeFor(play, slot, inn, rnd) {
+    const side = rnd ? rnd.side : 1;
+    if (play === 'flood') {
+      const role = side > 0 ? slot : { 7: 8, 8: 7, 9: 10, 10: 9, 1: 1 }[slot];
+      const t = { 8: [[20, 0]], 9: [[9, 0], [10, 9]], 1: [[0, 0], [2, 12]], 7: [[12, 0], [12, 10]], 10: [[5, 0], [5, 14]] };
+      return shake((t[role] || []).map(([f, l]) => [f, l * side]), rnd);
+    }
     const R = {
       quick: { 7: [[3, 0], [8, 5 * inn]], 8: [[3, 0], [8, 5 * inn]], 9: [[5, 0], [5, -6 * inn]], 10: [[4, 0], [5, 7 * inn]], 1: [[-1, 0], [3, 9 * inn]] },
       mixed: { 7: [[10, 0], [10, -2 * inn], [10, 0]], 8: [[13, 0], [20, 8 * inn]], 9: [[8, 0], [14, 7 * inn]], 10: [[12, 0]], 1: [[0, 0], [4, 8 * inn]] },
       deep: { 7: [[36, 0]], 8: [[36, 2 * inn]], 9: [[8, 0], [30, 12 * inn]], 10: [[7, 0], [9, 7 * inn]], 1: [[1, 0], [4, 7 * inn]] },
+      slant: { 7: [[2, 0], [8, 7 * inn]], 8: [[2, 0], [8, 7 * inn]], 9: [[2, 0], [7, 6 * inn]], 10: [[3, 0], [6, 5 * inn]], 1: [[-1, 0], [2, 8 * inn]] },
+      curl: { 7: [[12, 0], [10, 2 * inn]], 8: [[12, 0], [10, 2 * inn]], 9: [[9, 0], [7, -2 * inn]], 10: [[8, 0], [6, 2 * inn]], 1: [[1, 0], [4, 8 * inn]] },
+      screen: { 1: [[-3, 9 * side]], 7: [[4, 0]], 8: [[4, 0]], 9: [[3, 3 * inn]], 10: [[3, -3 * inn]] },
+      hail: { 7: [[40, 2]], 8: [[40, -2]], 9: [[38, -6]], 10: [[34, 8]], 1: [[8, 0], [26, 0]] },
     };
-    return (R[play] && R[play][slot]) || [];
+    return shake((R[play] && R[play][slot]) || [], rnd);
   }
+  function shake(route, rnd) { return rnd ? route.map(([f, l]) => [f + (f > 3 ? (rnd.r() - 0.5) * 3 : 0), l + (rnd.r() - 0.5) * 2]) : route; }
 
   function create(opts) {
     opts = opts || {};
@@ -72,18 +91,21 @@
   function cpuCall(g, team) {
     const r = g.rng, dir = dirOf(g);
     if (team !== g.off) {
-      const toGo = g.toGo, w = toGo >= 10 ? [['cover2', 3], ['man', 3], ['blitz', 2], ['prevent', 2]] : toGo <= 3 ? [['cover2', 2], ['man', 3], ['blitz', 4], ['prevent', 0]] : [['cover2', 3], ['man', 3], ['blitz', 3], ['prevent', 1]];
+      const toGo = g.toGo, close = Math.abs(goalOf(g, g.off) - g.los) <= 4;
+      const w = toGo >= 10 ? [['cover2', 3], ['man', 3], ['blitz', 2], ['prevent', 2], ['cover3', 3], ['zblitz', 2], ['cblitz', 1.5], ['spy', 1.5], ['runstop', 0.5]]
+        : toGo <= 3 ? [['cover2', 2], ['man', 3], ['blitz', 4], ['cover3', 1.5], ['zblitz', 2], ['cblitz', 2], ['goalline', close ? 5 : 1.5], ['runstop', 3]]
+        : [['cover2', 3], ['man', 3], ['blitz', 3], ['prevent', 1], ['cover3', 3], ['zblitz', 2], ['cblitz', 1.5], ['spy', 2], ['runstop', 1.5]];
       return pickW(w, r);
     }
     const toGoal = Math.abs(goalOf(g, g.off) - g.los);
     if (g.down === 4) {
       if (toGoal <= 38) return 'fg';
-      if (g.toGo <= 2 && toGoal < 60) return pickW([['runM', 2], ['quick', 1]], r);
+      if (g.toGo <= 2 && toGoal < 60) return pickW([['runM', 2], ['quick', 1], ['slant', 1]], r);
       return 'punt';
     }
-    if (g.toGo >= 8) return pickW([['quick', 3], ['mixed', 3], ['deep', 2], ['runM', 1]], r);
-    if (g.toGo <= 3) return pickW([['runL', 2], ['runM', 3], ['runR', 2], ['quick', 2], ['deep', 1]], r);
-    return pickW([['quick', 2], ['mixed', 2], ['deep', 1], ['runL', 2], ['runM', 2], ['runR', 2]], r);
+    if (g.toGo >= 8) return pickW([['quick', 3], ['mixed', 3], ['deep', 2], ['slant', 2], ['curl', 2], ['flood', 2], ['screen', 1.5], ['draw', 1], ['runM', 1], ['hail', toGoal > 25 ? 0.3 : 0]], r);
+    if (g.toGo <= 3) return pickW([['runL', 2], ['runM', 3], ['runR', 2], ['sweepL', 1], ['sweepR', 1], ['quick', 2], ['slant', 2], ['deep', 1]], r);
+    return pickW([['quick', 2], ['mixed', 2], ['deep', 1], ['slant', 1.5], ['curl', 1.5], ['flood', 1.5], ['screen', 1], ['draw', 1.5], ['runL', 2], ['runM', 2], ['runR', 2], ['sweepL', 1], ['sweepR', 1]], r);
   }
   function pickW(list, r) { const t = list.reduce((n, x) => n + x[1], 0); let v = r() * t; for (const [id, w] of list) { if ((v -= w) < 0) return id; } return list[0][0]; }
 
@@ -94,31 +116,53 @@
     const place = (p, fwd, y) => { p.x = los + dir * fwd; p.y = clamp(y, 1, W - 1); p.vx = p.vy = 0; p.eng = -1; p.engT = 0; p.free = false; p.stun = 0; p.dive = 0; p.jukeT = 0; p.route = []; p.ri = 0; p.assign = -1; p.zone = null; p.mode = 'stand'; };
     O.forEach((p, k) => { p.role = ROLES_OFF[k]; });
     D.forEach((p, k) => { p.role = ROLES_DEF[k]; });
-    const rbSide = oc === 'runL' ? -1 : 1;
-    place(O[0], kind === 'pass' ? -4.6 : -4.2, CY);
+    // nothing is the same twice: the alignment moves around a little, and so do the routes and the running lane
+    const rr = () => (g.rng() - 0.5), flipS = () => (g.rng() < 0.5 ? -1 : 1);
+    const rbSide = oc === 'runL' || oc === 'sweepL' ? -1 : kind === 'pass' || oc === 'draw' ? flipS() : 1;
+    place(O[0], kind === 'pass' || oc === 'draw' ? -4.6 : -4.2, CY);
     place(O[1], -4.6, CY + 2.8 * rbSide);
     [-5.2, -2.6, 0, 2.6, 5.2].forEach((o, i) => place(O[2 + i], -0.9, CY + o));
-    place(O[7], -0.6, CY - 20); place(O[8], -0.6, CY + 19); place(O[9], -1.8, CY + 9.5); place(O[10], -0.9, CY - 5.6);
+    place(O[7], -0.6, CY - 20 + rr() * 4); place(O[8], -0.6, CY + 19 + rr() * 4); place(O[9], -1.8, CY + 9.5 * flipS() + rr() * 3); place(O[10], -0.9, CY + 5.6 * flipS());
     // routes
-    if (kind === 'pass') for (const slot of RECEIVERS) { const p = O[slot], inn = CY - p.y > 0 ? 1 : -1; p.route = routeFor(oc, slot, inn).map(([f, l]) => [p.x + dir * f, p.y + l]); p.mode = 'route'; }
+    const rnd = { r: g.rng, side: flipS() };
+    if (kind === 'pass') for (const slot of RECEIVERS) {
+      const p = O[slot], inn = (CY - p.y > 0 ? 1 : -1) * (oc !== 'flood' && oc !== 'screen' && g.rng() < 0.28 ? -1 : 1);
+      p.route = routeFor(oc, slot, inn, rnd).map(([f, l]) => [p.x + dir * f, clamp(p.y + l, 2.5, W - 2.5)]); p.mode = 'route';
+    }
     O.forEach((p) => { if (p.role === 'OL') p.mode = 'oline'; });
     if (kind === 'pass') { O[1].mode = oc === 'deep' ? 'block' : 'route'; if (oc === 'deep') O[1].route = []; } else { O[1].mode = 'runner'; O[7].mode = 'block'; O[8].mode = 'block'; O[9].mode = 'block'; O[10].mode = 'block'; }
     // defence
     const deep = dc === 'prevent', blitz = dc === 'blitz', man = dc === 'man';
+    const J = (a) => (g.rng() - 0.5) * 2 * a, pickN = (list, n) => list.slice().sort(() => g.rng() - 0.5).slice(0, n);
     [-4.6, -1.6, 1.6, 4.6].forEach((o, i) => place(D[i], 1.1, CY + o));
     [-6.5, 0, 6.5].forEach((o, i) => place(D[4 + i], blitz ? 2.8 : deep ? 7 : 4.4, CY + o));
     place(D[7], man ? 2 : deep ? 11 : 6, O[7].y); place(D[8], man ? 2 : deep ? 11 : 6, O[8].y);
     place(D[9], deep ? 24 : 13, CY - 9); place(D[10], deep ? 24 : 13, CY + 9);
     D.forEach((p) => { p.mode = 'rush'; });
-    const zone = (p, fwd, y) => { p.mode = 'zone'; p.zone = { x: los + dir * fwd, y }; };
+    const zone = (p, fwd, y) => { p.mode = 'zone'; p.zone = { x: los + dir * (fwd + J(1.6)), y: clamp(y + J(1.5), 3, W - 3) }; };
     const mark = (p, slotIdx) => { p.mode = 'man'; p.assign = O[slotIdx].id; };
     if (dc === 'cover2') { zone(D[4], 8, CY - 8); zone(D[5], 8, CY); zone(D[6], 8, CY + 8); zone(D[7], 6, 6); zone(D[8], 6, W - 6); zone(D[9], 20, CY - 11); zone(D[10], 20, CY + 11); }
-    else if (man) { mark(D[7], 7); mark(D[8], 8); mark(D[9], 9); zone(D[10], 20, CY); mark(D[4], 1); mark(D[5], 10); zone(D[6], 9, CY); }
-    else if (blitz) { mark(D[7], 7); mark(D[8], 8); mark(D[9], 9); mark(D[10], 10); D[4].mode = D[5].mode = D[6].mode = 'rush'; }
+    else if (man) { const sw = g.rng() < 0.4; mark(D[7], sw ? 8 : 7); mark(D[8], sw ? 7 : 8); mark(D[9], 9); zone(D[10], 20, CY); mark(D[4], 1); mark(D[5], 10); zone(D[6], 9, CY); }
+    else if (blitz) { mark(D[7], 7); mark(D[8], 8); mark(D[9], 9); mark(D[10], 10); D[4].mode = D[5].mode = D[6].mode = 'rush'; if (g.rng() < 0.4) { const x = g.rng() < 0.5 ? 9 : 10; D[x].mode = 'rush'; } }
+    else if (dc === 'cover3') { zone(D[7], 22, 9); zone(D[8], 22, W - 9); zone(D[9], 24, CY); zone(D[10], 12, CY + (g.rng() < 0.5 ? -12 : 12)); zone(D[4], 8, CY - 10); zone(D[5], 8, CY); zone(D[6], 8, CY + 10); }
+    else if (dc === 'zblitz') {
+      const rush = pickN([4, 5, 6, 9, 10], 2);
+      zone(D[0], 5, CY - 7); zone(D[3], 5, CY + 7); zone(D[7], 6, 6); zone(D[8], 6, W - 6); zone(D[9], 20, CY - 10); zone(D[10], 20, CY + 10); zone(D[4], 8, CY - 8); zone(D[5], 8, CY); zone(D[6], 8, CY + 8);
+      for (const k of rush) D[k].mode = 'rush';
+    }
+    else if (dc === 'cblitz') { D[7].mode = 'rush'; D[4].mode = 'rush'; mark(D[8], 8); mark(D[9], 9); zone(D[10], 22, CY); mark(D[5], 10); zone(D[6], 8, CY); }
+    else if (dc === 'spy') { D[5].mode = 'spy'; zone(D[4], 8, CY - 9); zone(D[6], 8, CY + 9); zone(D[7], 6, 6); zone(D[8], 6, W - 6); zone(D[9], 20, CY - 10); zone(D[10], 20, CY + 10); }
+    else if (dc === 'goalline') {
+      [-6, 0, 6].forEach((o, i) => { place(D[4 + i], 2.2, CY + o); D[4 + i].mode = 'rush'; });
+      place(D[7], 3, CY - 9); place(D[8], 3, CY + 9); place(D[9], 4.5, CY - 3.5); place(D[10], 4.5, CY + 3.5);
+      for (const k of [7, 8, 9, 10]) D[k].mode = 'rush';
+    }
+    else if (dc === 'runstop') { zone(D[4], 3, CY - 8); zone(D[5], 3, CY); zone(D[6], 3, CY + 8); zone(D[9], 5, CY - 5); zone(D[10], 5, CY + 5); mark(D[7], 7); mark(D[8], 8); }
     else if (deep) { D[3].mode = 'zone'; D[3].zone = { x: los + dir * 7, y: CY }; zone(D[4], 11, CY - 9); zone(D[5], 11, CY); zone(D[6], 11, CY + 9); zone(D[7], 15, 7); zone(D[8], 15, W - 7); zone(D[9], 26, CY - 12); zone(D[10], 26, CY + 12); }
     else { /* fallback */ }
     g.ball.x = los; g.ball.y = CY; g.ball.z = 0; g.ball.state = 'held'; g.ball.carrier = O[0].id;
-    g.P = { play: oc, defPlay: dc, kind, t: 0, thrown: false, handed: false, target: -1, qb: O[0].id, rb: O[1].id, carrier: O[0].id, done: false, turnover: false, qbT: 0, aiLook: 0, scramble: false, dropped: false, catchT: 0, caught: false, intercepted: false, thrower: O[0].id, backfield: true };
+    const gap = { runL: [-1, 4.5], runR: [1, 4.5], runM: [0, 0], sweepL: [-1, 13], sweepR: [1, 13], draw: [flipS(), 3] }[oc] || [0, 0];
+    g.P = { gap: { side: gap[0], w: gap[1] ? gap[1] + rr() * 2 : 0 }, play: oc, defPlay: dc, kind, t: 0, thrown: false, handed: false, target: -1, qb: O[0].id, rb: O[1].id, carrier: O[0].id, done: false, turnover: false, qbT: 0, aiLook: 0, scramble: false, dropped: false, catchT: 0, caught: false, intercepted: false, thrower: O[0].id, backfield: true };
     g.ctl[offT] = O[0].id; g.ctl[defT] = D[5].id;
   }
 
@@ -202,7 +246,7 @@
       else if (!humanO) aiThrow(g, qb, O, D, dt);
     }
     // ---- handoff ----
-    if (P.kind === 'run' && !P.handed && P.t > 0.5) { P.handed = true; P.carrier = P.rb; g.ball.carrier = P.rb; P.backfield = false; }
+    if (P.kind === 'run' && !P.handed && P.t > (P.play === 'draw' ? 1.3 : 0.5)) { P.handed = true; P.carrier = P.rb; g.ball.carrier = P.rb; P.backfield = false; }
 
     // ---- defence ----
     let sel = g.ctl[defT];
@@ -217,13 +261,13 @@
         let mul = 1;
         if (d.dive > 0) { d.dive -= dt; mul = 1.45; }
         drive(d, inD.dx || 0, inD.dy || 0, dt, mul);
-        if (press(inD, lastD, 'actN') && d.dcd <= 0) { d.dive = 0.3; d.dcd = 1.3; }
+        if (press(inD, lastD, 'actN') && d.dcd <= 0 && !(P.thrown && g.ball.state === 'air')) { d.dive = 0.3; d.dcd = 1.3; }
       } else defAI(g, d, dt, P, O, D, dir);
     }
     // ---- blocking ----
     blocking(g, dt, P, O, D);
     // ---- the ball in the air ----
-    if (g.ball.state === 'air') ballFlight(g, dt, O, D);
+    if (g.ball.state === 'air') ballFlight(g, dt, O, D, { pressO: humanO && press(inO, lastO, 'actN'), pressD: humanD && press(inD, lastD, 'actN'), sel });
     // ---- move everybody ----
     for (const p of g.players) {
       p.x += p.vx * dt; p.y += p.vy * dt;
@@ -246,7 +290,7 @@
         if (P.carrier === p.id) carrierAI(g, p, dt, D, dir); else mv(p, p.x - dir * 0.2, p.y, dt, 0.3);
         return;
       }
-      if (P.kind === 'pass') {
+      if (P.kind === 'pass' || (P.play === 'draw' && !P.handed)) {
         const spotX = los - dir * 7.2; // drop back
         if (P.scrambling) carrierAI(g, p, dt, D, dir); else mv(p, (P.t < 1.0 ? spotX : p.x), CY + Math.sin(P.t * 1.5) * 0 + (p.y - CY) * 0.9, dt, 0.8);
       } else mv(p, O[1].x - dir * 0.2, O[1].y - (O[1].y > CY ? 1 : -1) * 0.5, dt, 0.7);
@@ -269,8 +313,8 @@
       return;
     }
     if (p.mode === 'runner') { // the back before the handoff heads to his gap
-      const side = P.play === 'runL' ? -1 : P.play === 'runR' ? 1 : 0;
-      mv(p, los + dir * 1.5, CY + side * 4.5 + (P.play === 'runM' ? (p.y > CY ? -1 : 1) * 0.8 : 0), dt, P.handed ? 1 : 0.62);
+      const gp = P.gap || { side: 0, w: 0 };
+      mv(p, los + dir * 1.5, CY + gp.side * gp.w + (P.play === 'runM' ? (p.y > CY ? -1 : 1) * 0.8 : 0), dt, P.handed ? 1 : P.play === 'draw' ? 0.25 : 0.62);
       return;
     }
     if (p.mode === 'block') { chaseBlock(g, p, dt, D, dir); return; }
@@ -339,26 +383,51 @@
     tx += (g.rng() - 0.5) * 2 * err; ty += (g.rng() - 0.5) * 2 * err;
     Object.assign(b, { state: 'air', sx: qb.x, sy: qb.y, tx, ty, T, u: 0, hgt: 1.4 + Math.hypot(tx - qb.x, ty - qb.y) * 0.07, carrier: null, x: qb.x, y: qb.y, z: 0 });
   }
-  function ballFlight(g, dt, O, D) {
+  // the ball in the air. A person has to be inside the ring (CATCH_R yards) when the ball comes down and go for it at the right moment:
+  // too early or out of range and he whiffs, a perfect click makes the catch (or the pick). The computer catches by chance, as before.
+  function ballFlight(g, dt, O, D, c) {
     const b = g.ball, P = g.P; b.u += dt / b.T;
     const u = Math.min(1, b.u); b.x = b.sx + (b.tx - b.sx) * u; b.y = b.sy + (b.ty - b.sy) * u; b.z = 4 * b.hgt * u * (1 - u);
-    if (b.u < 1) return;
-    // the ball comes down
-    const R = g.players[P.target], team = g.players.filter((p) => p.team !== R.team);
+    const R = g.players[P.target], tl = (1 - b.u) * b.T; P.tl = tl;
+    const humanOff = g.human[R.team] && !P.intercepted, humanDef = g.human[1 - R.team];
+    if (P.lockO > 0) P.lockO -= dt; if (P.lockD > 0) P.lockD -= dt;
+    const open = tl <= WIN_OPEN && tl >= -WIN_LATE, perfect = Math.abs(tl - CATCH_AT) <= PERFECT;
+    const flash = (t, s) => { g.text = t; g.textT = s || 0.8; };
+    const foes = g.players.filter((p) => p.team !== R.team);
+    // a person on defence goes for the ball
+    if (humanDef && c.pressD && !(P.lockD > 0)) {
+      const d = g.players.find((p) => p.id === c.sel && p.team !== R.team);
+      if (d && open && Math.hypot(d.x - b.x, d.y - b.y) <= CATCH_R) {
+        if (g.rng() < (perfect ? 0.8 : 0.3)) { P.intercepted = true; interception(g, d); return; }
+        flash('BROKEN UP!', 1.2); b.state = 'dead'; b.carrier = null; endPlay(g, 'incomplete', g.los); return;
+      } else if (d) { P.lockD = 0.45; flash(tl > WIN_OPEN ? 'TOO EARLY!' : 'OUT OF RANGE!', 0.7); }
+    }
+    // a person on offence goes for it
+    if (humanOff && c.pressO && !(P.lockO > 0)) {
+      if (open && Math.hypot(R.x - b.x, R.y - b.y) <= CATCH_R) {
+        const nd = foes.map((d) => ({ d, dd: Math.hypot(d.x - R.x, d.y - R.y) })).sort((a, b2) => a.dd - b2.dd)[0];
+        const pc = (perfect ? 1 : 0.85) * (nd.dd < 0.9 ? 0.6 : nd.dd < 1.6 ? 0.85 : 1);
+        if (g.rng() < pc) { flash(perfect ? 'PERFECT CATCH!' : 'CAUGHT IT!', 0.9); return caught(g, R); }
+        flash('DROPPED!', 1.2); b.state = 'dead'; b.carrier = null; endPlay(g, 'incomplete', g.los); return;
+      }
+      P.lockO = 0.45; flash(tl > WIN_OPEN ? 'TOO EARLY!' : 'OUT OF RANGE!', 0.7);
+    }
+    // the ball comes down (a person gets a moment longer to go for it)
+    if (humanOff ? tl >= -WIN_LATE : tl > 0) return;
     const dr = Math.hypot(R.x - b.tx, R.y - b.ty);
-    const defs = team.map((d) => ({ d, dd: Math.hypot(d.x - b.tx, d.y - b.ty) })).sort((a, b2) => a.dd - b2.dd);
+    const defs = foes.map((d) => ({ d, dd: Math.hypot(d.x - b.tx, d.y - b.ty) })).sort((a, b2) => a.dd - b2.dd);
     const nd = defs[0], reach = 2.8;
     const skill = { easy: 0.9, medium: 1, hard: 1.08 }[g.level] || 1;
-    let catchP = dr > reach ? 0 : (nd.dd < 0.9 ? 0.5 : nd.dd < 1.6 ? 0.74 : 0.95) * (1 - dr / reach * 0.2);
-    const rv = g.rng();
-    if (rv < catchP) { // caught
-      P.caught = true; P.carrier = R.id; b.state = 'held'; b.carrier = R.id; R.route = []; R.ri = 0; R.mode = 'runner2'; P.catchX = R.x; return;
-    }
-    if (nd.dd < 1.3 && nd.dd < dr && g.rng() < 0.2 * skill) { // picked off
-      P.intercepted = true; interception(g, nd.d); return;
-    }
+    const catchP = humanOff ? 0 : dr > reach ? 0 : (nd.dd < 0.9 ? 0.5 : nd.dd < 1.6 ? 0.74 : 0.95) * (1 - dr / reach * 0.2);
+    if (g.rng() < catchP) return caught(g, R);
+    if (nd.dd < 1.3 && nd.dd < dr && g.rng() < 0.2 * skill) { P.intercepted = true; interception(g, nd.d); return; } // picked off
     // incomplete
+    if (humanOff) flash('INCOMPLETE', 1.2);
     b.state = 'dead'; b.carrier = null; endPlay(g, 'incomplete', g.los);
+  }
+  function caught(g, R) {
+    const P = g.P, b = g.ball;
+    P.caught = true; P.carrier = R.id; b.state = 'held'; b.carrier = R.id; R.route = []; R.ri = 0; R.mode = 'runner2'; P.catchX = R.x;
   }
   function interception(g, d) {
     const P = g.P, b = g.ball, dir = d.team === 0 ? 1 : -1;
@@ -386,9 +455,14 @@
       if (d.mode === 'man' && d.assign >= 0) { const r = g.players[d.assign]; if (r.id === P.target || near < 9) mv(d, b.tx, b.ty, dt, 1); else mv(d, r.x + dir * 1.2, r.y, dt, 1); return; }
       if (near < 7) { mv(d, b.tx, b.ty, dt, 1); return; }
     }
+    if (d.mode === 'spy') { // shadow the QB a few yards off, and go after him if he runs
+      if (c && c.id === qb.id && (P.scrambling || P.t > 1.2)) { mv(d, c.x + c.vx * 0.3, c.y + c.vy * 0.3, dt, 1); return; }
+      mv(d, qb.x + dir * 4.5, qb.y, dt, 0.95); return;
+    }
     if (d.mode === 'rush') {
-      if (P.kind === 'run' && !P.handed) { mv(d, g.los - dir * 1.5, qb.y + (d.y - qb.y) * 0.4, dt, 0.9); return; }
-      if (P.kind === 'run') { const cc = carrierOf(g); if (cc && P.t > 0.75) mv(d, cc.x + cc.vx * 0.3, cc.y + cc.vy * 0.3, dt, 0.97); else mv(d, d.x, d.y, dt, 0); return; }
+      const drawFake = P.play === 'draw' && !P.handed; // the draw looks like a pass, so the rush comes straight in
+      if (P.kind === 'run' && !drawFake && !P.handed) { mv(d, g.los - dir * 1.5, qb.y + (d.y - qb.y) * 0.4, dt, 0.9); return; }
+      if (P.kind === 'run' && !drawFake) { const cc = carrierOf(g); if (cc && P.t > 0.75) mv(d, cc.x + cc.vx * 0.3, cc.y + cc.vy * 0.3, dt, 0.97); else mv(d, d.x, d.y, dt, 0); return; }
       const t = c || qb; mv(d, t.x + t.vx * 0.2, t.y + t.vy * 0.2, dt, d.free ? 1 : 0.9); return;
     }
     if (d.mode === 'man' && d.assign >= 0) { const r = g.players[d.assign]; mv(d, r.x + dir * 1.2 + r.vx * 0.15, r.y + r.vy * 0.15, dt, 1); return; }
@@ -559,10 +633,11 @@
       pl: g.players.map((p) => [Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10, p.team, ROLE_CODE[p.role] || 0, (p.jukeT > 0 ? 1 : 0) | (p.stun > 0 ? 2 : 0) | (p.dive > 0 ? 4 : 0) | (g.ball.carrier === p.id ? 8 : 0) | (g.ctl[p.team] === p.id ? 16 : 0), Math.round(p.vx * 10) / 10, Math.round(p.vy * 10) / 10]),
       ball: [Math.round(g.ball.x * 10) / 10, Math.round(g.ball.y * 10) / 10, Math.round(g.ball.z * 10) / 10, g.ball.state === 'held' ? 0 : g.ball.state === 'air' ? 1 : g.ball.state === 'kick' ? 2 : 3],
       routes: g.phase === 'presnap' || g.phase === 'live' ? g.players.filter((p) => p.team === g.off && p.mode === 'route' && p.route.length && !(P && P.thrown)).map((p) => [p.id, p.route.slice(p.ri).map((w) => [Math.round(w[0] * 10) / 10, Math.round(w[1] * 10) / 10])]) : [],
+      catch: P && P.thrown && !P.caught && !P.intercepted && g.ball.state === 'air' && P.target >= 0 ? { r: P.target, R: CATCH_R, tl: Math.round((P.tl || 0) * 100) / 100, lx: Math.round(g.ball.tx * 10) / 10, ly: Math.round(g.ball.ty * 10) / 10, in: dist(g.ball, g.players[P.target]) <= CATCH_R, ho: g.human[g.players[P.target].team], hd: g.human[1 - g.players[P.target].team], d: g.ctl[1 - g.players[P.target].team] } : null,
       thrown: P ? P.thrown : false, target: P ? P.target : -1, ctl: g.ctl, pcall: g.calls[g.off] || null, dcall: g.calls[1 - g.off] || null, plays: g.plays, kick: g.kickAnim ? g.kickAnim.kind : null,
     };
   }
   const ROLE_CODE = { QB: 1, RB: 2, OL: 3, WR: 4, TE: 5, DL: 6, LB: 7, CB: 8, S: 9 };
 
-  return { create, OFF_PLAYS, DEF_PLAYS, RECEIVERS, L, W, CY, EZ, yardLine, goalOf, routeFor, CLOCK_RATE };
+  return { create, OFF_PLAYS, DEF_PLAYS, RECEIVERS, L, W, CY, EZ, yardLine, goalOf, routeFor, CLOCK_RATE, CATCH_R };
 });

@@ -16,6 +16,8 @@
     .fbpanel { position: absolute; left: 50%; bottom: 3%; transform: translateX(-50%); width: min(98%, 900px); background: rgba(8, 14, 10, .93); border: 4px solid #fff; border-radius: 6px; padding: 10px 12px; font-family: "Press Start 2P", monospace; text-align: center; z-index: 5; box-shadow: 0 0 0 4px #000; }
     .fbpanel[hidden] { display: none; }
     .fbpanel h3 { margin: 0 0 6px; font-size: clamp(9px, 1.7vw, 14px); color: #ffd23f; font-weight: 400; line-height: 1.5; }
+    .fbpanel { max-height: 88%; overflow-y: auto; }
+    .fbpanel h3 small { font-size: .7em; opacity: .7; }
     .fbpanel .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 6px; }
     .fbpanel button.play { font-family: inherit; font-size: clamp(7px, 1.2vw, 10px); line-height: 1.5; background: #14301c; color: #fff; border: 3px solid #fff; border-radius: 4px; padding: 6px 4px 8px; cursor: pointer; display: grid; gap: 5px; justify-items: center; }
     .fbpanel button.play:hover, .fbpanel button.play:focus-visible { background: #1f5a2c; border-color: #ffd23f; outline: none; }
@@ -71,7 +73,8 @@
           <div class="ctl-grid">
             <div class="ctl"><span class="keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></span><span class="act">Move the QB, the ball carrier or your defender</span></div>
             <div class="ctl"><span class="keys"><kbd>1</kbd>–<kbd>5</kbd> or <kbd class="mouse">Click a receiver</kbd></span><span class="act">Offence: throw to that receiver (the numbers float over their heads)</span></div>
-            <div class="ctl"><span class="keys"><kbd>Space</kbd></span><span class="act">Ball carrier: juke (dodge tackles). Defence: dive tackle</span></div>
+            <div class="ctl"><span class="keys"><kbd>Space</kbd></span><span class="act">Ball carrier: juke (dodge tackles). Defence: dive tackle. <b>While a pass is in the air: go for the catch</b></span></div>
+            <div class="ctl"><span class="keys"><kbd class="mouse">Click</kbd> in the air</span><span class="act">Catch or pick off the ball: get inside the ring around your player, then click when the yellow ring meets the green one (too early or out of range and you miss)</span></div>
             <div class="ctl"><span class="keys"><kbd>E</kbd> / <kbd>Shift</kbd></span><span class="act">Defence: switch to the defender closest to the ball</span></div>
           </div>
           <p class="ctl-extra"><b>Offence:</b> pick a play, then throw before the pass rush gets to you. Four downs to move 10 yards; on 4th down punt or kick a field goal. <b>Defence:</b> pick a coverage, then control one defender (ringed in yellow) to tackle, sack the QB or pick off the pass. A touchdown is worth 7. Quarters are short, and the clock only runs while the ball is live.</p>
