@@ -39,6 +39,7 @@
         const segs = Object.entries(o).map(([k, d]) => `<p class="np-label">${esc(d.label || k)}</p><div class="np-seg" data-k="${k}">${d.values.map((v) => `<button data-v="${esc(v)}" class="${room.opts[k] === v ? 'sel' : ''}" ${host ? '' : 'disabled'}>${esc(fmt(k, v))}</button>`).join('')}</div>`).join('');
         box.insertAdjacentHTML('beforeend', `<div class="np-members">${room.members.map((m) => `<div class="np-member${m.id === room.host ? ' host' : ''}">${avatarHtml(m.avatar)}${esc(m.username)}${m.id === room.host ? ' 👑' : ''}</div>`).join('')}</div>
           <p class="np-hint">${room.members.length} / ${room.max} players. ${room.state === 'lobby' ? (host ? 'You are the host: pick the settings, then start when everyone is here.' : 'Waiting for the host to start…') : room.state === 'countdown' ? 'Starting…' : 'A game is in progress.'}</p>${segs}
+          ${room.state === 'lobby' ? T.autoStartHtml(room) : ''}
           <div class="btn-row"><button class="btn" id="npStart" ${host && room.state === 'lobby' && room.members.length >= 2 ? '' : 'disabled'}>🏁 Start game</button><button class="btn secondary" id="npLeave">Leave room</button></div>`);
         box.querySelectorAll('.np-seg').forEach((seg) => { if (!host) return; seg.querySelectorAll('button').forEach((b) => b.onclick = () => { const k = seg.dataset.k, d = o[k], v = d.values.find((x) => String(x) === b.dataset.v); T.send({ t: 'gr_config', opts: { [k]: v } }); }); });
         box.querySelector('#npStart').onclick = () => T.send({ t: 'gr_start' });

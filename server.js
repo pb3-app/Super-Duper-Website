@@ -1021,7 +1021,7 @@ function onChallenge(ws, msg) {
 
 // ---------- Votes: before a game with several maps or modes starts, everybody who is going to play votes on them ----------
 // Most votes wins; a tie is settled at random; nobody voting keeps the default. Used by 1v1 matches (challenges and arena logs) and Tung Up rooms.
-const VOTE_MS = 15000, VOTE_RESULT_MS = 2400, PICK_MS = 20000;
+const VOTE_MS = 15000, VOTE_RESULT_MS = 2400, PICK_MS = 15000;
 const votes = new Map(), userVote = new Map();
 const voteKeysOf = (g) => (GAMES[g].vote || []).filter((k) => GAMES[g].options && GAMES[g].options[k]);
 function voteTally(v) {
@@ -1411,7 +1411,7 @@ function broadcastRooms() {
 }
 function roomView(room, key) {
   return {
-    id: room.id, state: room.state, host: room.host, notice: room.notice || null,
+    autoMs: room.autoAt ? Math.max(0, room.autoAt - Date.now()) : 0, id: room.id, state: room.state, host: room.host, notice: room.notice || null,
     min: Imposter.MIN_PLAYERS, max: Imposter.MAX_PLAYERS,
     members: room.members.map((k) => publicUser(db.users[k])),
     game: room.game ? Imposter.view(room.game, key, Date.now()) : null,
@@ -1560,7 +1560,7 @@ function onImp(ws, msg) {
 // ---------- Generic open rooms for real-time host-simulated games (Sumo, Bomber Arena): 2-4 players ----------
 const grRooms = new Map(), grUserRoom = new Map();
 const grPub = (k) => publicUser(db.users[k]);
-function grView(r) { return { id: r.id, game: r.game, host: r.host, state: r.state, opts: r.opts, max: GAMES[r.game].groomMax, members: r.members.map(grPub) }; }
+function grView(r) { return { autoMs: r.autoAt ? Math.max(0, r.autoAt - Date.now()) : 0, id: r.id, game: r.game, host: r.host, state: r.state, opts: r.opts, max: GAMES[r.game].groomMax, members: r.members.map(grPub) }; }
 function grSend(r) { for (const k of r.members) sendUser(k, { t: 'gr_room', room: grView(r) }); }
 function grList(game) { return [...grRooms.values()].filter((r) => r.game === game && r.state === 'lobby').map((r) => ({ id: r.id, host: grPub(r.host), count: r.members.length, max: GAMES[game].groomMax, opts: r.opts })); }
 function grBroadcastList(game) { const msg = JSON.stringify({ t: 'gr_rooms', game, rooms: grList(game) }); for (const ws of wss.clients) if (ws.grWatch === game && ws.readyState === 1) ws.send(msg); }
@@ -1666,7 +1666,7 @@ const crPub = (k) => publicUser(db.users[k]);
 function crView(r, key) {
   const E = CardGames[r.game];
   return {
-    id: r.id, game: r.game, host: r.host, state: r.state, opts: r.opts, max: CR_MAX, notice: r.notice || null,
+    autoMs: r.autoAt ? Math.max(0, r.autoAt - Date.now()) : 0, id: r.id, game: r.game, host: r.host, state: r.state, opts: r.opts, max: CR_MAX, notice: r.notice || null,
     members: r.members.map(crPub),
     g: r.g ? E.view(r.g, key) : null, turnMs: r.turnEnds ? Math.max(0, r.turnEnds - Date.now()) : 0,
     seatNames: r.g ? Object.fromEntries(r.g.players.map((p) => [p.id, p.name])) : null,
@@ -1803,7 +1803,7 @@ function picLev(a, b) { const m = a.length, n = b.length; const d = Array.from({
 function picMask(g) { return g.word.split('').map((ch, i) => (/[a-z0-9]/i.test(ch) ? (g.reveal.has(i) ? ch : '_') : ch)).join(''); }
 function picView(r, key) {
   const g = r.g;
-  const base = { id: r.id, host: r.host, state: r.state, opts: r.opts, max: PIC_MAX, members: r.members.map((k) => ({ ...picPub(k), pts: g ? g.scores[k] || 0 : 0, guessed: !!(g && g.guessed.has(k)), drawer: !!(g && g.drawer === k) })) };
+  const base = { autoMs: r.autoAt ? Math.max(0, r.autoAt - Date.now()) : 0, id: r.id, host: r.host, state: r.state, opts: r.opts, max: PIC_MAX, members: r.members.map((k) => ({ ...picPub(k), pts: g ? g.scores[k] || 0 : 0, guessed: !!(g && g.guessed.has(k)), drawer: !!(g && g.drawer === k) })) };
   if (!g) return base;
   const showWord = key === g.drawer || g.guessed.has(key) || g.phase === 'reveal' || g.phase === 'end';
   base.game = { phase: g.phase, round: Math.floor(g.turn / g.order.length) + 1, rounds: r.opts.rounds, turn: g.turn + 1, turns: g.turns, drawer: g.drawer, choices: key === g.drawer && g.phase === 'pick' ? g.choices : null, word: showWord ? g.word : null, hint: g.word ? picMask(g) : '', len: g.word ? g.word.length : 0, endsAt: g.endsAt, now: Date.now(), total: g.phase === 'draw' ? r.opts.time * 1000 : 0, lastWord: g.lastWord || null };
@@ -1974,7 +1974,7 @@ function tuBroadcastList() {
   for (const ws of wss.clients) if (ws.tuWatch && ws.readyState === 1) ws.send(msg);
 }
 function tuView(r) {
-  return { id: r.id, host: r.host, state: r.state, map: r.map, chaos: r.chaos, max: TU_MAX, members: r.members.map((k) => ({ ...tuPub(k), progress: (r.prog[k] || 0) })) };
+  return { autoMs: r.autoAt ? Math.max(0, r.autoAt - Date.now()) : 0, id: r.id, host: r.host, state: r.state, map: r.map, chaos: r.chaos, max: TU_MAX, members: r.members.map((k) => ({ ...tuPub(k), progress: (r.prog[k] || 0) })) };
 }
 function tuSend(r) { for (const k of r.members) sendUser(k, { t: 'tu_room', room: tuView(r) }); }
 function tuEnd(r, winnerKey, reason) {
@@ -2112,6 +2112,31 @@ setInterval(() => {
     if (room.game && room.game.phase !== 'result' && Imposter.tick(room.game, now)) afterGameChange(room);
   }
 }, 500).unref();
+
+// ---------- Every open room starts by itself 15 seconds after it has enough players ----------
+// (the host can still start sooner). The room view carries autoMs so every lobby can show the countdown.
+const AUTO_START_MS = 15000;
+const asHost = (r) => ({ key: r.host, readyState: 0 }); // the host pressing Start, as far as the room code can tell
+const AUTO_SYSTEMS = [
+  { rooms: grRooms, min: () => 2, send: grSend, start: (r) => onGr(asHost(r), { t: 'gr_start' }) },
+  { rooms: crRooms, min: () => 2, send: crSend, start: (r) => onCr(asHost(r), { t: 'cr_start' }) },
+  { rooms: picRooms, min: () => 2, send: picSend, start: (r) => onPic(asHost(r), { t: 'pic_start' }) },
+  { rooms: tuRooms, min: () => 2, send: tuSend, start: (r) => onTu(asHost(r), { t: 'tu_start' }) },
+  { rooms: rooms, min: () => Imposter.MIN_PLAYERS, send: sendRoom, start: (r) => onImp(asHost(r), { t: 'imp_start' }) },
+];
+function autoStartTick() {
+  const now = Date.now();
+  for (const sys of AUTO_SYSTEMS) {
+    for (const r of sys.rooms.values()) {
+      if (r.auto) continue; // rooms made from an arena log already start when everybody has arrived
+      const ready = r.state === 'lobby' && r.members.length >= sys.min(r);
+      if (!ready) { if (r.autoAt) { r.autoAt = 0; if (r.state === 'lobby') sys.send(r); } continue; }
+      if (!r.autoAt) { r.autoAt = now + AUTO_START_MS; sys.send(r); continue; }
+      if (now >= r.autoAt) { r.autoAt = 0; try { sys.start(r); } catch (e) { console.error('auto start failed', e); } }
+    }
+  }
+}
+setInterval(autoStartTick, 500).unref();
 
 // ---------- WebSocket connections ----------
 wss.on('connection', (ws) => {

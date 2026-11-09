@@ -95,6 +95,7 @@
       room.notice ? h("p", { class: "sp-status bad" }, room.notice) : null,
       h("p", { class: "imp-muted" }, `${n}/${room.max} players. ${n < room.min ? `Need ${room.min - n} more to start.` : "Ready when you are!"}`),
       h("div", { class: "imp-players" }, room.members.map((m) => h("div", { class: "imp-p" }, av(m.avatar, 32), h("span", { class: "nm" }, m.username + (m.id === room.host ? " 👑" : ""))))),
+      TM.autoStartEl(room),
       h("div", { class: "imp-row" },
         isHost ? h("button", { class: "mp-btn", disabled: !canStart, onclick: () => TM.send({ t: "imp_start" }) }, "▶ Start game") : h("span", { class: "imp-muted" }, "Waiting for the host to start…"),
         h("button", { class: "mp-btn ghost", onclick: () => TM.send({ t: "imp_leave" }) }, "Leave room")));

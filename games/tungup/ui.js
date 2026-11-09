@@ -160,6 +160,7 @@
         <p class="hintline">${r.members.length} / ${r.max} racers. ${r.state === 'lobby' ? (host ? 'You are the host: start when everyone is ready: you all vote on the map and chaos level first.' : 'Waiting for the host to start the race…') : r.state === 'countdown' ? 'Starting…' : 'A race is in progress.'}</p>
         <p style="margin:.4rem 0 .2rem;font-weight:800">Map</p><div class="seg" id="rmaps">${mapsOpts}</div>
         <p style="margin:.6rem 0 .2rem;font-weight:800">Chaos</p><div class="seg" id="rchaos">${chaos}</div>
+        ${r.state === 'lobby' ? TungMP.autoStartHtml(r) : ''}
         <div class="btn-row"><button class="btn" id="roomStart" ${host && r.state === 'lobby' && r.members.length >= 2 ? '' : 'disabled'}>🏁 Start race</button><button class="btn secondary" id="roomLeave">Leave room</button></div>`;
       if (!host) for (const b of box.querySelectorAll('#rmaps button, #rchaos button')) b.disabled = true;
       box.querySelectorAll('[data-rmap]').forEach((b) => b.onclick = () => TungMP.send({ t: 'tu_config', map: b.dataset.rmap }));

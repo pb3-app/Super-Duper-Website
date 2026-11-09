@@ -146,6 +146,7 @@
       <div class="members">${room.members.map((m) => `<div class="member${m.id === room.host ? " host" : ""}">${av(m.avatar)}${esc(m.username)}${m.id === room.host ? " 👑" : ""}</div>`).join("")}</div>
       <p class="hint">${room.members.length} / ${room.max} players. ${host ? "You are the host: choose the settings, then start (at least 2 players)." : "Waiting for the host to start…"}</p>
       ${seg("rounds", [1, 2, 3], (v) => v + (v === 1 ? " round" : " rounds"))}${seg("time", [60, 80, 100], (v) => v + " s")}
+      ${T.autoStartHtml(room)}
       <div class="btn-row" style="justify-content:flex-start"><button class="btn" id="go" ${host && room.members.length >= 2 ? "" : "disabled"}>🏁 Start game</button><button class="btn secondary" id="lv">Leave room</button></div>`;
     p.querySelectorAll(".seg").forEach((sg) => { if (host) sg.querySelectorAll("button").forEach((b) => b.onclick = () => T.send({ t: "pic_config", [sg.dataset.k]: Number(b.dataset.v) })); });
     $("go").onclick = () => T.send({ t: "pic_start" }); $("lv").onclick = () => T.send({ t: "pic_leave" });

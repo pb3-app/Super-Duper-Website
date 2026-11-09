@@ -216,6 +216,7 @@
     ws.onopen = () => ws.send(JSON.stringify({ t: 'auth', token: S.token }));
     ws.onmessage = (e) => {
       let m; try { m = JSON.parse(e.data); } catch { return; }
+      if (m.room && typeof m.room.autoMs === 'number') m.room.autoAt = m.room.autoMs ? Date.now() + m.room.autoMs : 0; // when this lobby starts by itself
       onMsg(m);
     };
     ws.onclose = () => {
@@ -526,6 +527,8 @@
   }
 
   // ---------- the daily reward: a wheel to spin every day, and a streak with a prize every week ----------
+  const autoText = (at) => { const s = Math.ceil((at - Date.now()) / 1000); return s > 0 ? `⏱️ Starts automatically in ${s}s` : '⏱️ Starting…'; };
+  setInterval(() => { for (const el of document.querySelectorAll('[data-autoat]')) el.textContent = autoText(Number(el.dataset.autoat)); }, 400);
   const WHEEL = ['b1', 't1', 'b2', 'b3', 't2', 'b1', 'b5', 'b2', 't3', 'b3', 'b10', 't4'];
   const WHEEL_STYLE = { b1: ['#8a5a30', '1 🪙'], b2: ['#a86b35', '2 🪙'], b3: ['#7a4a1f', '3 🪙'], b5: ['#c8873a', '5 🪙'], b10: ['#e0a91a', '10 🪙'], t1: ['#6c7480', '★'], t2: ['#2f8f55', '★★'], t3: ['#2f6fe0', '★★★'], t4: ['#e8a000', '👑'] };
   const dailyReady = () => !!(S.daily && (S.daily.canSpin || (S.daily.pending && S.daily.pending.length)));
@@ -1072,6 +1075,9 @@
     get match() { return S.shell ? S.shell.match : null; },
     fmtTime,
     get daily() { return S.daily; },
+    // "Starts automatically in 12s" for a room lobby (every open room starts 15 seconds after it has enough players)
+    autoStartHtml: (room) => (room && room.autoAt ? `<p class="np-hint" data-autoat="${room.autoAt}" style="font-weight:800;color:#ffc933">${autoText(room.autoAt)}</p>` : ''),
+    autoStartEl: (room) => { if (!room || !room.autoAt) return null; const p = document.createElement('p'); p.dataset.autoat = String(room.autoAt); p.style.cssText = 'font-weight:800;color:#ffc933'; p.textContent = autoText(room.autoAt); return p; },
     applyDaily(d) { S.daily = d; renderSlot(); renderDrawer(); emit('daily'); },
     loadDaily: () => loadDaily(false),
     openDaily,
