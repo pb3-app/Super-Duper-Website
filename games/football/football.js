@@ -2,7 +2,7 @@
 (() => {
   const S = window.FootballSim, $ = (id) => document.getElementById(id);
   const canvas = $("view"), ctx = canvas.getContext("2d"); ctx.imageSmoothingEnabled = false;
-  const IW = 384, IH = 216, PXX = 7.2, FT = 30, FH = 166, PXY = FH / S.W; // pixels per yard across and down
+  const IW = 384, IH = 216, PXX = IW / 90, FT = 30, FH = 166, PXY = FH / S.W; // pixels per yard across and down
   const TEAM = [{ jersey: "#ff8c2a", dark: "#b9560f", helmet: "#ffb25e", pants: "#f4efe6", abbr: "TUN" }, { jersey: "#2f6fe0", dark: "#1c448f", helmet: "#6fa0ff", pants: "#f4efe6", abbr: "CAP" }];
   const FONT = '"Press Start 2P", monospace';
 

@@ -13,6 +13,7 @@
   const ROLES_OFF = ['QB', 'RB', 'OL', 'OL', 'OL', 'OL', 'OL', 'WR', 'WR', 'WR', 'TE'];
   const ROLES_DEF = ['DL', 'DL', 'DL', 'DL', 'LB', 'LB', 'LB', 'CB', 'CB', 'S', 'S'];
   const RECEIVERS = [7, 8, 9, 10, 1]; // keys 1 to 5 throw to these offensive slots
+  const MAX_DOWNFIELD = 40; // nobody goes (and no pass is thrown) more than 40 yards past the line of scrimmage
   const BALL_SPEED = 27, CLOCK_RATE = 2.5; // the game clock runs 2.5 times faster than real time, so a quarter is about 35 seconds of live play
   const OFF_PLAYS = {
     quick: { name: 'Quick Pass', kind: 'pass' }, mixed: { name: 'Mixed Routes', kind: 'pass' }, deep: { name: 'Deep Bombs', kind: 'pass' },
@@ -127,7 +128,7 @@
     const rnd = { r: g.rng, side: flipS() };
     if (kind === 'pass') for (const slot of RECEIVERS) {
       const p = O[slot], inn = (CY - p.y > 0 ? 1 : -1) * (oc !== 'flood' && oc !== 'screen' && g.rng() < 0.28 ? -1 : 1);
-      p.route = routeFor(oc, slot, inn, rnd).map(([f, l]) => [p.x + dir * f, clamp(p.y + l, 2.5, W - 2.5)]); p.mode = 'route';
+      p.route = routeFor(oc, slot, inn, rnd).map(([f, l]) => { const wx = p.x + dir * f, lim = los + dir * MAX_DOWNFIELD; return [(wx - lim) * dir > 0 ? lim : wx, clamp(p.y + l, 2.5, W - 2.5)]; }); p.mode = 'route';
     }
     O.forEach((p) => { if (p.role === 'OL') p.mode = 'oline'; });
     if (kind === 'pass') { O[1].mode = oc === 'deep' ? 'block' : 'route'; if (oc === 'deep') O[1].route = []; } else { O[1].mode = 'runner'; O[7].mode = 'block'; O[8].mode = 'block'; O[9].mode = 'block'; O[10].mode = 'block'; }
@@ -275,6 +276,7 @@
     // ---- move everybody ----
     for (const p of g.players) {
       p.x += p.vx * dt; p.y += p.vy * dt;
+      if (p.team === offT && p.id !== P.carrier) { const lim = g.los + dir * MAX_DOWNFIELD; if ((p.x - lim) * dir > 0) { p.x = lim; p.vx = 0; } } // a receiver stops once he is 40 yards downfield
       if (p.y < -1.5) { p.y = -1.5; p.vy = 0; } if (p.y > W + 1.5) { p.y = W + 1.5; p.vy = 0; }
       p.x = clamp(p.x, 1, L - 1);
     }
@@ -385,9 +387,11 @@
     // lead the receiver: aim at where he will be when the ball gets there
     let T = Math.max(0.3, dist(qb, r) / BALL_SPEED), tx = r.x + r.vx * T * 0.95, ty = r.y + r.vy * T * 0.95;
     T = Math.max(0.3, Math.hypot(tx - qb.x, ty - qb.y) / BALL_SPEED); tx = r.x + r.vx * T * 0.95; ty = r.y + r.vy * T * 0.95;
+    { const lim = g.los + dirOf(g) * MAX_DOWNFIELD; if ((tx - lim) * dirOf(g) > 0) tx = lim; } // the ball can not be thrown more than 40 yards downfield
     const rush = D.some((d) => d.mode === 'rush' && d.free && dist(d, qb) < 3.2);
     const err = 0.3 + (rush ? 0.9 : 0) + Math.hypot(tx - qb.x, ty - qb.y) * 0.012 + (qb.jukeT > 0 ? 0.3 : 0);
     tx += (g.rng() - 0.5) * 2 * err; ty += (g.rng() - 0.5) * 2 * err;
+    { const lim = g.los + dirOf(g) * MAX_DOWNFIELD; if ((tx - lim) * dirOf(g) > 0) tx = lim; }
     Object.assign(b, { state: 'air', sx: qb.x, sy: qb.y, tx, ty, T, u: 0, hgt: 1.4 + Math.hypot(tx - qb.x, ty - qb.y) * 0.07, carrier: null, x: qb.x, y: qb.y, z: 0 });
   }
   // the ball in the air. A person has to be inside the ring (CATCH_R yards) when the ball comes down and go for it at the right moment:
