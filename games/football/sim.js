@@ -218,7 +218,7 @@
 
   function live(g, dt, ins) {
     const P = g.P, dir = dirOf(g), offT = g.off, defT = 1 - g.off, O = g.players.slice(offT * 11, offT * 11 + 11), D = g.players.slice(defT * 11, defT * 11 + 11);
-    P.t += dt; g.clock = Math.max(0, g.clock - dt * CLOCK_RATE); if (g.clock === 0) g.endAfter = true;
+    P.t += dt; if (P.caught && P.carrier >= 0) P.catchT = (P.catchT || 0) + dt; g.clock = Math.max(0, g.clock - dt * CLOCK_RATE); if (g.clock === 0) g.endAfter = true;
     const inO = ins[offT] || {}, inD = ins[defT] || {}, lastO = g.lastIn[offT] || {}, lastD = g.lastIn[defT] || {};
     const press = (inp, last, key) => (inp[key] || 0) !== (last[key] || 0);
     const humanO = g.human[offT], humanD = g.human[defT];
@@ -236,7 +236,7 @@
     for (const p of O) {
       if (p.stun > 0) p.stun -= dt;
       if (p.id === offCtl && humanO && !P.intercepted) {
-        drive(p, inO.dx || 0, inO.dy || 0, dt, p.jukeT > 0 ? 1.28 : 1);
+        drive(p, inO.dx || 0, inO.dy || 0, dt, (p.jukeT > 0 ? 1.28 : 1) * tired(g, p));
         if (press(inO, lastO, 'actN') && p.id === P.carrier && p.id !== P.qb && p.jcd <= 0) { p.jukeT = 0.42; p.jcd = 1.4; }
         if (press(inO, lastO, 'actN') && p.id === P.qb && !P.thrown && p.jcd <= 0) { p.jukeT = 0.35; p.jcd = 1.5; }
       } else offAI(g, p, dt, P, O, D, dir);
@@ -287,6 +287,8 @@
     if (c2 && g.ball.state === 'held' && g.phase === 'live') checkCarrier(g, c2, dt);
   }
 
+  // a receiver who has caught the ball slows down the longer he runs with it (down to 55% of his speed after about six seconds)
+  const tired = (g, p) => (g.P && g.P.caught && p.id === g.P.carrier ? Math.max(0.55, 1 - 0.075 * (g.P.catchT || 0)) : 1);
   const nearestTo = (list, pt) => list.slice().sort((a, b) => dist(a, pt) - dist(b, pt))[0];
 
   function offAI(g, p, dt, P, O, D, dir) {
@@ -355,7 +357,7 @@
       p.aiDir = best;
     }
     const rad = p.aiDir * Math.PI / 180;
-    mv(p, p.x + Math.cos(rad) * dir * 6, p.y + Math.sin(rad) * 6, dt, p.jukeT > 0 ? 1.28 : 1);
+    mv(p, p.x + Math.cos(rad) * dir * 6, p.y + Math.sin(rad) * 6, dt, (p.jukeT > 0 ? 1.28 : 1) * tired(g, p));
     const near = D.filter((d) => dist(d, p) < 2.0 && d.stun <= 0).length;
     if (near && p.jcd <= 0 && p.id !== g.P.qb && g.rng() < dt * 2.5) { p.jukeT = 0.42; p.jcd = 1.5; }
   }
@@ -458,7 +460,7 @@
   }
   function caught(g, R) {
     const P = g.P, b = g.ball;
-    P.caught = true; P.carrier = R.id; b.state = 'held'; b.carrier = R.id; R.route = []; R.ri = 0; R.mode = 'runner2'; P.catchX = R.x;
+    P.caught = true; P.carrier = R.id; b.state = 'held'; b.carrier = R.id; R.route = []; R.ri = 0; R.mode = 'runner2'; P.catchX = R.x; P.catchT = 0;
   }
   function interception(g, d) {
     const P = g.P, b = g.ball, dir = d.team === 0 ? 1 : -1;
