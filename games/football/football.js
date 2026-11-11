@@ -94,27 +94,35 @@
       ctx.stroke(); const e = pts[pts.length - 1]; ctx.fillStyle = "#3be86b"; ctx.fillRect(sx(e[0]) - 1, sy(e[1]) - 1, 3, 3);
     }
   }
-  // the catch ring: the ball has to come down inside it, and you go for it (click / space) when the shrinking ring meets the green one
+  // the catch: a ring around the player (the ball has to come down inside it) and a bar at the bottom of the screen. A marker slides across the bar and you click
+  // (or press space) when it is in the green middle: the middle is the perfect catch, the yellow either side is a good catch, red is a miss.
+  const SPAN = 1.1, CATCH_AT = 0.04, OPEN_FROM = 0.24, OPEN_TO = -0.2, PERFECT = 0.1;
   function drawCatch(v, t) {
     const c = v.catch; if (!c) return;
     let id = null;
     if (myTeam === v.off && c.ho) id = c.r; else if (myTeam !== v.off && c.hd && c.d != null) id = c.d;
     if (id == null) return;
-    const p = v.pl[id], X = sx(p[0]), Y = sy(p[1]) + 1, rx = c.R * PXX, ry = c.R * PXY, open = c.tl <= 0.24 && c.tl >= -0.2;
-    const ell = (k, color, w) => { ctx.strokeStyle = color; ctx.lineWidth = w; ctx.beginPath(); ctx.ellipse(X, Y, Math.max(1, rx * k), Math.max(1, ry * k), 0, 0, 7); ctx.stroke(); };
-    // where the ball is coming down
+    const p = v.pl[id], X = sx(p[0]), Y = sy(p[1]) + 1, rx = c.R * PXX, ry = c.R * PXY, open = c.tl <= OPEN_FROM && c.tl >= OPEN_TO;
+    // where the ball is coming down, and the ring around the player
     const lx = sx(c.lx), ly = sy(c.ly); ctx.strokeStyle = "rgba(255,255,255,.8)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(lx - 3, ly - 1); ctx.lineTo(lx + 3, ly + 2); ctx.moveTo(lx + 3, ly - 1); ctx.lineTo(lx - 3, ly + 2); ctx.stroke();
-    ctx.save();
-    ctx.globalAlpha = 0.9; ell(1, c.in ? (open ? "#3be86b" : "#d8ffd8") : "#ff6b5e", c.in ? 2 : 1);
-    ell(0.3, "rgba(59,232,107,.9)", 2);                                   // the spot to click on
-    const k = 0.3 + 0.7 * Math.max(0, Math.min(1, (c.tl - 0.04) / 0.5));  // the shrinking ring
-    ell(k, c.tl < -0.06 ? "#ff6b5e" : "#ffd23f", 1.5);
-    ctx.restore();
-    if (c.tl > 0.24) text(myTeam === v.off ? "get under it" : "get to the ball", X, Y - 22, "#fff", 6, "center");
-    else if (open) text(c.in ? "CLICK!" : "MOVE INTO THE RING", X, Y - 22, c.in ? "#ffd23f" : "#ff6b5e", 7, "center");
+    ctx.save(); ctx.globalAlpha = 0.9; ctx.strokeStyle = c.in ? (open ? "#3be86b" : "#d8ffd8") : "#ff6b5e"; ctx.lineWidth = c.in ? 2 : 1; ctx.beginPath(); ctx.ellipse(X, Y, rx, ry, 0, 0, 7); ctx.stroke(); ctx.restore();
+    if (myTeam !== v.off && c.tl > OPEN_FROM) text("get to the ball", X, Y - 22, "#fff", 6, "center");
+    // the bar
+    const bw = 230, bh = 11, bx = Math.round(IW / 2 - bw / 2), by = IH - 30, at = (tl) => bx + bw * (0.5 + (CATCH_AT - tl) / SPAN);
+    ctx.fillStyle = "#000"; ctx.fillRect(bx - 3, by - 3, bw + 6, bh + 6);
+    ctx.fillStyle = "#7a2a24"; ctx.fillRect(bx, by, bw, bh);                                           // miss
+    ctx.fillStyle = "#c9b73a"; ctx.fillRect(at(OPEN_FROM), by, at(OPEN_TO) - at(OPEN_FROM), bh);        // a good catch
+    ctx.fillStyle = "#3be86b"; ctx.fillRect(at(CATCH_AT + PERFECT), by, at(CATCH_AT - PERFECT) - at(CATCH_AT + PERFECT), bh); // the perfect catch, in the middle
+    ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.fillRect(Math.round(bx + bw / 2), by - 2, 1, bh + 4);
+    const mk = Math.max(bx, Math.min(bx + bw, at(c.tl)));                                                // the marker
+    ctx.fillStyle = c.in ? "#ffffff" : "#ff9a8a"; ctx.fillRect(Math.round(mk) - 1, by - 4, 3, bh + 8); ctx.fillRect(Math.round(mk) - 3, by - 6, 7, 3);
+    const msg = !c.in ? (c.tl < 0.4 ? (myTeam === v.off ? "OUT OF RANGE" : "GET INTO THE RING") : "") : open ? "CLICK!" : "";
+    if (msg) text(msg, IW / 2, by - 10, !c.in ? "#ff6b5e" : "#ffd23f", 7, "center");
   }
   function drawLabels(v) {
     if (myTeam !== v.off || v.thrown || (v.phase !== "live" && v.phase !== "presnap")) return; // the numbers are there as soon as the team lines up
+    if (!v.pcall || S.OFF_PLAYS[v.pcall].kind !== "pass") return; // no numbers on a run
+    if (v.phase === "live" && !v.canThrow) { const q = v.pl[v.off * 11], X = sx(q[0]), Y = sy(q[1]) - 18; text("past the line: no throw", X, Y, "#ff9a8a", 6, "center"); return; } // a pass has to be thrown from behind the line of scrimmage
     S.RECEIVERS.forEach((slot, k) => {
       const id = v.off * 11 + slot, p = v.pl[id], X = sx(p[0]), Y = sy(p[1]) - 14;
       ctx.fillStyle = "rgba(0,0,0,.65)"; ctx.fillRect(X - 4, Y - 5, 9, 9); text(String(k + 1), X, Y, "#ffd23f", 7, "center");

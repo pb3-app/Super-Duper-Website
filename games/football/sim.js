@@ -227,7 +227,8 @@
 
     // ---- who each person controls ----
     // offence: the QB until the ball is thrown, then the target, then whoever carries it
-    let offCtl = P.intercepted ? P.carrier : (P.thrown && !P.caught && P.target >= 0 ? P.target : P.carrier);
+    // offence: the QB until the ball is thrown and then STILL the QB while it is in the air (the receivers run their routes by themselves); whoever catches it after that
+    let offCtl = P.intercepted ? P.carrier : (P.thrown && !P.caught && P.target >= 0 ? P.thrower : P.carrier);
     g.ctl[offT] = offCtl >= 0 ? offCtl : null;
 
     // ---- offence movement ----
@@ -242,8 +243,11 @@
     }
     // ---- pass: a throw ----
     if (P.kind === 'pass' && !P.thrown && !P.scrambling) {
-      if (humanO && press(inO, lastO, 'thrN') && P.t > 0.35) throwTo(g, qb, O[RECEIVERS[clamp((inO.thrK | 0), 0, 4)]], D);
-      else if (!humanO) aiThrow(g, qb, O, D, dt);
+      const behind = (qb.x - g.los) * dir <= 0.4; // a forward pass has to be thrown from behind the line of scrimmage
+      if (humanO && press(inO, lastO, 'thrN') && P.t > 0.35) {
+        if (behind) throwTo(g, qb, O[RECEIVERS[clamp((inO.thrK | 0), 0, 4)]], D);
+        else { g.text = "CAN'T THROW PAST THE LINE"; g.textT = 1.1; }
+      } else if (!humanO && behind) aiThrow(g, qb, O, D, dt);
     }
     // ---- handoff ----
     if (P.kind === 'run' && !P.handed && P.t > (P.play === 'draw' ? 1.3 : 0.5)) { P.handed = true; P.carrier = P.rb; g.ball.carrier = P.rb; P.backfield = false; }
@@ -285,6 +289,9 @@
 
   function offAI(g, p, dt, P, O, D, dir) {
     const los = g.los;
+    if (P.thrown && !P.caught && !P.intercepted && p.id === P.target) { // the ball is on its way: go and get it
+      const b = g.ball; mv(p, b.tx, b.ty, dt, 1); return;
+    }
     if (p.id === P.qb) {
       if (P.thrown || P.handed) { // after the throw / handoff: step back and watch (or a runner)
         if (P.carrier === p.id) carrierAI(g, p, dt, D, dir); else mv(p, p.x - dir * 0.2, p.y, dt, 0.3);
@@ -634,6 +641,7 @@
       ball: [Math.round(g.ball.x * 10) / 10, Math.round(g.ball.y * 10) / 10, Math.round(g.ball.z * 10) / 10, g.ball.state === 'held' ? 0 : g.ball.state === 'air' ? 1 : g.ball.state === 'kick' ? 2 : 3],
       routes: g.phase === 'presnap' || g.phase === 'live' ? g.players.filter((p) => p.team === g.off && p.mode === 'route' && p.route.length && !(P && P.thrown)).map((p) => [p.id, p.route.slice(p.ri).map((w) => [Math.round(w[0] * 10) / 10, Math.round(w[1] * 10) / 10])]) : [],
       catch: P && P.thrown && !P.caught && !P.intercepted && g.ball.state === 'air' && P.target >= 0 ? { r: P.target, R: CATCH_R, tl: Math.round((P.tl || 0) * 100) / 100, lx: Math.round(g.ball.tx * 10) / 10, ly: Math.round(g.ball.ty * 10) / 10, in: dist(g.ball, g.players[P.target]) <= CATCH_R, ho: g.human[g.players[P.target].team], hd: g.human[1 - g.players[P.target].team], d: g.ctl[1 - g.players[P.target].team] } : null,
+      canThrow: !!(P && P.kind === 'pass' && !P.thrown && !P.scrambling && g.phase === 'live' && (g.players[P.qb].x - g.los) * dirOf(g) <= 0.4),
       thrown: P ? P.thrown : false, target: P ? P.target : -1, ctl: g.ctl, pcall: g.calls[g.off] || null, dcall: g.calls[1 - g.off] || null, plays: g.plays, kick: g.kickAnim ? g.kickAnim.kind : null,
     };
   }
