@@ -396,45 +396,65 @@
   }
   // the ball in the air. A person has to be inside the ring (CATCH_R yards) when the ball comes down and go for it at the right moment:
   // too early or out of range and he whiffs, a perfect click makes the catch (or the pick). The computer catches by chance, as before.
+  // ---- the contested catch ----
+  // Whoever clicks closer to the perfect moment wins the ball. Every click error is scaled down ("dispersion removed") by the offence's 10% edge and by
+  // 20% for each extra player a team has in the catch zone. If neither is close enough it is incomplete; if the offence wins it is a catch; if the defence
+  // wins it is an interception 40% of the time and a knocked-down ball the other 60%.
+  const CLICK_OK = 0.22, OFF_EDGE = 0.10, EXTRA_EDGE = 0.20, PICK_CHANCE = 0.4;
+  const gauss = (g) => Math.sqrt(-2 * Math.log(1 - g.rng() * 0.999999)) * Math.cos(6.283185307 * g.rng());
+  const aiError = (g, sigma) => Math.abs(gauss(g)) * sigma; // how far from perfect a computer player clicks
+  function zoneCounts(g, R) {
+    const b = g.ball, inZone = (p) => Math.hypot(p.x - b.x, p.y - b.y) <= CATCH_R;
+    const off = g.players.filter((p) => p.team === R.team && inZone(p)), def = g.players.filter((p) => p.team !== R.team && inZone(p));
+    return { off, def };
+  }
+  function resolveCatch(g, R, humanOff, humanDef, sel) {
+    const P = g.P, b = g.ball, flash = (t, sec) => { g.text = t; g.textT = sec || 1; };
+    const z = zoneCounts(g, R), nO = z.off.length, nD = z.def.length;
+    const skill = { easy: [0.2, 0.17], medium: [0.14, 0.12], hard: [0.09, 0.08] }[g.level] || [0.14, 0.12]; // [computer defender, computer receiver] click spread
+    // raw click errors (seconds away from the perfect moment)
+    let eO = Infinity, eD = Infinity, dWho = null;
+    if (P.clk.o) eO = P.clk.o.raw; else if (!humanOff && z.off.some((p) => p.id === R.id)) eO = aiError(g, skill[1]);
+    if (P.clk.d) { eD = P.clk.d.raw; dWho = g.players[P.clk.d.id]; }
+    for (const d of z.def) { if (humanDef && d.id === sel) continue; const e = aiError(g, skill[0]); if (e < eD) { eD = e; dWho = d; } } // the computer's defenders in the zone go for it too
+    // the dispersion removed
+    const extraO = Math.max(0, nO - nD), extraD = Math.max(0, nD - nO);
+    const mulO = 1 - Math.min(0.7, OFF_EDGE + EXTRA_EDGE * extraO), mulD = 1 - Math.min(0.6, EXTRA_EDGE * extraD);
+    const aO = eO * mulO, aD = eD * mulD, okO = aO <= CLICK_OK, okD = aD <= CLICK_OK;
+    P.contest = { nO, nD, aO: Number.isFinite(aO) ? Math.round(aO * 1000) / 1000 : null, aD: Number.isFinite(aD) ? Math.round(aD * 1000) / 1000 : null };
+    if (!okO && !okD) { flash('INCOMPLETE', 1.2); b.state = 'dead'; b.carrier = null; endPlay(g, 'incomplete', g.los); return; }
+    if (okO && (!okD || aO <= aD)) { flash(eO <= PERFECT ? 'PERFECT CATCH!' : 'CAUGHT IT!', 1); return caught(g, R); }
+    if (g.rng() < PICK_CHANCE && dWho) { P.intercepted = true; interception(g, dWho); return; }
+    flash('BROKEN UP!', 1.2); b.state = 'dead'; b.carrier = null; endPlay(g, 'incomplete', g.los);
+  }
+  // the ball in the air. A person has to be inside the ring (CATCH_R yards) when the ball comes down and click at the right moment: too early or out of range and
+  // he whiffs. The computer's players "click" with some spread. When everybody who is going to click has, the closest click wins (see above).
   function ballFlight(g, dt, O, D, c) {
     const b = g.ball, P = g.P; b.u += dt / b.T;
     const u = Math.min(1, b.u); b.x = b.sx + (b.tx - b.sx) * u; b.y = b.sy + (b.ty - b.sy) * u; b.z = 4 * b.hgt * u * (1 - u);
     const R = g.players[P.target], tl = (1 - b.u) * b.T; P.tl = tl;
     const humanOff = g.human[R.team] && !P.intercepted, humanDef = g.human[1 - R.team];
+    if (!P.clk) P.clk = { o: null, d: null };
     if (P.lockO > 0) P.lockO -= dt; if (P.lockD > 0) P.lockD -= dt;
-    const open = tl <= WIN_OPEN && tl >= -WIN_LATE, perfect = Math.abs(tl - CATCH_AT) <= PERFECT;
+    const open = tl <= WIN_OPEN && tl >= -WIN_LATE;
     const flash = (t, s) => { g.text = t; g.textT = s || 0.8; };
-    const foes = g.players.filter((p) => p.team !== R.team);
     // a person on defence goes for the ball
-    if (humanDef && c.pressD && !(P.lockD > 0)) {
+    if (humanDef && c.pressD && !P.clk.d && !(P.lockD > 0)) {
       const d = g.players.find((p) => p.id === c.sel && p.team !== R.team);
-      if (d && open && Math.hypot(d.x - b.x, d.y - b.y) <= CATCH_R) {
-        if (g.rng() < (perfect ? 0.8 : 0.3)) { P.intercepted = true; interception(g, d); return; }
-        flash('BROKEN UP!', 1.2); b.state = 'dead'; b.carrier = null; endPlay(g, 'incomplete', g.los); return;
-      } else if (d) { P.lockD = 0.45; flash(tl > WIN_OPEN ? 'TOO EARLY!' : 'OUT OF RANGE!', 0.7); }
+      if (d && open && Math.hypot(d.x - b.x, d.y - b.y) <= CATCH_R) P.clk.d = { raw: Math.abs(tl - CATCH_AT), id: d.id };
+      else if (d) { P.lockD = 0.45; flash(tl > WIN_OPEN ? 'TOO EARLY!' : 'OUT OF RANGE!', 0.7); }
     }
     // a person on offence goes for it
-    if (humanOff && c.pressO && !(P.lockO > 0)) {
-      if (open && Math.hypot(R.x - b.x, R.y - b.y) <= CATCH_R) {
-        const nd = foes.map((d) => ({ d, dd: Math.hypot(d.x - R.x, d.y - R.y) })).sort((a, b2) => a.dd - b2.dd)[0];
-        const pc = (perfect ? 1 : 0.85) * (nd.dd < 0.9 ? 0.6 : nd.dd < 1.6 ? 0.85 : 1);
-        if (g.rng() < pc) { flash(perfect ? 'PERFECT CATCH!' : 'CAUGHT IT!', 0.9); return caught(g, R); }
-        flash('DROPPED!', 1.2); b.state = 'dead'; b.carrier = null; endPlay(g, 'incomplete', g.los); return;
-      }
-      P.lockO = 0.45; flash(tl > WIN_OPEN ? 'TOO EARLY!' : 'OUT OF RANGE!', 0.7);
+    if (humanOff && c.pressO && !P.clk.o && !(P.lockO > 0)) {
+      if (open && Math.hypot(R.x - b.x, R.y - b.y) <= CATCH_R) P.clk.o = { raw: Math.abs(tl - CATCH_AT) };
+      else { P.lockO = 0.45; flash(tl > WIN_OPEN ? 'TOO EARLY!' : 'OUT OF RANGE!', 0.7); }
     }
-    // the ball comes down (a person gets a moment longer to go for it)
-    if (humanOff ? tl >= -WIN_LATE : tl > 0) return;
-    const dr = Math.hypot(R.x - b.tx, R.y - b.ty);
-    const defs = foes.map((d) => ({ d, dd: Math.hypot(d.x - b.tx, d.y - b.ty) })).sort((a, b2) => a.dd - b2.dd);
-    const nd = defs[0], reach = 2.8;
-    const skill = { easy: 0.9, medium: 1, hard: 1.08 }[g.level] || 1;
-    const catchP = humanOff ? 0 : dr > reach ? 0 : (nd.dd < 0.9 ? 0.5 : nd.dd < 1.6 ? 0.74 : 0.95) * (1 - dr / reach * 0.2);
-    if (g.rng() < catchP) return caught(g, R);
-    if (nd.dd < 1.3 && nd.dd < dr && g.rng() < 0.2 * skill) { P.intercepted = true; interception(g, nd.d); return; } // picked off
-    // incomplete
-    if (humanOff) flash('INCOMPLETE', 1.2);
-    b.state = 'dead'; b.carrier = null; endPlay(g, 'incomplete', g.los);
+    // who is still to click? (a person who has not clicked yet gets until the window closes)
+    const windowOpen = tl >= -WIN_LATE, pendingO = humanOff && !P.clk.o && windowOpen, pendingD = humanDef && !P.clk.d && windowOpen;
+    const anyClick = !!(P.clk.o || P.clk.d), noPeople = !humanOff && !humanDef;
+    const done = (anyClick && !pendingO && !pendingD) || tl < -WIN_LATE || (noPeople && tl <= 0);
+    if (!done) return;
+    resolveCatch(g, R, humanOff, humanDef, c.sel);
   }
   function caught(g, R) {
     const P = g.P, b = g.ball;
@@ -646,6 +666,7 @@
       routes: g.phase === 'presnap' || g.phase === 'live' ? g.players.filter((p) => p.team === g.off && p.mode === 'route' && p.route.length && !(P && P.thrown)).map((p) => [p.id, p.route.slice(p.ri).map((w) => [Math.round(w[0] * 10) / 10, Math.round(w[1] * 10) / 10])]) : [],
       catch: P && P.thrown && !P.caught && !P.intercepted && g.ball.state === 'air' && P.target >= 0 ? { r: P.target, R: CATCH_R, tl: Math.round((P.tl || 0) * 100) / 100, lx: Math.round(g.ball.tx * 10) / 10, ly: Math.round(g.ball.ty * 10) / 10, in: dist(g.ball, g.players[P.target]) <= CATCH_R, ho: g.human[g.players[P.target].team], hd: g.human[1 - g.players[P.target].team], d: g.ctl[1 - g.players[P.target].team] } : null,
       canThrow: !!(P && P.kind === 'pass' && !P.thrown && !P.scrambling && g.phase === 'live' && (g.players[P.qb].x - g.los) * dirOf(g) <= 0.4),
+      zone: P && P.thrown && g.ball.state === 'air' && P.target >= 0 ? (() => { const z = zoneCounts(g, g.players[P.target]); return [z.off.length, z.def.length]; })() : null,
       thrown: P ? P.thrown : false, target: P ? P.target : -1, ctl: g.ctl, pcall: g.calls[g.off] || null, dcall: g.calls[1 - g.off] || null, plays: g.plays, kick: g.kickAnim ? g.kickAnim.kind : null,
     };
   }

@@ -116,6 +116,10 @@
     ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.fillRect(Math.round(bx + bw / 2), by - 2, 1, bh + 4);
     const mk = Math.max(bx, Math.min(bx + bw, at(c.tl)));                                                // the marker
     ctx.fillStyle = c.in ? "#ffffff" : "#ff9a8a"; ctx.fillRect(Math.round(mk) - 1, by - 4, 3, bh + 8); ctx.fillRect(Math.round(mk) - 3, by - 6, 7, 3);
+    if (v.zone) { // how many are in the catch zone: more players than the other side = a better click for them
+      const [no, nd] = v.zone, lead = no > nd ? "OFFENCE +" + Math.min(60, 10 + 20 * (no - nd)) + "% " : nd > no ? "DEFENCE +" + Math.min(60, 20 * (nd - no)) + "% " : "OFFENCE +10% ";
+      text(`ZONE: OFF ${no} v DEF ${nd}  (${lead.trim()})`, bx - 3, by + bh + 9, "#cfe8cf", 5, "left");
+    }
     const msg = !c.in ? (c.tl < 0.4 ? (myTeam === v.off ? "OUT OF RANGE" : "GET INTO THE RING") : "") : open ? "CLICK!" : "";
     if (msg) text(msg, IW / 2, by - 10, !c.in ? "#ff6b5e" : "#ffd23f", 7, "center");
   }
