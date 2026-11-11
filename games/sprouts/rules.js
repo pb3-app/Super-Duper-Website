@@ -15,11 +15,12 @@
   const W = 640, H = 420, R = 7;     // board size, dot radius
   const CELL = 4;                    // raster cell for the "any legal move left?" search
   const MAX_PTS = 400;
-  const DOT_CLEAR = R + 8;   // lines keep this far from other dots
-  const LINE_CLEAR = 18;     // lines keep this far from other lines
-  const DOT_GAP = 24;        // new dots keep this far from every dot
-  const DOT_LINE_GAP = 20;   // new dots keep this far from every line
-  const END_ZONE = 30;       // clearances are relaxed near the line's own end dots
+  // These are deliberately small: if two lines would not cross, a drawn line should be allowed, so the clearances are only there to keep the picture readable.
+  const DOT_CLEAR = R + 4;   // lines keep this far from other dots
+  const LINE_CLEAR = 5;      // lines keep this far from other lines
+  const DOT_GAP = 14;        // new dots keep this far from every dot
+  const DOT_LINE_GAP = 8;   // new dots keep this far from every line
+  const END_ZONE = 24;       // clearances are relaxed near the line's own end dots
   const EPS = 1e-4;
   const round1 = (v) => Math.round(v * 10) / 10;
 
@@ -81,6 +82,10 @@
 
   // Choose where on the new line the new dot goes: nearest the middle with clear space around it.
   function findDotSpot(s, pts, cum, total) {
+    const first = findDotSpotAt(s, pts, cum, total, DOT_GAP, DOT_LINE_GAP);
+    return first || findDotSpotAt(s, pts, cum, total, DOT_GAP * 0.7, DOT_LINE_GAP * 0.7); // a tight squeeze: allow a little less room
+  }
+  function findDotSpotAt(s, pts, cum, total, DOT_GAP, DOT_LINE_GAP) {
     const n = pts.length - 1;
     const at = (d) => {
       let i = 1;
@@ -244,10 +249,10 @@
     for (const e of s.edges) {
       for (let i = 0; i < e.pts.length - 1; i++) {
         const p = e.pts[i], q = e.pts[i + 1], l = dist(p, q), steps = Math.max(1, Math.ceil(l / 2));
-        for (let t = 0; t <= steps; t++) mark(p[0] + ((q[0] - p[0]) * t) / steps, p[1] + ((q[1] - p[1]) * t) / steps, LINE_CLEAR + 5);
+        for (let t = 0; t <= steps; t++) mark(p[0] + ((q[0] - p[0]) * t) / steps, p[1] + ((q[1] - p[1]) * t) / steps, LINE_CLEAR + 3);
       }
     }
-    for (const d of s.dots) mark(d.x, d.y, DOT_CLEAR + 5);
+    for (const d of s.dots) mark(d.x, d.y, DOT_CLEAR + 3);
     return { cw, ch, blocked };
   }
 
@@ -277,7 +282,7 @@
   function ports(g, comp, d) {
     const out = new Map();
     for (let a = 0; a < 360; a += 6) {
-      for (const rad of [DOT_CLEAR + 5 + 3, DOT_CLEAR + 5 + 6]) {
+      for (const rad of [DOT_CLEAR + 3 + 3, DOT_CLEAR + 3 + 6]) {
         const x = d.x + rad * Math.cos((a * Math.PI) / 180), y = d.y + rad * Math.sin((a * Math.PI) / 180);
         const X = Math.floor(x / CELL), Y = Math.floor(y / CELL);
         if (X < 0 || Y < 0 || X >= g.cw || Y >= g.ch) continue;
@@ -527,6 +532,46 @@
     return mv;
   }
 
+  // ---------- freehand strokes: the player drags from a dot to a dot ----------
+  /** Would the stroke so far (a polyline starting on dot `from`) run into another line, itself or a dot? Used to stop the line while it is being drawn. */
+  function strokeBlocked(s, pts, from) {
+    if (pts.length < 2) return false;
+    const a = s.dots[from], A = [a.x, a.y], last = pts.length - 2, p = pts[last], q = pts[last + 1];
+    for (const e of s.edges) for (let j = 0; j < e.pts.length - 1; j++) {
+      const r = segInt(p, q, e.pts[j], e.pts[j + 1]);
+      if (r === null) continue;
+      if (r !== 'overlap' && dist(r, A) < 1) continue; // the line leaves its own dot
+      return true;
+    }
+    for (let i = 0; i < last - 1; i++) if (segInt(p, q, pts[i], pts[i + 1]) !== null) return true; // crossing itself
+    for (let k = 0; k < s.dots.length; k++) { if (k === from) continue; const d = s.dots[k]; if (distPtSeg([d.x, d.y], p, q) < R + 1 && dist(q, [d.x, d.y]) > 12) return true; }
+    return false;
+  }
+  /** Turn the points of a drag into a smooth line that follows it (as smooth as the board allows) and check it.
+   *  Returns {ok:true, path} or {ok:false, error}. */
+  function stroke(s, from, to, raw) {
+    const a = s.dots[from], b = s.dots[to];
+    if (!a || !b || !Array.isArray(raw) || raw.length < 2) return { ok: false, error: 'Draw a line from one dot to another' };
+    let base = raw.map((q) => [q[0], q[1]]);
+    base[0] = [a.x, a.y]; base[base.length - 1] = [b.x, b.y];
+    base = base.filter((q, i) => i === 0 || i === base.length - 1 || dist(q, base[i - 1]) > 0.6);
+    const mine = (path) => ({ from, to, path });
+    const plain = simplify(base, 0.8);
+    const tries = [[5, 5], [3, 6], [2, 6], [1, 5]];
+    for (const [passes, step] of tries) {
+      let pts = resample(base, step);
+      pts = relax(pts, passes * 3);
+      pts = resample(pts, 12);
+      pts = spline(pts, 5);
+      pts[0] = [a.x, a.y]; pts[pts.length - 1] = [b.x, b.y];
+      pts = simplify(pts, 0.35).map((q) => [round1(q[0]), round1(q[1])]);
+      if (pts.length > MAX_PTS - 5) continue;
+      if (validate(s, mine(pts)).ok) return { ok: true, path: pts };
+    }
+    const r = validate(s, mine(plain.map((q) => [round1(q[0]), round1(q[1])])));
+    return r.ok ? { ok: true, path: plain.map((q) => [round1(q[0]), round1(q[1])]) } : { ok: false, error: r.error };
+  }
+
   /** Every legal line that joins dots A and B (one per region they share), drawn smoothly. */
   function movesFor(s, A, B) {
     const a = s.dots[A], b = s.dots[B];
@@ -561,5 +606,5 @@
 
   function hasMove(s) { return candidateMoves(s, 1).length > 0; }
 
-  return { W, H, R, newGame, clone, validate, applyValid, play, candidateMoves, movesFor, curve, hasMove, simplify, pathLen };
+  return { W, H, R, newGame, clone, validate, applyValid, play, candidateMoves, movesFor, curve, hasMove, simplify, pathLen, stroke, strokeBlocked };
 });

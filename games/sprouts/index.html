@@ -53,9 +53,9 @@
         <label>Mode <select id="modeSel"><option value="normal" selected>Normal (last move wins)</option><option value="misere">Misère (last move loses)</option></select></label>
         <button class="btn" id="newBtn">New game</button>
       </div>
-      <div class="sp-status" id="status">Your turn: click a dot, then the dot to join it to.</div>
+      <div class="sp-status" id="status">Your turn: drag from a dot to another dot.</div>
       <canvas id="board" width="640" height="420"></canvas>
-      <p class="help">Click a dot, then click the dot you want to join it to. Click the same dot twice to make a loop. Lines can’t cross, and a dot can only hold 3 lines.</p>
+      <p class="help"><b>Press on a dot and drag to another dot</b>, then let go: your line follows your path and is smoothed out. Drag back to the same dot to make a loop. The line stops if it would cross another line, so steer around. A new dot appears in the middle of every line, and a dot can only hold 3 lines.</p>
       <details class="rules">
         <summary>How to play</summary>
         <ul>

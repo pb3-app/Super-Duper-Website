@@ -17,9 +17,9 @@
   let waiting = false;      // MP: our move is on its way to the server
   let turn = "me";          // solo: "me" | "ai"; MP: user id whose turn it is
   let over = false;
-  let selected = null;      // the first dot clicked
-  let choices = null;       // several ways round: the player picks one
-  let badStroke = null;
+  let drag = null;          // the line being drawn: { from, pts }
+  let hoverDot = -1;        // the dot the line would end on if you let go now
+  let badStroke = null;     // a line that was not allowed, shown in red for a moment
   let aiTimer = null;
   let lastEdges = 0;
   let myMoves = 0;
@@ -66,7 +66,7 @@
       const fresh = i >= state.edges.length - 2 && state.edges.length === lastEdges;
       line(e.pts, COLORS[e.by || 0], fresh ? 6 : 4);
     });
-    if (choices) choices.forEach((c) => line(c.path, COLORS[myColor()], 4, [10, 8]));
+    if (drag && drag.pts.length > 1) { line(drag.pts, COLORS[myColor()], 5); ctx.globalAlpha = 0.25; line(drag.pts, "#ffffff", 9); ctx.globalAlpha = 1; }
     if (badStroke) line(badStroke, "#ff5252", 4, [6, 6]);
 
     const canPick = canMove();
@@ -86,10 +86,16 @@
         ctx.fillStyle = "#3a2208";
         ctx.fill();
       }
-      if (i === selected) {
+      if (drag && i === drag.from) {
         ctx.beginPath();
         ctx.arc(d.x, d.y, R + 7, 0, Math.PI * 2);
         ctx.strokeStyle = COLORS[myColor()];
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      } else if (drag && i === hoverDot && !dead) {
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, R + 7, 0, Math.PI * 2);
+        ctx.strokeStyle = "#7df08f";
         ctx.lineWidth = 3;
         ctx.stroke();
       } else if (canPick && !dead) {
@@ -109,12 +115,12 @@
     return turn === "me";
   }
 
-  // ---------- input: click a dot, then the dot to join it to ----------
+  // ---------- input: drag from a dot to another dot (or back to the same one for a loop) ----------
   function pos(e) {
     const r = canvas.getBoundingClientRect();
     return [((e.clientX - r.left) * W) / r.width, ((e.clientY - r.top) * H) / r.height];
   }
-  function nearestDot(p, maxD = 26) {
+  function nearestDot(p, maxD = 28) {
     let best = -1, bd = maxD;
     state.dots.forEach((d, i) => {
       const dd = Math.hypot(d.x - p[0], d.y - p[1]);
@@ -122,63 +128,71 @@
     });
     return best;
   }
-  function distToPath(p, pts) {
-    let m = 1e9;
-    for (let i = 0; i < pts.length - 1; i++) {
-      const [x0, y0] = pts[i], [x1, y1] = pts[i + 1];
-      const dx = x1 - x0, dy = y1 - y0, l2 = dx * dx + dy * dy;
-      const t = l2 ? Math.max(0, Math.min(1, ((p[0] - x0) * dx + (p[1] - y0) * dy) / l2)) : 0;
-      m = Math.min(m, Math.hypot(p[0] - x0 - t * dx, p[1] - y0 - t * dy));
-    }
-    return m;
-  }
   function flashBad(text) {
     setStatus(text, true);
     draw();
   }
-  function cancel() { selected = null; choices = null; badStroke = null; }
+  function cancel() { drag = null; hoverDot = -1; badStroke = null; }
+  const hint = () => (mp ? "Your turn! " : "Your turn: ") + "drag from a dot to another dot (or back to the same dot for a loop). " + modeText();
+  let badTimer = 0;
+  function showBad(pts, text) {
+    badStroke = pts; clearTimeout(badTimer); badTimer = setTimeout(() => { badStroke = null; draw(); }, 1400);
+    setStatus(text, true); draw();
+  }
 
-  canvas.addEventListener("pointermove", (e) => {
-    const i = canMove() ? nearestDot(pos(e)) : -1;
-    canvas.style.cursor = i >= 0 && state.dots[i].deg < 3 ? "pointer" : choices ? "pointer" : "default";
-  });
-
-  canvas.addEventListener("click", (e) => {
-    if (!canMove()) return;
-    const p = pos(e);
-
-    if (choices) { // pick which way round
-      let best = null, bd = 34;
-      for (const c of choices) { const d = distToPath(p, c.path); if (d < bd) { bd = d; best = c; } }
-      if (best) { cancel(); return submit(best); }
-      cancel();
-      setStatus("Pick a dot to start a line. " + modeText(), false, myColor());
-      return draw();
-    }
-
-    const i = nearestDot(p);
-    if (selected === null) {
-      if (i < 0) return;
-      if (state.dots[i].deg >= 3) return flashBad("That dot already has 3 lines.");
-      selected = i;
-      setStatus("Now click the dot to join it to. Click the same dot again for a loop.", false, myColor());
-      return draw();
-    }
-
-    if (i < 0) { cancel(); setStatus("Click a dot to start a line. " + modeText(), false, myColor()); return draw(); }
-    const from = selected;
-    if (state.dots[i].deg >= 3) { selected = null; return flashBad("That dot already has 3 lines."); }
-    const options = Rules.movesFor(state, from, i);
-    selected = null;
-    if (!options.length) {
-      setStatus(from === i ? "There isn’t room for a loop at that dot." : "Those dots can’t be joined without crossing a line.", true);
-      return draw();
-    }
-    if (options.length === 1) return submit(options[0]);
-    choices = options;
-    setStatus("Two ways round. Click the line you want.", false, myColor());
+  canvas.addEventListener("pointerdown", (e) => {
+    if (!canMove() || drag) return;
+    const p = pos(e), i = nearestDot(p);
+    e.preventDefault();
+    if (i < 0) return;
+    if (state.dots[i].deg >= 3) return flashBad("That dot already has 3 lines.");
+    badStroke = null;
+    drag = { from: i, pts: [[state.dots[i].x, state.dots[i].y]], id: e.pointerId, blocked: false };
+    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+    setStatus("Keep going, then let go on the dot you want to join.", false, myColor());
     draw();
   });
+  canvas.addEventListener("pointermove", (e) => {
+    if (!drag) {
+      const i = canMove() ? nearestDot(pos(e)) : -1;
+      canvas.style.cursor = i >= 0 && state.dots[i].deg < 3 ? "grab" : "default";
+      return;
+    }
+    if (e.pointerId !== drag.id) return;
+    canvas.style.cursor = "grabbing";
+    const list = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    for (const ev of list.length ? list : [e]) {
+      const p = pos(ev), last = drag.pts[drag.pts.length - 1];
+      if (Math.hypot(p[0] - last[0], p[1] - last[1]) < 3) continue;
+      p[0] = Math.max(1, Math.min(W - 1, p[0])); p[1] = Math.max(1, Math.min(H - 1, p[1]));
+      const next = drag.pts.concat([p]);
+      if (Rules.strokeBlocked(state, next, drag.from)) { // the line stops at whatever it would cross: steer round it
+        if (!drag.blocked) { drag.blocked = true; setStatus("The line can’t cross another line (or itself). Steer around it.", true); }
+        continue;
+      }
+      if (drag.blocked) { drag.blocked = false; setStatus("Keep going, then let go on the dot you want to join.", false, myColor()); }
+      drag.pts = next;
+    }
+    const tip = drag.pts[drag.pts.length - 1], d = nearestDot(tip, 26);
+    hoverDot = d >= 0 && state.dots[d].deg < 3 && (d !== drag.from || Rules.pathLen(drag.pts) > 60) ? d : -1;
+    draw();
+  });
+  function endStroke(e, cancelled) {
+    if (!drag || e.pointerId !== drag.id) return;
+    const d = drag; drag = null; hoverDot = -1;
+    try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+    if (cancelled) { setStatus(hint(), false, myColor()); return draw(); }
+    const len = Rules.pathLen(d.pts);
+    if (len < 12) { setStatus(hint(), false, myColor()); return draw(); } // just a tap
+    const tip = d.pts[d.pts.length - 1], to = nearestDot(tip, 30);
+    if (to < 0) return showBad(d.pts, "Let go on a dot to finish the line.");
+    if (state.dots[to].deg >= 3) return showBad(d.pts, "That dot already has 3 lines.");
+    const r = Rules.stroke(state, d.from, to, d.pts);
+    if (!r.ok) return showBad(d.pts, r.error);
+    submit({ from: d.from, to, path: r.path });
+  }
+  canvas.addEventListener("pointerup", (e) => endStroke(e, false));
+  canvas.addEventListener("pointercancel", (e) => endStroke(e, true));
 
   function submit(mv) {
     if (mp) {
@@ -196,7 +210,7 @@
     clearTimeout(aiTimer);
     state = Rules.newGame(Number(dotSel.value), modeSel.value === "misere");
     lastEdges = 0; over = false; turn = "me"; cancel();
-    setStatus("Your turn: click a dot, then the dot to join it to. " + modeText(), false, 0);
+    setStatus(hint(), false, 0);
     draw();
   }
 
@@ -217,7 +231,7 @@
       draw();
       aiTimer = setTimeout(aiMove, 650);
     } else {
-      setStatus("Your turn. " + modeText(), false, 0);
+      setStatus(hint(), false, 0);
       draw();
     }
     return true;
@@ -270,7 +284,7 @@
   }
   function updateTurnText() {
     if (over) return;
-    if (turn === myId()) setStatus("Your turn! " + modeText(), false, myIdx);
+    if (turn === myId()) setStatus(hint(), false, myIdx);
     else setStatus("Opponent’s turn…", false, 1 - myIdx);
   }
 
@@ -306,5 +320,6 @@
     });
   }
 
+  window.__sprouts = () => ({ state, drag, over, turn }); // for testing
   newSolo();
 })();
