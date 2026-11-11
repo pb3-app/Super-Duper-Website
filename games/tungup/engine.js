@@ -60,7 +60,7 @@
     }
     function setup(c) {
       cfg = c; map = M.build(c.mapId);
-      plats = map.platforms; solids = plats.filter((p) => p.kind === 'block');
+      plats = map.platforms; solids = plats.filter((p) => p.id !== 0 && !p.thin); // everything is solid (blocks head, sides and feet) except the 'thin' ledges
       const all = [c.me].concat(c.others || []);
       me = makePlayer(c.me, all.findIndex((x) => x.id === c.me.id), all.length);
       remotes = new Map();
@@ -373,7 +373,7 @@
       else p.vx = approach(p.vx, 0, (p.grounded ? (ice ? 420 : 3300) : (stunned ? 60 : 420)) * dt);
       p.run += Math.abs(p.vx) * dt * 0.05;
       // jump
-      p.coyote = p.grounded ? 0.11 : Math.max(0, p.coyote - dt);
+      p.coyote = p.grounded ? 0.06 : Math.max(0, p.coyote - dt);
       if (!stunned && input.jumpBuf > 0) {
         if (p.coyote > 0 || (p.fx.rocket <= 0 && p.airLeft > 0 && !p.grounded)) {
           const air = !(p.coyote > 0); if (air) p.airLeft--;
@@ -383,7 +383,8 @@
         }
       }
       if (!input.jump && p.vy < -320 && !p.jumpCut && p.fx.rocket <= 0) { p.vy *= 0.5; p.jumpCut = true; }
-      if (input.down && p.grounded && p.standing && p.standing.id !== 0 && p.standing.kind !== 'block') { p.drop = 0.28; p.grounded = false; p.standing = null; p.y += 2; }
+      // only the see-through ledges let you drop through them
+      if (input.down && p.grounded && p.standing && p.standing.thin) { p.drop = 0.28; p.grounded = false; p.standing = null; p.y += 2; }
       // vertical forces
       const g = G0 * (evActive('lowgrav') ? 0.42 : 1) * (p.fx.feather > 0 ? 0.4 : 1);
       if (p.fx.rocket > 0) { p.vy = Math.min(p.vy, -820); if (Math.random() < 0.9) addParts(p.x, p.y, 1, { col: Math.random() < 0.5 ? '#ff9d00' : '#ffe45e', vy: 220, sp: 120, life: 0.4, r: 4 }); }
@@ -393,8 +394,10 @@
       for (const h of map.hazards) if (h.kind === 'fan' && p.x > h.x && p.x < h.x + h.w && p.y > h.y && p.y < h.y + h.h + 20) { p.vy -= h.force * dt; if (p.vy < -560) p.vy = -560; p.grounded = false; if (Math.random() < 0.3) addParts(p.x + (Math.random() - 0.5) * 30, p.y, 1, { col: 'rgba(255,255,255,.6)', vy: -200, sp: 20, life: 0.5, r: 2, g: 0 }); }
       // integrate x with solid blocks
       let nx = clamp(p.x + p.vx * dt, 14, VW - 14);
-      for (const b of solids) {
-        if (rr(nx - BODY_W, nx + BODY_W, p.y - BODY_H, p.y - 0.5, b.x, b.x + b.w, b.y, b.y + b.h)) { nx = p.vx > 0 || nx < b.x + b.w / 2 ? b.x - BODY_W : b.x + b.w + BODY_W; p.vx = 0; }
+      if (p.fx.rocket <= 0) for (const b of solids) { // the sides of solid platforms stop you
+        const cs = crumble.get(b.id); if (cs && cs.gone > 0) continue;
+        const sp = b.kind === 'block' ? b : pos(b);
+        if (rr(nx - BODY_W, nx + BODY_W, p.y - BODY_H, p.y - 0.5, sp.x, sp.x + b.w, sp.y, sp.y + b.h)) { nx = p.vx > 0 || nx < sp.x + b.w / 2 ? sp.x - BODY_W : sp.x + b.w + BODY_W; p.vx = 0; }
       }
       p.x = nx;
       // integrate y with platform landing
@@ -403,7 +406,7 @@
       if (p.vy >= 0 || (p.grounded && !p.standing)) {
         for (const pl of plats) {
           if (pl.kind === 'block') { if (p.x + BODY_W > pl.x && p.x - BODY_W < pl.x + pl.w && prevFeet <= pl.y + 1 && ny >= pl.y && pl.y < landY) { land = pl; landY = pl.y; } continue; }
-          if (p.drop > 0 && pl.id !== 0) continue;
+          if (p.drop > 0 && pl.thin) continue;
           const cs = crumble.get(pl.id); if (cs && cs.gone > 0) continue;
           const pp = pos(pl), prevTop = M.platPos(pl, t - dt).y;
           if (p.x + 11 > pp.x && p.x - 11 < pp.x + pl.w && prevFeet <= prevTop + 4 && ny >= pp.y && pp.y < landY) { land = pl; landY = pp.y; }
@@ -416,8 +419,12 @@
         if (land.kind === 'bounce') { p.vy = -1320; p.grounded = false; p.standing = null; sfx.bounce(); addParts(p.x, top, 12, { col: '#ff6b5e', sp: 240, vy: -100 }); }
         if (land.kind === 'crumble' && !crumble.has(land.id)) crumble.set(land.id, { t: 0.001, gone: 0 });
       } else if (p.vy < 0) {
-        // bump head on solid blocks
-        for (const b of solids) if (p.x + BODY_W > b.x && p.x - BODY_W < b.x + b.w && p.y - BODY_H >= b.y + b.h - 1 && ny - BODY_H < b.y + b.h) { ny = b.y + b.h + BODY_H; p.vy = 0; }
+        // bump your head on the underside of a solid platform
+        if (p.fx.rocket <= 0) for (const b of solids) {
+          const cs = crumble.get(b.id); if (cs && cs.gone > 0) continue;
+          const sp = b.kind === 'block' ? b : pos(b);
+          if (p.x + BODY_W > sp.x && p.x - BODY_W < sp.x + b.w && p.y - BODY_H >= sp.y + b.h - 1 && ny - BODY_H < sp.y + b.h) { ny = sp.y + b.h + BODY_H; p.vy = Math.max(0, p.vy * -0.1); p.jumpCut = true; addParts(p.x, ny - BODY_H, 4, { col: '#cfc7b4', sp: 120, vy: 30, life: 0.25 }); }
+        }
         p.grounded = false;
       } else if (p.grounded && p.standing) { ny = p.y; }
       else p.grounded = false;
@@ -555,12 +562,13 @@
     }
     const DECO_COL = { car: ['#c0392b', '#2e86c1', '#d4ac0d', '#27ae60', '#7d3c98'], couch: ['#a04040', '#406080'], fridge: ['#e8e8ee'], barrel: ['#2f7d4a', '#a04a2a'], crate: ['#b9803c'], tire: ['#222'], girder: ['#e8892b'], cone: ['#ff7a1a'], pipe: ['#5a8a6a'], ice: ['#bfe9ff'], snow: ['#f4faff'], rock: ['#6e6a66', '#7a5a4a'], sign: ['#ff4fd8', '#4fd8ff', '#ffe24f'], screen: ['#1d2a44'], vent: ['#586070'], lava: ['#3a2020'], bone: ['#efe3c8'], cloud: ['#ffffff'], balloon: ['#ff7a9a'], rest: ['#c9954f'], goal: ['#ffd23f'], ground: ['#5a4a3a'], spring: ['#ff6b5e'] };
     function drawPlat(pl) {
-      const pp = pos(pl); let { x, y } = pp; const w = pl.w, h = pl.kind === 'block' ? pl.h : 28;
+      const pp = pos(pl); let { x, y } = pp; const w = pl.w, h = pl.kind === 'block' ? pl.h : 28, thin = !!pl.thin;
       const cs = crumble.get(pl.id);
       if (cs && cs.gone > 0) return;
       if (cs && cs.t > 0) { x += (Math.random() - 0.5) * 3; y += Math.random() * 2; }
       const cols = DECO_COL[pl.deco] || ['#8a7a6a'], col = cols[pl.id % cols.length];
       ctx.save();
+      if (thin) ctx.globalAlpha = 0.62; // see-through: you can jump up through these
       ctx.fillStyle = col;
       if (pl.deco === 'ground') { ctx.fillStyle = map.id === 'frost' ? '#e8f4ff' : map.id === 'volcano' ? '#2a1612' : '#4e3a2a'; ctx.fillRect(x, y, w, 70); ctx.fillStyle = map.theme.accent; ctx.fillRect(x, y, w, 7); ctx.restore(); return; }
       switch (pl.deco) {
@@ -587,6 +595,8 @@
       if (pl.kind === 'conv') { ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(x, y, w, 5); ctx.fillStyle = '#ffe45e'; const o = ((t * 60 * pl.dirc) % 20 + 20) % 20; for (let cx = x - 20 + o; cx < x + w; cx += 20) { ctx.beginPath(); const a = Math.max(x, cx), b = Math.min(x + w, cx + 10); if (b > a) ctx.fillRect(a, y + 1, b - a, 3); } }
       if (pl.kind === 'ice') { ctx.fillStyle = 'rgba(200,240,255,.55)'; ctx.fillRect(x, y, w, 5); }
       if (pl.kind === 'crumble') { ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + w * 0.25, y); ctx.lineTo(x + w * 0.3, y + 12); ctx.lineTo(x + w * 0.22, y + 24); ctx.moveTo(x + w * 0.7, y); ctx.lineTo(x + w * 0.66, y + 10); ctx.stroke(); }
+      if (thin) { ctx.globalAlpha = 1; ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 2; ctx.setLineDash([6, 5]); ctx.strokeRect(x + 1, y + 1, w - 2, 24); ctx.setLineDash([]); }
+      else if (pl.kind !== 'block' && pl.deco !== 'ground') { ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fillRect(x + 3, y + 22, w - 6, 4); } // a darker underside: this one is solid
       if (evActive('ice') && pl.kind !== 'ice') { ctx.fillStyle = 'rgba(190,235,255,.55)'; ctx.fillRect(x, y - 1, w, 6); }
       ctx.restore();
     }

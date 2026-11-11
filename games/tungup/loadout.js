@@ -4,21 +4,21 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   // speed (px/s) / jump (launch speed) / weight (1 = normal; higher = flung less) / airJumps / float
   const TUNGS = {
-    classic: { id: 'classic', name: 'Tung Tung Sahur', pal: 'brown', hp: 100, speed: 250, jump: 860, weight: 1.0, airJumps: 0, float: false, blurb: 'The original log. Good at everything.', hat: null },
-    bulky: { id: 'bulky', name: 'Big Sahur', pal: 'red', hp: 135, speed: 218, jump: 840, weight: 1.4, airJumps: 0, float: false, blurb: 'A huge log. Hard to knock off, slow to run.', hat: 'helmet' },
-    speedy: { id: 'speedy', name: 'Zoom Tung', pal: 'blue', hp: 80, speed: 290, jump: 870, weight: 0.85, airJumps: 0, float: false, blurb: 'Fast and slippery, but fragile.', hat: 'cap' },
-    springy: { id: 'springy', name: 'Boing Tung', pal: 'green', hp: 90, speed: 235, jump: 945, weight: 1.0, airJumps: 0, float: false, blurb: 'Springs in its roots: the highest jump.', hat: 'sprout' },
-    golden: { id: 'golden', name: 'Golden Tung', pal: 'gold', hp: 85, speed: 245, jump: 860, weight: 0.95, airJumps: 1, float: false, blurb: 'Can jump a second time in mid-air.', hat: 'crown' },
-    ghost: { id: 'ghost', name: 'Ghost Tung', pal: 'ghost', hp: 90, speed: 240, jump: 860, weight: 0.8, airJumps: 0, float: true, blurb: 'Hold jump while falling to glide. Light as air.', hat: 'halo' },
+    classic: { id: 'classic', name: 'Tung Tung Sahur', pal: 'brown', hp: 100, speed: 240, jump: 800, weight: 1.0, airJumps: 0, float: false, blurb: 'The original log. Same stats as every Tung.', hat: null },
+    bulky: { id: 'bulky', name: 'Big Sahur', pal: 'red', hp: 100, speed: 240, jump: 800, weight: 1.0, airJumps: 0, float: false, blurb: 'A bigger, redder log with a helmet. Same stats as every Tung.', hat: 'helmet' },
+    speedy: { id: 'speedy', name: 'Zoom Tung', pal: 'blue', hp: 100, speed: 240, jump: 800, weight: 1.0, airJumps: 0, float: false, blurb: 'A blue log with a cap. Same stats as every Tung.', hat: 'cap' },
+    springy: { id: 'springy', name: 'Boing Tung', pal: 'green', hp: 100, speed: 240, jump: 800, weight: 1.0, airJumps: 0, float: false, blurb: 'A green log with a sprout on top. Same stats as every Tung.', hat: 'sprout' },
+    golden: { id: 'golden', name: 'Golden Tung', pal: 'gold', hp: 100, speed: 240, jump: 800, weight: 1.0, airJumps: 0, float: false, blurb: 'A golden log with a crown. Same stats as every Tung.', hat: 'crown' },
+    ghost: { id: 'ghost', name: 'Ghost Tung', pal: 'ghost', hp: 100, speed: 240, jump: 800, weight: 1.0, airJumps: 0, float: false, blurb: 'A ghostly log with a halo. Same stats as every Tung.', hat: 'halo' },
   };
   // dmg / knock (launch speed) / swing (seconds) / reach (px) / stun / slow / moveMul
   const BATS = {
     classic: { id: 'classic', name: 'Classic Bat', dmg: 16, knock: 560, swing: 0.34, reach: 62, stun: 0.3, slow: null, moveMul: 1, blurb: 'The reliable wooden bat.', col: '#d9a566', dark: '#8c5a2a' },
-    heavy: { id: 'heavy', name: 'Heavy Log', dmg: 28, knock: 840, swing: 0.68, reach: 56, stun: 0.45, slow: null, moveMul: 0.92, blurb: 'Huge damage and knockback, but a slow swing.', col: '#9a6a36', dark: '#4e2f12' },
-    twig: { id: 'twig', name: 'Speedy Twig', dmg: 9, knock: 340, swing: 0.2, reach: 52, stun: 0.18, slow: null, moveMul: 1.05, blurb: 'Lightning-fast jabs for small hits.', col: '#b78b4e', dark: '#6b4a1e' },
-    noodle: { id: 'noodle', name: 'Spaghetti Noodle', dmg: 12, knock: 420, swing: 0.42, reach: 104, stun: 0.25, slow: null, moveMul: 1, blurb: 'Hits from far away.', col: '#f4d77a', dark: '#c79a2a' },
-    mallet: { id: 'mallet', name: 'Golden Mallet', dmg: 18, knock: 470, swing: 0.52, reach: 58, stun: 0.85, slow: null, moveMul: 0.96, blurb: 'Stuns whoever it hits.', col: '#ffd23f', dark: '#b8860b' },
-    frost: { id: 'frost', name: 'Frost Pop', dmg: 13, knock: 440, swing: 0.36, reach: 62, stun: 0.25, slow: { f: 0.55, t: 2.4 }, moveMul: 1, blurb: 'Slows everyone it hits.', col: '#8fd9ff', dark: '#2a82c4' },
+    heavy: { id: 'heavy', name: 'Heavy Log', dmg: 16, knock: 560, swing: 0.34, reach: 62, stun: 0.3, slow: null, moveMul: 1, blurb: 'A big log of a bat. Same stats as every bat.', col: '#9a6a36', dark: '#4e2f12' },
+    twig: { id: 'twig', name: 'Speedy Twig', dmg: 16, knock: 560, swing: 0.34, reach: 62, stun: 0.3, slow: null, moveMul: 1, blurb: 'A thin little twig. Same stats as every bat.', col: '#b78b4e', dark: '#6b4a1e' },
+    noodle: { id: 'noodle', name: 'Spaghetti Noodle', dmg: 16, knock: 560, swing: 0.34, reach: 62, stun: 0.3, slow: null, moveMul: 1, blurb: 'A long spaghetti noodle. Same stats as every bat.', col: '#f4d77a', dark: '#c79a2a' },
+    mallet: { id: 'mallet', name: 'Golden Mallet', dmg: 16, knock: 560, swing: 0.34, reach: 62, stun: 0.3, slow: null, moveMul: 1, blurb: 'A golden mallet. Same stats as every bat.', col: '#ffd23f', dark: '#b8860b' },
+    frost: { id: 'frost', name: 'Frost Pop', dmg: 16, knock: 560, swing: 0.34, reach: 62, stun: 0.3, slow: null, moveMul: 1, blurb: 'An icy lolly. Same stats as every bat.', col: '#8fd9ff', dark: '#2a82c4' },
   };
   // weights are used for random draws; "others" items only appear when there is someone to hit
   const ITEMS = {
