@@ -129,6 +129,10 @@ const GAMES = {
     title: 'Tung Bomber Arena', icon: '💣', progressLabel: 'Rounds won', judge: 'score', realtime: true, soloWL: true, groomMax: 4,
     options: { rounds: { label: 'Rounds to win', values: [1, 2, 3], default: 2 } },
   },
+  lava: {
+    title: 'Tung Floor Is Lava: Extreme', icon: '🌋', progressLabel: 'Rounds won', judge: 'score', realtime: true, soloWL: true, groomMax: 4,
+    options: { rounds: { label: 'Rounds to win', values: [1, 2, 3], default: 2 }, chaos: { label: 'Chaos events', values: ['off', 'normal', 'wild'], default: 'normal' } },
+  },
   sumo: {
     title: 'Tung Tung Sumo', icon: '🤼', progressLabel: 'Rounds won', judge: 'score', realtime: true, soloWL: true, groomMax: 4,
     options: { rounds: { label: 'Rounds to win', values: [2, 3, 5], default: 3 } },
@@ -194,6 +198,7 @@ const SCORE_CAP = {
   airhockey: (ms) => Math.floor(ms / 2200) + 2,
   bomber: (ms) => Math.floor(ms / 25000) + 1,
   sumo: (ms) => Math.floor(ms / 8000) + 1,
+  lava: (ms) => Math.floor(ms / 8000) + 1,
   archery: (ms) => (Math.floor(ms / 900) + 2) * 10,
   cuppong: (ms) => Math.min(10, Math.floor(ms / 1200) + 2),
   boxing: () => 1,
@@ -2232,7 +2237,7 @@ const bonkBoost = (bonks) => Math.min(1, Math.floor((bonks || 0) / 10) / 10);
 const AR_COLORS = ['#c8874a', '#a86b35', '#d9a066', '#8b5a2b', '#e0b07a', '#b5793f'];
 const arenaPlayers = new Map(); // key -> player
 let arenaTimer = null, arenaTickNo = 0;
-const ARENA_GROUP = ['bomber', 'sumo', 'dizzy', 'pictionary', 'tungup', 'imposter', 'uno', 'phase10']; // games with open rooms for more than 2 players
+const ARENA_GROUP = ['bomber', 'sumo', 'lava', 'dizzy', 'pictionary', 'tungup', 'imposter', 'uno', 'phase10']; // games with open rooms for more than 2 players
 const arenaRoomMax = (g) => (g === 'uno' || g === 'phase10' ? CR_MAX : g === 'pictionary' ? PIC_MAX : g === 'tungup' ? TU_MAX : g === 'imposter' ? Imposter.MAX_PLAYERS : GAMES[g].groomMax);
 const arenaRoomMin = (g) => (g === 'imposter' ? Imposter.MIN_PLAYERS : 3);
 const arenaGameMeta = (g) => ({ title: GAMES[g].title, icon: GAMES[g].icon });

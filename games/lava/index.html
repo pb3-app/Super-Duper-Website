@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Tung Floor Is Lava: Extreme</title>
+  <link rel="stylesheet" href="../game.css" />
+  <link rel="stylesheet" href="../../mp.css" />
+  <style>
+    body .game-page { max-width: 1040px; }
+    #view { width: 100%; max-width: 960px; aspect-ratio: 960 / 600; display: block; margin: 0 auto; border-radius: 18px; background: #1a0a0a; box-shadow: 0 10px 0 #0a0404, 0 20px 40px rgba(0,0,0,.55); touch-action: none; cursor: crosshair; }
+    .playwrap { position: relative; max-width: 960px; margin: 0 auto; }
+    .menu-card { max-width: 680px; margin: 1rem auto; text-align: left; } .menu-card h2 { margin: 0 0 .6rem; color: var(--accent); }
+    .evlist { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .25rem .9rem; font-size: .88rem; margin: .5rem 0 0; padding: 0; list-style: none; }
+  </style>
+</head>
+<body class="wide" data-game="lava" data-custom="1">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="game-page">
+    <div class="game-top">
+      <a class="back" href="../../index.html#games">← Games</a>
+      <h1>🌋 Floor Is Lava: Extreme</h1>
+      <div id="mpSlot"></div>
+    </div>
+    <div class="mode-switch" id="modeSwitch">
+      <button class="btn secondary active" data-mode="single">🎮 Single Player</button>
+      <button class="btn secondary" data-mode="multi">👥 Multiplayer</button>
+    </div>
+    <div class="mp-lobby" id="mpLobby" hidden></div>
+    <div class="mp-matchbar" id="mpMatchBar" hidden></div>
+
+    <div id="gameArea">
+      <div id="menu" class="np-sec menu-card">
+        <h2>Survive the lava</h2>
+        <div class="opts">
+          <label>Opponents <select id="bots"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option></select></label>
+          <label>Difficulty <select id="level"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option></select></label>
+          <label>Chaos <select id="chaos"><option value="off">Off</option><option value="normal" selected>Normal</option><option value="wild">Wild</option></select></label>
+          <label>Rounds to win <select id="rounds"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option></select></label>
+        </div>
+        <div class="btn-row"><button class="btn" id="startBtn" style="font-size:1.15rem;padding:.7rem 1.8rem">🌋 Jump in</button></div>
+        <p class="np-hint">The lava rises faster and faster. Stay on the furniture, bat the other Tungs into the lava and last longer than everybody else. Playing the computer never counts toward the leaderboard (solo wins and losses have their own board).</p>
+      </div>
+      <div id="mpPanel" hidden></div>
+      <div id="play" hidden>
+        <div class="hud"><span class="chip" id="roundChip">Round 1</span><span class="chip" id="scoreChip">0 - 0</span><button class="btn secondary" id="quitBtn">☰ Menu (Esc)</button></div>
+        <div class="playwrap"><canvas id="view" width="960" height="600"></canvas><div id="result" class="np-result" hidden></div></div>
+        <div id="pad"></div>
+        <section class="controls" aria-label="Controls">
+          <h2>🎮 Controls</h2>
+          <div class="ctl-grid">
+            <div class="ctl"><span class="keys"><kbd>A</kbd><kbd>D</kbd> or <kbd>←</kbd><kbd>→</kbd></span><span class="act">Run (platforms are jump-through, so you can hop up from below)</span></div>
+            <div class="ctl"><span class="keys"><kbd>W</kbd> <kbd>↑</kbd> <kbd>Space</kbd></span><span class="act">Jump (hold for a higher jump)</span></div>
+            <div class="ctl"><span class="keys"><kbd>J</kbd> <kbd>F</kbd> or <kbd class="mouse">Click</kbd></span><span class="act">Swing your bat: knock other Tungs towards the lava</span></div>
+            <div class="ctl"><span class="keys"><kbd>E</kbd> <kbd>K</kbd></span><span class="act">Use the item you are holding</span></div>
+            <div class="ctl"><span class="keys"><kbd>Esc</kbd></span><span class="act">Back to the menu (solo)</span></div>
+          </div>
+          <p class="ctl-extra">📱 <b>Touch:</b> joystick plus the Jump, Bat and Item buttons. <b>Goal:</b> be the last Tung out of the lava. Touch the lava and you are gone.<br>
+          <b>Items</b> glow on the platforms: 🚀 Rocket · 🦘 Spring shoes · 🛡️ Shield · 🏏 Mega bat · 🥤 Speed soda · 🪶 Feather fall · 🍌 Banana peel · 🦑 Ink bomb · 🙃 Invert zap.<br>
+          <b>Chaos events</b> are announced a few seconds ahead: 🌋 Earthquake · ☄️ Meteor shower · ⚡ Lightning storm · 💨 Gale wind · 🌪️ Tornado · 🙃 Inverted controls · 🦑 Ink splats · 🌑 Blackout · 🎈 Low gravity · 🧊 Flash freeze · 🍌 Banana rain · 🏏 Giant bat sweep · 😵‍💫 Dizzy spell · 🔥 <b>Lava surge</b> · 🌋 <b>Lava geysers</b> · ☄️ <b>Fireball rain</b>. Crumbling, moving, icy and bouncy furniture makes it worse.</p>
+        </section>
+      </div>
+    </div>
+    <div id="gameLeaderboard"></div>
+  </div>
+  <script src="../../mp.js"></script>
+  <script src="../../assets/shop-items.js"></script>
+  <script src="../../assets/tung-gear.js"></script>
+  <script src="../../assets/tung.js"></script>
+  <script src="../netplay.js"></script>
+  <script src="../touchpad.js"></script>
+  <script src="sim.js"></script>
+  <script src="lava.js"></script>
+</body>
+</html>
