@@ -13,6 +13,7 @@
   const ROLES_OFF = ['QB', 'RB', 'OL', 'OL', 'OL', 'OL', 'OL', 'WR', 'WR', 'WR', 'TE'];
   const ROLES_DEF = ['DL', 'DL', 'DL', 'DL', 'LB', 'LB', 'LB', 'CB', 'CB', 'S', 'S'];
   const RECEIVERS = [7, 8, 9, 10, 1]; // keys 1 to 5 throw to these offensive slots
+  const STIFF_CD = 5; // the stiff arm (juke) can only be used once every 5 seconds
   const MAX_DOWNFIELD = 40; // nobody goes (and no pass is thrown) more than 40 yards past the line of scrimmage
   const BALL_SPEED = 27, CLOCK_RATE = 2.5; // the game clock runs 2.5 times faster than real time, so a quarter is about 35 seconds of live play
   const OFF_PLAYS = {
@@ -237,8 +238,8 @@
       if (p.stun > 0) p.stun -= dt;
       if (p.id === offCtl && humanO && !P.intercepted) {
         drive(p, inO.dx || 0, inO.dy || 0, dt, (p.jukeT > 0 ? 1.28 : 1) * tired(g, p));
-        if (press(inO, lastO, 'actN') && p.id === P.carrier && p.id !== P.qb && p.jcd <= 0) { p.jukeT = 0.42; p.jcd = 1.4; }
-        if (press(inO, lastO, 'actN') && p.id === P.qb && !P.thrown && p.jcd <= 0) { p.jukeT = 0.35; p.jcd = 1.5; }
+        if (press(inO, lastO, 'actN') && p.id === P.carrier && p.id !== P.qb && p.jcd <= 0) { p.jukeT = 0.42; p.jcd = STIFF_CD; }
+        if (press(inO, lastO, 'actN') && p.id === P.qb && !P.thrown && p.jcd <= 0) { p.jukeT = 0.35; p.jcd = STIFF_CD; }
       } else offAI(g, p, dt, P, O, D, dir);
       if (p.jukeT > 0) p.jukeT -= dt; if (p.jcd > 0) p.jcd -= dt;
     }
@@ -257,7 +258,10 @@
     let sel = g.ctl[defT];
     if (humanD) {
       if (sel === null || sel === undefined || !D.some((d) => d.id === sel)) sel = D[5].id;
-      if (press(inD, lastD, 'swN') || (press(inD, lastD, 'actN') && false)) { sel = nearestTo(D, g.ball).id; }
+      if (press(inD, lastD, 'swN')) {
+        // while a pass is in the air, E puts you on the defender who is covering the receiver it is meant for; otherwise on the one nearest the ball
+        if (P.thrown && !P.caught && !P.intercepted && g.ball.state === 'air' && P.target >= 0) sel = guardOf(g, g.players[P.target]).id; else sel = nearestTo(D, g.ball).id;
+      }
       g.ctl[defT] = sel;
     }
     for (const d of D) {
@@ -289,6 +293,12 @@
 
   // a receiver who has caught the ball slows down the longer he runs with it (down to 55% of his speed after about six seconds)
   const tired = (g, p) => (g.P && g.P.caught && p.id === g.P.carrier ? Math.max(0.55, 1 - 0.075 * (g.P.catchT || 0)) : 1);
+  // the defender covering a receiver: the one assigned to him in man coverage, otherwise whoever is nearest
+  function guardOf(g, R) {
+    const D = g.players.filter((p) => p.team !== R.team);
+    const man = D.find((d) => d.mode === 'man' && d.assign === R.id);
+    return man && dist(man, R) < 14 ? man : D.slice().sort((a, b) => dist(a, R) - dist(b, R))[0];
+  }
   const nearestTo = (list, pt) => list.slice().sort((a, b) => dist(a, pt) - dist(b, pt))[0];
 
   function offAI(g, p, dt, P, O, D, dir) {
@@ -359,7 +369,7 @@
     const rad = p.aiDir * Math.PI / 180;
     mv(p, p.x + Math.cos(rad) * dir * 6, p.y + Math.sin(rad) * 6, dt, (p.jukeT > 0 ? 1.28 : 1) * tired(g, p));
     const near = D.filter((d) => dist(d, p) < 2.0 && d.stun <= 0).length;
-    if (near && p.jcd <= 0 && p.id !== g.P.qb && g.rng() < dt * 2.5) { p.jukeT = 0.42; p.jcd = 1.5; }
+    if (near && p.jcd <= 0 && p.id !== g.P.qb && g.rng() < dt * 2.5) { p.jukeT = 0.42; p.jcd = STIFF_CD; }
   }
 
   // ---------------- the pass ----------------
@@ -418,7 +428,7 @@
     let eO = Infinity, eD = Infinity, dWho = null;
     if (P.clk.o) eO = P.clk.o.raw; else if (!humanOff && z.off.some((p) => p.id === R.id)) eO = aiError(g, skill[1]);
     if (P.clk.d) { eD = P.clk.d.raw; dWho = g.players[P.clk.d.id]; }
-    for (const d of z.def) { if (humanDef && d.id === sel) continue; const e = aiError(g, skill[0]); if (e < eD) { eD = e; dWho = d; } } // the computer's defenders in the zone go for it too
+    if (!humanDef) for (const d of z.def) { const e = aiError(g, skill[0]); if (e < eD) { eD = e; dWho = d; } } // the computer's defenders in the zone go for it (when a person defends, only HE can pick it off)
     // the dispersion removed
     const extraO = Math.max(0, nO - nD), extraD = Math.max(0, nD - nO);
     const mulO = 1 - Math.min(0.7, OFF_EDGE + EXTRA_EDGE * extraO), mulD = 1 - Math.min(0.6, EXTRA_EDGE * extraD);
@@ -442,8 +452,9 @@
     const flash = (t, s) => { g.text = t; g.textT = s || 0.8; };
     // a person on defence goes for the ball
     if (humanDef && c.pressD && !P.clk.d && !(P.lockD > 0)) {
-      const d = g.players.find((p) => p.id === c.sel && p.team !== R.team);
-      if (d && open && Math.hypot(d.x - b.x, d.y - b.y) <= CATCH_R) P.clk.d = { raw: Math.abs(tl - CATCH_AT), id: d.id };
+      const d = g.players.find((p) => p.id === c.sel && p.team !== R.team), guard = guardOf(g, R);
+      if (d && d.id !== guard.id) { P.lockD = 0.45; flash('PRESS E: COVER THE RECEIVER', 1); }
+      else if (d && open && Math.hypot(d.x - b.x, d.y - b.y) <= CATCH_R) P.clk.d = { raw: Math.abs(tl - CATCH_AT), id: d.id };
       else if (d) { P.lockD = 0.45; flash(tl > WIN_OPEN ? 'TOO EARLY!' : 'OUT OF RANGE!', 0.7); }
     }
     // a person on offence goes for it
@@ -666,9 +677,10 @@
       pl: g.players.map((p) => [Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10, p.team, ROLE_CODE[p.role] || 0, (p.jukeT > 0 ? 1 : 0) | (p.stun > 0 ? 2 : 0) | (p.dive > 0 ? 4 : 0) | (g.ball.carrier === p.id ? 8 : 0) | (g.ctl[p.team] === p.id ? 16 : 0), Math.round(p.vx * 10) / 10, Math.round(p.vy * 10) / 10]),
       ball: [Math.round(g.ball.x * 10) / 10, Math.round(g.ball.y * 10) / 10, Math.round(g.ball.z * 10) / 10, g.ball.state === 'held' ? 0 : g.ball.state === 'air' ? 1 : g.ball.state === 'kick' ? 2 : 3],
       routes: g.phase === 'presnap' || g.phase === 'live' ? g.players.filter((p) => p.team === g.off && p.mode === 'route' && p.route.length && !(P && P.thrown)).map((p) => [p.id, p.route.slice(p.ri).map((w) => [Math.round(w[0] * 10) / 10, Math.round(w[1] * 10) / 10])]) : [],
-      catch: P && P.thrown && !P.caught && !P.intercepted && g.ball.state === 'air' && P.target >= 0 ? { r: P.target, R: CATCH_R, tl: Math.round((P.tl || 0) * 100) / 100, lx: Math.round(g.ball.tx * 10) / 10, ly: Math.round(g.ball.ty * 10) / 10, in: dist(g.ball, g.players[P.target]) <= CATCH_R, ho: g.human[g.players[P.target].team], hd: g.human[1 - g.players[P.target].team], d: g.ctl[1 - g.players[P.target].team] } : null,
+      catch: P && P.thrown && !P.caught && !P.intercepted && g.ball.state === 'air' && P.target >= 0 ? { r: P.target, R: CATCH_R, tl: Math.round((P.tl || 0) * 100) / 100, lx: Math.round(g.ball.tx * 10) / 10, ly: Math.round(g.ball.ty * 10) / 10, in: dist(g.ball, g.players[P.target]) <= CATCH_R, ho: g.human[g.players[P.target].team], hd: g.human[1 - g.players[P.target].team], d: g.ctl[1 - g.players[P.target].team], g: guardOf(g, g.players[P.target]).id } : null,
       canThrow: !!(P && P.kind === 'pass' && !P.thrown && !P.scrambling && g.phase === 'live' && (g.players[P.qb].x - g.los) * dirOf(g) <= 0.4),
       zone: P && P.thrown && g.ball.state === 'air' && P.target >= 0 ? (() => { const z = zoneCounts(g, g.players[P.target]); return [z.off.length, z.def.length]; })() : null,
+      stiff: (() => { const id = g.ctl[g.off]; const p = id != null ? g.players[id] : null; return p ? Math.round(Math.max(0, p.jcd || 0) * 10) / 10 : 0; })(),
       thrown: P ? P.thrown : false, target: P ? P.target : -1, ctl: g.ctl, pcall: g.calls[g.off] || null, dcall: g.calls[1 - g.off] || null, plays: g.plays, kick: g.kickAnim ? g.kickAnim.kind : null,
     };
   }

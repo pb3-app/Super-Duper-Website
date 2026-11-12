@@ -106,7 +106,11 @@
     // where the ball is coming down, and the ring around the player
     const lx = sx(c.lx), ly = sy(c.ly); ctx.strokeStyle = "rgba(255,255,255,.8)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(lx - 3, ly - 1); ctx.lineTo(lx + 3, ly + 2); ctx.moveTo(lx + 3, ly - 1); ctx.lineTo(lx - 3, ly + 2); ctx.stroke();
     ctx.save(); ctx.globalAlpha = 0.9; ctx.strokeStyle = c.in ? (open ? "#3be86b" : "#d8ffd8") : "#ff6b5e"; ctx.lineWidth = c.in ? 2 : 1; ctx.beginPath(); ctx.ellipse(X, Y, rx, ry, 0, 0, 7); ctx.stroke(); ctx.restore();
-    if (myTeam !== v.off && c.tl > OPEN_FROM) text("get to the ball", X, Y - 22, "#fff", 6, "center");
+    if (myTeam !== v.off && c.g != null) { // the defender covering the receiver is the one who can pick it off: E puts you on him
+      const gp = v.pl[c.g], GX = sx(gp[0]), GY = sy(gp[1]) - 16;
+      ctx.fillStyle = "#ffd23f"; ctx.beginPath(); ctx.moveTo(GX - 4, GY - 5); ctx.lineTo(GX + 4, GY - 5); ctx.lineTo(GX, GY); ctx.closePath(); ctx.fill();
+      if (c.d !== c.g) text("PRESS E: COVER THE RECEIVER", IW / 2, 24 + 26, "#ffd23f", 7, "center");
+    }
     // the bar
     const bw = 230, bh = 11, bx = Math.round(IW / 2 - bw / 2), by = IH - 30, at = (tl) => bx + bw * (0.5 + (CATCH_AT - tl) / SPAN);
     ctx.fillStyle = "#000"; ctx.fillRect(bx - 3, by - 3, bw + 6, bh + 6);
@@ -144,6 +148,10 @@
     text(`${q} ${m}:${sec}`, IW / 2, 7, "#fff", 7, "center");
     const goalToGo = Math.abs(S.goalOf({ off: v.off }, v.off) - v.los) <= 10;
     text(`${ord(v.down)} & ${goalToGo ? "Goal" : v.toGo}`, IW - 4, 7, "#fff", 7, "right");
+    if (v.phase === "live" && v.off === myTeam && !v.thrown && v.stiff != null && v.pcall) { // the stiff arm (Space) once every 5 seconds
+      const car = v.pl.find((p) => (p[4] & 8) && p[2] === v.off);
+      if (car) text(v.stiff > 0 ? `STIFF ARM ${v.stiff.toFixed(1)}s` : "STIFF ARM READY (SPACE)", 4, FT + FH + 12, v.stiff > 0 ? "#ff9a8a" : "#7df08f", 6);
+    }
     if (v.last && v.phase === "call") text(v.last, 4, FT + FH + 12, "#cfe8cf", 6);
     const who = v.phase === "call" || v.phase === "presnap" || v.phase === "live" ? (v.off === myTeam ? "You have the ball" : "Defence: stop them") : "";
     if (who && role !== "idle") text(who, IW - 4, FT + FH + 12, "#cfe8cf", 6, "right");
