@@ -176,6 +176,10 @@ const GAMES = {
     title: 'Tung Tung Football', icon: '🏈', progressLabel: 'Points', judge: 'score', realtime: true, soloWL: true,
     options: { quarter: { label: 'Quarter length', values: [60, 90, 120], default: 90 } },
   },
+  cricket: {
+    title: 'Tung Cricket', icon: '🏏', progressLabel: 'Runs', judge: 'score', realtime: true, soloWL: true,
+    options: { overs: { label: 'Overs each', values: [1, 2, 3, 5], default: 2 }, pitch: { label: 'Pitch', values: ['random', 'flat', 'green', 'dusty', 'damp'], default: 'random' } },
+  },
   paper: {
     title: 'Tung Paper.io', icon: '📄', progressLabel: 'Peak land', judge: 'score', realtime: true,
     options: {
@@ -204,6 +208,7 @@ const SCORE_CAP = {
   boxing: () => 1,
   dizzy: () => 1,
   football: (ms) => Math.floor(ms / 6000) * 7 + 14,
+  cricket: (ms) => Math.floor(ms / 4500) * 6 + 40,
 };
 const SOLO_MAX = { snake: SNAKE_GRID * SNAKE_GRID, slope: 99999, brainrot: 999999, flappy: 999, whack: 9999, paper: 1000, archery: 150 };
 const isAuth = (g) => g === 'sprouts' || g === 'pool' || !!GAMES[g].turnBased; // server decides these, clients do not report scores
@@ -499,9 +504,17 @@ function dailyState(u) {
 }
 
 function shopOf(u) { return u.shop || (u.shop = { owned: [], equipped: {}, spent: 0 }); }
+// The shop rotates every 6 hours. Paying 1 tung buck refreshes your own shop (a different ten items) once per shop day;
+// it holds until the next 6 hour rotation, then you are back on the shared shop.
+function shopSeed(u) {
+  const sh = u.shop, period = Shop.periodStr();
+  return sh && sh.rr && sh.rr.period === period ? period + '|r' + sh.rr.salt : period;
+}
+const shopOffer = (u) => Shop.offerFor(shopSeed(u));
 function shopState(u) {
   const sh = u.shop || { owned: [], equipped: {}, spent: 0 }, wins = statsFor(u, 'all').w, bonus = sh.bonus || 0;
-  return { wins, bonus, spent: sh.spent, balance: wins + bonus - sh.spent, owned: sh.owned, equipped: sh.equipped, today: Shop.offerFor(Shop.todayStr()), resetsIn: Shop.msUntilReset() };
+  const day = Shop.todayStr(), usedToday = !!(sh.rr && sh.rr.day === day);
+  return { wins, bonus, spent: sh.spent, balance: wins + bonus - sh.spent, owned: sh.owned, equipped: sh.equipped, today: shopOffer(u), resetsIn: Shop.msUntilRotate(), dayResetsIn: Shop.msUntilReset(), refreshCost: 1, refreshUsed: usedToday, refreshed: !!(sh.rr && sh.rr.period === Shop.periodStr()) };
 }
 // what a tung wears, as the numbers the arena sends (the item's place in the list + 1, 0 for nothing)
 function gearOf(u) { const eq = (u.shop && u.shop.equipped) || {}; return Shop.SLOTS.map((slot) => (eq[slot] && Shop.byId[eq[slot]] ? Shop.byId[eq[slot]].n : 0)); }
@@ -808,11 +821,25 @@ async function handleApi(req, res, url) {
       const b = await readJson(req, 1024);
       const item = Shop.byId[String(b.id)];
       if (!item) throw httpErr(400, 'No such item');
-      if (!Shop.offerFor(Shop.todayStr()).includes(item.id)) throw httpErr(400, 'That item is not in today\'s shop');
       const u = db.users[key], sh = shopOf(u);
+      if (!shopOffer(u).includes(item.id)) throw httpErr(400, 'That item is not in the shop right now');
       if (sh.owned.includes(item.id)) throw httpErr(409, 'You already own that');
       if (shopState(u).balance < item.price) throw httpErr(402, 'Not enough tung bucks');
       sh.spent += item.price; sh.owned.push(item.id);
+      saveDb();
+      return json(res, 200, shopState(u));
+    }
+    case 'POST /api/shop/refresh': { // 1 tung buck, once per shop day: a different ten items until the next rotation
+      rateLimit(ip, 'shop', 120, 3600e3);
+      const key = sessionKey(bearer(req) || '');
+      if (!key) throw httpErr(401, 'Log in to shop');
+      const u = db.users[key], sh = shopOf(u), day = Shop.todayStr();
+      if (sh.rr && sh.rr.day === day) throw httpErr(409, 'You already refreshed the shop today. You can again after 8:00 AM Eastern.');
+      if (shopState(u).balance < 1) throw httpErr(402, 'A refresh costs 1 tung buck');
+      const before = shopOffer(u).join(), period = Shop.periodStr();
+      let salt = crypto.randomBytes(4).toString('hex');
+      for (let i = 0; i < 20 && Shop.offerFor(period + '|r' + salt).join() === before; i++) salt = crypto.randomBytes(4).toString('hex');
+      sh.spent += 1; sh.rr = { day, period, salt };
       saveDb();
       return json(res, 200, shopState(u));
     }
@@ -2320,12 +2347,19 @@ const arenaInfo = () => ({
 });
 const arenaSpawn = () => ({ x: AR.w * 0.3 + Math.random() * AR.w * 0.2, y: AR.h * 0.45 + Math.random() * AR.h * 0.17 });
 
+// Somebody who is standing on the arena page is not in a game room any more (a room they left behind when they came back
+// from a game would otherwise keep them "in a match" and keep them out of the arena). A real 1v1 match in progress still counts.
+function arenaFreeUser(key) {
+  if (!userMatch.has(key)) return true;
+  for (const leave of [grLeave, crLeave, tuLeave, picLeave, leaveRoom]) { try { leave(key); } catch (_) {} }
+  return !userMatch.has(key);
+}
 function arenaJoin(ws) {
   if (!ws.key || !db.users[ws.key]) return;
   let p = arenaPlayers.get(ws.key);
   if (!p) {
     if (arenaPlayers.size >= AR.max) return wsSend(ws, { t: 'arena_full' });
-    if (userMatch.has(ws.key)) return wsSend(ws, { t: 'error', message: 'Finish your current match first' });
+    if (!arenaFreeUser(ws.key)) return wsSend(ws, { t: 'arena_busy' });
     const sp = arenaSpawn(), u = db.users[ws.key];
     p = { key: ws.key, name: u.username, color: AR_COLORS[[...ws.key].reduce((a, c) => a + c.charCodeAt(0), 0) % AR_COLORS.length],
       x: sp.x, y: sp.y, vx: 0, vy: 0, facing: 0, input: { up: false, down: false, left: false, right: false, aim: 0 },

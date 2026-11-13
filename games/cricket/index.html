@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Tung Cricket</title>
+  <link rel="stylesheet" href="../game.css" />
+  <link rel="stylesheet" href="../../mp.css" />
+  <style>
+    body .game-page { max-width: 1120px; }
+    .menu-card { max-width: 860px; margin: 1rem auto; text-align: left; } .menu-card h2 { margin: 0 0 .6rem; color: var(--accent); }
+    .teamgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: .6rem; margin: .5rem 0 1rem; }
+    .team { text-align: left; border: 3px solid #5a3517; background: rgba(40, 22, 10, .8); color: inherit; border-radius: 14px; padding: .55rem .7rem; cursor: pointer; font: inherit; display: grid; gap: .25rem; }
+    .team:hover { border-color: var(--accent); } .team.on { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(255, 201, 51, .35), 0 0 18px rgba(255, 201, 51, .3); }
+    .team b { display: flex; align-items: center; gap: .5rem; font-size: 1.02rem; } .team b i { width: 14px; height: 14px; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 2px rgba(255,255,255,.55); }
+    .team small { opacity: .8; } .bars { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; font-size: .72rem; align-items: center; opacity: .95; }
+    .bars span.bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,.14); position: relative; overflow: hidden; } .bars span.bar i { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 3px; }
+    .cx-board { max-width: 960px; margin: .3rem auto; display: grid; gap: .35rem; }
+    .cx-score { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .9rem; background: rgba(20, 12, 6, .88); border: 3px solid #5a3517; border-radius: 14px; padding: .45rem .8rem; }
+    .cx-score .tm { display: flex; align-items: center; gap: .5rem; font-weight: 900; font-size: 1.05rem; } .cx-score .tm i { width: 16px; height: 16px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(255,255,255,.6); }
+    .cx-score .big { font-size: 1.7rem; font-weight: 900; font-variant-numeric: tabular-nums; letter-spacing: .5px; }
+    .cx-score .mid { font-size: .86rem; opacity: .9; } .cx-score .grow { flex: 1; }
+    .chip2 { display: inline-block; padding: .08rem .5rem; border-radius: 999px; font-size: .74rem; font-weight: 800; background: rgba(255,255,255,.12); } .chip2.hot { background: #e5503c; } .chip2.pp { background: #2670b8; } .chip2.ok { background: #2e9a4a; }
+    .cx-lines { display: flex; flex-wrap: wrap; gap: .3rem 1.2rem; font-size: .88rem; background: rgba(20,12,6,.6); border-radius: 12px; padding: .35rem .8rem; align-items: center; }
+    .cx-lines b { font-variant-numeric: tabular-nums; } .cx-lines .st { color: var(--accent); }
+    .balls { display: inline-flex; gap: 4px; flex-wrap: wrap; } .balls i { font-style: normal; min-width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 50%; font-size: .72rem; font-weight: 900; background: rgba(255,255,255,.16); padding: 0 4px; }
+    .balls i.f { background: #2e9a4a; } .balls i.s { background: #8a3ffc; } .balls i.w { background: #e5503c; } .balls i.x { background: #d98d1f; color: #1a1005; }
+    .cx-wrap { max-width: 960px; margin: 0 auto; }
+    .cx-stage { position: relative; } #view { display: block; width: 100%; aspect-ratio: 960 / 540; border-radius: 16px; background: #123; box-shadow: 0 8px 0 #0a0404, 0 18px 36px rgba(0,0,0,.5); touch-action: none; cursor: crosshair; }
+    .cx-banner { position: absolute; left: 50%; top: 22%; transform: translate(-50%, 0); font-weight: 900; font-size: clamp(1.6rem, 5vw, 3.2rem); text-shadow: 0 4px 0 rgba(0,0,0,.55), 0 0 24px rgba(0,0,0,.4); pointer-events: none; animation: cxpop .5s ease-out; text-align: center; white-space: nowrap; }
+    .cx-banner[hidden] { display: none; } .cx-banner small { display: block; font-size: .38em; font-weight: 700; margin-top: .2em; letter-spacing: .5px; }
+    @keyframes cxpop { 0% { transform: translate(-50%, 14px) scale(.6); opacity: 0; } 70% { transform: translate(-50%, 0) scale(1.1); opacity: 1; } 100% { transform: translate(-50%, 0) scale(1); } }
+    .cx-panel { margin-top: .6rem; background: rgba(30, 16, 8, .86); border: 3px solid #5a3517; border-radius: 16px; padding: .7rem .9rem; text-align: left; min-height: 96px; }
+    .cx-panel h3 { margin: 0 0 .4rem; color: var(--accent); font-size: 1.02rem; } .cx-panel .hint { font-size: .82rem; opacity: .8; margin: .25rem 0 0; }
+    .cx-row { display: flex; flex-wrap: wrap; gap: .4rem; align-items: stretch; }
+    .cx-btn { font: inherit; color: inherit; cursor: pointer; border: 2px solid #7a4a1f; background: rgba(90, 53, 23, .85); border-radius: 10px; padding: .35rem .65rem; text-align: left; line-height: 1.25; }
+    .cx-btn:hover:not(:disabled) { border-color: var(--accent); background: rgba(125, 78, 33, .95); } .cx-btn:disabled { opacity: .4; cursor: not-allowed; }
+    .cx-btn.on { border-color: var(--accent); background: rgba(160, 100, 30, .95); box-shadow: 0 0 0 2px rgba(255,201,51,.35); }
+    .cx-btn small { display: block; opacity: .8; font-size: .72rem; } .cx-btn kbd { background: #fff3e0; color: #2b1a0e; border-radius: 4px; padding: 0 5px; font-size: .7rem; font-weight: 800; margin-right: 4px; }
+    .cx-btn.go { background: #2e9a4a; border-color: #7ee08f; font-weight: 900; font-size: 1.05rem; padding: .5rem 1.2rem; } .cx-btn.go:hover:not(:disabled) { background: #36b556; }
+    .cx-btn.safe { border-color: #7ee08f; } .cx-btn.risky { border-color: #ffb347; } .cx-btn.danger { border-color: #ff6b5b; }
+    .cx-two { display: grid; grid-template-columns: 1fr auto; gap: .8rem; align-items: start; } @media (max-width: 760px) { .cx-two { grid-template-columns: 1fr; } }
+    #aim { width: 210px; height: 210px; border-radius: 12px; background: #14341c; touch-action: none; cursor: crosshair; display: block; }
+    .cx-slider { display: flex; align-items: center; gap: .6rem; margin-top: .4rem; font-size: .85rem; } .cx-slider input { flex: 1; max-width: 260px; }
+    .order { display: grid; gap: 3px; max-width: 520px; } .order div { display: grid; grid-template-columns: 24px 1fr auto auto; gap: .5rem; align-items: center; background: rgba(255,255,255,.06); border-radius: 8px; padding: 2px 8px; font-size: .86rem; }
+    .order button { font: inherit; background: rgba(255,255,255,.12); border: 0; color: inherit; border-radius: 6px; cursor: pointer; padding: 0 7px; } .order button:disabled { opacity: .3; }
+    .rt { font-size: .72rem; opacity: .8; } .rt b { color: var(--accent); }
+    .cx-timer { height: 5px; border-radius: 3px; background: rgba(255,255,255,.14); margin-top: .5rem; overflow: hidden; } .cx-timer i { display: block; height: 100%; background: var(--accent); width: 100%; }
+    .cx-centre { max-width: 960px; margin: .8rem auto 0; background: rgba(20, 12, 6, .7); border: 3px solid #5a3517; border-radius: 16px; padding: .5rem .8rem .8rem; text-align: left; }
+    .tabs { display: flex; gap: .3rem; flex-wrap: wrap; margin-bottom: .5rem; } .tabs button { font: inherit; color: inherit; background: rgba(255,255,255,.08); border: 0; border-radius: 999px; padding: .2rem .8rem; cursor: pointer; font-weight: 700; } .tabs button.on { background: var(--accent); color: #2b1a0e; }
+    .comm { max-height: 300px; overflow-y: auto; display: grid; gap: 3px; font-size: .88rem; } .comm p { margin: 0; padding: .15rem .4rem; border-radius: 6px; } .comm p.wicket { background: rgba(229, 80, 60, .3); } .comm p.boundary { background: rgba(46, 154, 74, .25); } .comm p.big { background: rgba(255, 255, 255, .1); font-weight: 800; } .comm p.dec { background: rgba(38, 112, 184, .3); }
+    table.sc { width: 100%; border-collapse: collapse; font-size: .84rem; margin: .2rem 0 .6rem; font-variant-numeric: tabular-nums; } table.sc th, table.sc td { padding: 2px 6px; text-align: right; border-bottom: 1px solid rgba(255,255,255,.08); } table.sc th:first-child, table.sc td:first-child { text-align: left; } table.sc td.how { text-align: left; opacity: .75; font-size: .78rem; } table.sc tr.out td:first-child { opacity: .85; } table.sc th { opacity: .7; font-weight: 700; }
+    .sc-h { display: flex; justify-content: space-between; font-weight: 900; margin: .6rem 0 .2rem; } .fow { font-size: .78rem; opacity: .8; }
+    .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: .8rem; } .charts canvas { width: 100%; max-width: 420px; background: #14341c; border-radius: 12px; display: block; }
+    .manh { display: flex; align-items: flex-end; gap: 4px; height: 130px; margin: .3rem 0; } .manh div { flex: 1; background: var(--accent); border-radius: 3px 3px 0 0; position: relative; min-height: 2px; } .manh div.w { background: #e5503c; } .manh span { position: absolute; top: -16px; left: 0; right: 0; text-align: center; font-size: .66rem; } .manh em { position: absolute; bottom: -16px; left: 0; right: 0; text-align: center; font-size: .6rem; opacity: .7; font-style: normal; }
+    .cx-result { position: fixed; inset: 0; z-index: 40; background: rgba(0, 0, 0, .82); display: grid; place-items: start center; overflow-y: auto; padding: 1.2rem; } .cx-result[hidden] { display: none; }
+    .cx-result > div { background: #231208; border: 3px solid var(--accent); border-radius: 18px; padding: 1rem 1.2rem; max-width: 860px; width: 100%; text-align: left; }
+    .cx-result h2 { margin: 0; color: var(--accent); text-align: center; } .cx-result .sub { text-align: center; opacity: .9; margin: .2rem 0 .6rem; }
+    .rowbtn { display: flex; gap: .5rem; justify-content: center; flex-wrap: wrap; margin: .8rem 0 .2rem; }
+    .teamstats { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: .8rem; }
+    @media (max-width: 640px) { .cx-banner { top: 14%; } .cx-score .big { font-size: 1.35rem; } }
+  </style>
+</head>
+<body class="wide" data-game="cricket" data-custom="1">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="game-page">
+    <div class="game-top">
+      <a class="back" href="../../index.html#games">← Games</a>
+      <h1>🏏 Tung Cricket</h1>
+      <div id="mpSlot"></div>
+    </div>
+    <div class="mode-switch" id="modeSwitch">
+      <button class="btn secondary active" data-mode="single">🎮 Single Player</button>
+      <button class="btn secondary" data-mode="multi">👥 Multiplayer</button>
+    </div>
+    <div class="mp-lobby" id="mpLobby" hidden></div>
+    <div class="mp-matchbar" id="mpMatchBar" hidden></div>
+
+    <div id="gameArea">
+      <div id="menu" class="np-sec menu-card">
+        <h2>Pick your team</h2>
+        <div class="teamgrid" id="teamGrid"></div>
+        <div class="opts">
+          <label>Overs each <select id="overs"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="5">5</option><option value="10">10</option><option value="20">20</option></select></label>
+          <label>Computer <select id="level"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option></select></label>
+          <label>Pitch <select id="pitch"><option value="random">Random</option><option value="flat">Flat deck</option><option value="green">Green top</option><option value="dusty">Dusty turner</option><option value="damp">Damp and slow</option></select></label>
+        </div>
+        <div class="btn-row"><button class="btn" id="startBtn" style="font-size:1.15rem;padding:.7rem 1.8rem">🏏 Toss up</button></div>
+        <p class="np-hint">A full limited-overs match: eleven a side, ten wickets, a toss, a batting order, a pitch and weather report, a powerplay, free hits, DRS reviews and a super over if it ends level. You set the field and choose the bowler and each delivery's line, length and type. When you bat you pick a shot and time it. Playing the computer never counts toward the leaderboard (solo wins and losses have their own board).</p>
+      </div>
+      <div id="mpPanel" hidden></div>
+      <div id="play" hidden>
+        <div class="cx-board" id="board"></div>
+        <div class="cx-wrap">
+          <div class="cx-stage"><canvas id="view" width="960" height="540"></canvas><div class="cx-banner" id="banner" hidden></div></div>
+          <div class="cx-panel" id="ctl"></div>
+        </div>
+        <div class="cx-centre">
+          <div class="tabs" id="tabs"><button data-t="comm" class="on">💬 Commentary</button><button data-t="card">📋 Scorecard</button><button data-t="charts">📈 Charts</button><button data-t="teams">👥 Teams</button><button data-t="help">❓ How to play</button><button id="quitBtn" style="margin-left:auto">☰ Menu (Esc)</button></div>
+          <div id="tabBody"></div>
+        </div>
+        <div class="cx-result" id="result" hidden></div>
+      </div>
+    </div>
+    <div id="gameLeaderboard"></div>
+  </div>
+  <script src="../../mp.js"></script>
+  <script src="../../assets/shop-items.js"></script>
+  <script src="../../assets/tung-gear.js"></script>
+  <script src="../../assets/tung.js"></script>
+  <script src="../netplay.js"></script>
+  <script src="sim.js"></script>
+  <script src="cricket.js"></script>
+</body>
+</html>

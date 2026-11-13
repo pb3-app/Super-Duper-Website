@@ -35,7 +35,10 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     $("gate").hidden = true;
   }
   $("gateBtn").addEventListener("click", () => T.openAuth());
+  let missingSince = 0, lastStateAt = 0;
   function join() { if (T && T.user) T.send({ t: "arena_join" }); }
+  // if the server could not seat us yet (a game we just left is still winding down), keep asking until we are in
+  setInterval(() => { if (T && T.user && document.visibilityState !== "hidden" && (!myId || Date.now() - lastStateAt > 4000)) join(); }, 2500);
 
   // ---------- messages from the server ----------
   function onMsg(m) {
@@ -47,9 +50,11 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
         break;
       case "arena_chat": addChat(m, true); break;
       case "arena_state":
-        serverOffset = Date.now() - m.ts;
+        serverOffset = Date.now() - m.ts; lastStateAt = Date.now();
         logState = {}; for (const l of m.logs) logState[l[0]] = l;
         snapshots.push(m); while (snapshots.length > 30) snapshots.shift();
+        // the server no longer has us (we were dropped while a game page was open, or the socket was replaced): ask to come back in
+        if (myId && m.players && !m.players.some((p) => p.id === myId)) { missingSince = missingSince || Date.now(); if (Date.now() - missingSince > 1500) { missingSince = 0; myId = null; join(); } } else missingSince = 0;
         break;
       case "arena_sd": sdBoard = m.board; break;
       case "arena_me":
@@ -88,13 +93,14 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
         try { sessionStorage.setItem("tungArenaReturn", "1"); } catch (_) {}
         location.href = "/games/" + m.game + "/index.html?room=" + encodeURIComponent(m.id);
         break;
+      case "arena_busy": break;
       case "arena_full":
         showGate("Tung Arena is full", "Try again in a minute.", false);
         break;
     }
   }
   if (T) {
-    for (const t of ["arena_welcome", "arena_chat", "arena_state", "arena_event", "arena_solo", "arena_room", "arena_full", "arena_sd", "arena_me"]) T.on("msg:" + t, onMsg);
+    for (const t of ["arena_welcome", "arena_chat", "arena_state", "arena_event", "arena_solo", "arena_room", "arena_full", "arena_busy", "arena_sd", "arena_me"]) T.on("msg:" + t, onMsg);
     T.on("ready", () => { refreshGate(); join(); });
     T.on("logout", () => { joined = false; chatBox.hidden = true;  myId = null; snapshots.length = 0; refreshGate(); });
     T.booted.then(() => { refreshGate(); join(); });
@@ -818,7 +824,9 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     const body = $("shopBody");
     if (shopTab === "shop") {
       const mins = Math.max(1, Math.floor(d.resetsIn / 60000)), left = `${Math.floor(mins / 60)}h ${mins % 60}m`;
-      body.innerHTML = `<p class="shop__note">Six new items every day at 8:00 AM Eastern, one for each part of your tung. The four tiers are Tung, Tung Tung, Tung Tung Tung and Triple T Sahur: the higher the tier, the rarer it is in the shop. You earn one tung buck for every multiplayer win. New items in ${left}.</p><div class="shop__grid">${d.today.map(itemCard).join("")}</div>`;
+      const refreshBtn = d.refreshUsed ? `<button class="shop__btn" disabled>🔄 Refreshed today (again after 8:00 AM Eastern)</button>`
+        : d.balance >= d.refreshCost ? `<button class="shop__btn buy" data-act="refresh">🔄 Refresh the shop for 🪙 ${d.refreshCost}</button>` : `<button class="shop__btn" disabled>🔄 Refresh costs 🪙 ${d.refreshCost}</button>`;
+      body.innerHTML = `<p class="shop__note">Ten items on sale, and the shop changes every 6 hours (8:00 AM, 2:00 PM, 8:00 PM and 2:00 AM Eastern). There is always one for each part of your tung. The four tiers are Tung, Tung Tung, Tung Tung Tung and Triple T Sahur: the higher the tier, the rarer it is in the shop. You earn one tung buck for every multiplayer win. New items in ${left}.${d.refreshed ? " <b>You are looking at your refreshed shop.</b>" : ""}</p><div class="shop__refresh">${refreshBtn} <small>One refresh a day, ten new items just for you until the next change.</small></div><div class="shop__grid">${d.today.map(itemCard).join("")}</div>`;
     } else if (shopTab === "daily") {
       const dd = T.daily;
       if (!dd) { body.innerHTML = '<p class="shop__note">Loading your streak...</p>'; return; }
@@ -845,8 +853,8 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
       const ownedN = all.filter((it) => owns(it.id)).length;
       const cardHtml = (it) => {
         const own = owns(it.id), pct = Shop.chanceOf(it) * 100, odds = pct >= 10 ? Math.round(pct) + "%" : pct >= 1 ? pct.toFixed(1) + "%" : "<1%";
-        const status = own ? `<span class="cat__st own">✔ Owned${wearing(it) ? " · wearing" : ""}</span>` : todaySet.has(it.id) ? `<span class="cat__st now">🛍 In today's shop</span>` : `<span class="cat__st">🔒 Not owned</span>`;
-        return `<div class="shop__card cat__card tier-${it.tier}${own ? " owned" : ""}"><canvas width="132" height="132" data-item="${it.id}" aria-label="${it.name}"></canvas><div class="shop__name">${it.name}</div><div class="shop__meta">${Shop.SLOT_NAMES[it.slot]} · 🪙 ${it.price}</div><div class="shop__meta">In the shop about ${odds} of days</div>${status}</div>`;
+        const status = own ? `<span class="cat__st own">✔ Owned${wearing(it) ? " · wearing" : ""}</span>` : todaySet.has(it.id) ? `<span class="cat__st now">🛍 In the shop now</span>` : `<span class="cat__st">🔒 Not owned</span>`;
+        return `<div class="shop__card cat__card tier-${it.tier}${own ? " owned" : ""}"><canvas width="132" height="132" data-item="${it.id}" aria-label="${it.name}"></canvas><div class="shop__name">${it.name}</div><div class="shop__meta">${Shop.SLOT_NAMES[it.slot]} · 🪙 ${it.price}</div><div class="shop__meta">In the shop about ${odds} of the time</div>${status}</div>`;
       };
       let list = "";
       if (!items.length) list = '<p class="shop__note">Nothing matches those filters.</p>';
@@ -855,7 +863,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
         const have = group.filter((it) => owns(it.id)).length;
         list += `<h3 class="cat__tier t${t}">${Shop.TIERS[t]} <small>${have} of ${group.length} owned · 🪙 ${Shop.PRICE[t]} each</small></h3><div class="shop__grid cat__grid">${group.map(cardHtml).join("")}</div>`;
       }
-      body.innerHTML = `<p class="shop__note">Every cosmetic there is: <b>${all.length}</b> items, and you own <b>${ownedN}</b>. They only go on sale in the daily shop (one per part of your tung each day), and the higher the tier the less often they show up.</p>
+      body.innerHTML = `<p class="shop__note">Every cosmetic there is: <b>${all.length}</b> items, and you own <b>${ownedN}</b>. They only go on sale in the shop (ten items that change every 6 hours), and the higher the tier the less often they show up.</p>
         <div class="cat__filters"><div>${chip("tier", 0, "All tiers", !catTier)}${[1, 2, 3, 4].map((t) => chip("tier", t, Shop.TIERS[t], catTier === t)).join("")}</div>
         <div>${chip("slot", "all", "All parts", catSlot === "all")}${Shop.SLOTS.map((sl) => chip("slot", sl, Shop.SLOT_NAMES[sl], catSlot === sl)).join("")}</div>
         <div>${chip("own", "all", "Everything", catOwn === "all")}${chip("own", "owned", "Owned", catOwn === "owned")}${chip("own", "missing", "Not owned yet", catOwn === "missing")}</div></div>${list}`;
@@ -902,6 +910,9 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
         const r = await T.api("/api/daily/claim", { method: "POST" });
         T.applyDaily(r.state); shopMsg(`🎉 Week ${r.week} prize: ${r.item.name} and ${r.bucks} tung bucks!`);
         shopData = await T.api("/api/shop"); renderBucks();
+      } else if (b.dataset.act === "refresh") {
+        shopData = await T.api("/api/shop/refresh", { method: "POST" });
+        shopMsg("Shop refreshed: ten new items for you.");
       } else if (b.dataset.act === "buy") {
         const id = b.dataset.id, it = Shop.byId[id];
         shopData = await T.api("/api/shop/buy", { method: "POST", body: { id } });

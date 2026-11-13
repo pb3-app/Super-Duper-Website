@@ -76,6 +76,7 @@ window.TUNG_GAMES = [
   { id: "phase10", title: "Tung Tung Phase 10", description: "Lay down sets, runs and colours across ten phases. Be the first to finish.", icon: "🔟", players: "1 player or 2-6 online", url: "games/phase10/index.html" },
   { id: "football", title: "Tung Tung Football", description: "Pixel football with offence and defence: call the plays, throw, run and tackle.", icon: "🏈", players: "1 player or 1v1 online", url: "games/football/index.html" },
   { id: "walls", title: "Tung Walls", description: "Race across the board and build walls to block the other tung. Your cosmetics show on your tung.", icon: "🧱", players: "1 or 2 players", url: "games/walls/index.html" },
+  { id: "cricket", title: "Tung Cricket", description: "A full limited-overs match: toss, batting order, field settings, swing and spin, DRS and a super over.", icon: "🏏", players: "1 or 2 players", url: "games/cricket/index.html" },
   { id: "lava", title: "Tung Floor Is Lava: Extreme", description: "The lava keeps rising. Bat the others in, dodge meteors, geysers and sixteen kinds of chaos.", icon: "🌋", players: "1 to 4 players", url: "games/lava/index.html" },
   // Add more games here
 ];

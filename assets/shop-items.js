@@ -169,8 +169,8 @@
   const byId = {};
   ITEMS.forEach((it, i) => { it.n = i + 1; it.price = PRICE[it.tier]; byId[it.id] = it; });
 
-  // The shop changes every day at 8:00 AM US Eastern time (it follows daylight saving). Everybody sees the same six items:
-  // one for each slot, picked from the date. The higher the tier, the less likely it is to be picked (see TIER_WEIGHT).
+  // The shop changes every 6 hours (from 8:00 AM US Eastern, it follows daylight saving). Everybody sees the same six items:
+  // one for each slot, picked from the date and the 6 hour window. The higher the tier, the less likely it is to be picked (see TIER_WEIGHT).
   const RESET_HOUR = 8, RESET_TZ = 'America/New_York';
   const fmt = new Intl.DateTimeFormat('en-US', { timeZone: RESET_TZ, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
   function wall(ms) { const o = {}; for (const p of fmt.formatToParts(new Date(ms))) o[p.type] = p.value; return { y: +o.year, m: +o.month, d: +o.day, h: (+o.hour) % 24, mi: +o.minute, s: +o.second }; }
@@ -184,17 +184,41 @@
     at = nextWall - (wallUtc(at) - at); // in case the clocks change in between
     return at - t;
   }
+  // the shop itself changes every 6 hours (8:00 AM, 2:00 PM, 8:00 PM and 2:00 AM Eastern); the daily reward still turns over at 8:00 AM
+  const ROTATE_HOURS = 6;
+  const blockOf = (now) => { const w = wall(now == null ? Date.now() : now); return Math.floor((((w.h - RESET_HOUR) % 24 + 24) % 24) / ROTATE_HOURS); };
+  const periodStr = (now) => todayStr(now) + '|' + blockOf(now); // names the current 6 hour window, the seed for what is on sale
+  function msUntilRotate(now) {
+    const t = now == null ? Date.now() : now, w = wall(t), nextH = RESET_HOUR + (blockOf(t) + 1) * ROTATE_HOURS;
+    const nextWall = Date.UTC(w.y, w.m - 1, w.d + (w.h >= RESET_HOUR ? 0 : -1), nextH, 0, 0);
+    let at = nextWall - (wallUtc(t) - t);
+    at = nextWall - (wallUtc(at) - at);
+    return at - t;
+  }
   function hash(str) { let a = 2166136261; for (let i = 0; i < str.length; i++) a = Math.imul(a ^ str.charCodeAt(i), 16777619) >>> 0; a ^= a >>> 15; a = Math.imul(a, 2246822519) >>> 0; a ^= a >>> 13; a = Math.imul(a, 3266489917) >>> 0; return (a ^ (a >>> 16)) >>> 0; }
-  function offerFor(dateStr) {
-    return SLOTS.map((slot) => {
-      const list = ITEMS.filter((it) => it.slot === slot);
-      const tiers = [1, 2, 3, 4].filter((t) => list.some((it) => it.tier === t));
-      const total = tiers.reduce((n, t) => n + TIER_WEIGHT[t], 0);
-      let roll = (hash(dateStr + '|' + slot + '|tier') / 4294967296) * total, tier = tiers[tiers.length - 1];
+  // one pick for a slot: the tier is rolled first (the rarer, the less likely), then an item of that tier
+  function pickFor(seed, slot, skip) {
+    const list = ITEMS.filter((it) => it.slot === slot);
+    const tiers = [1, 2, 3, 4].filter((t) => list.some((it) => it.tier === t));
+    const total = tiers.reduce((n, t) => n + TIER_WEIGHT[t], 0);
+    for (let k = 0; k < 40; k++) {
+      const sd = k ? seed + '#' + k : seed;
+      let roll = (hash(sd + '|' + slot + '|tier') / 4294967296) * total, tier = tiers[tiers.length - 1];
       for (const t of tiers) { if (roll < TIER_WEIGHT[t]) { tier = t; break; } roll -= TIER_WEIGHT[t]; }
-      const pool = list.filter((it) => it.tier === tier);
-      return pool[hash(dateStr + '|' + slot + '|' + tier) % pool.length].id;
-    });
+      const pool = list.filter((it) => it.tier === tier), id = pool[hash(sd + '|' + slot + '|' + tier) % pool.length].id;
+      if (!skip || !skip.has(id)) return id;
+    }
+    return list.find((it) => !skip || !skip.has(it.id)).id;
+  }
+  // the shop: one item for every part of the tung, then four more from parts picked at random (10 in all)
+  const SHOP_SIZE = 10;
+  function offerFor(seed) {
+    const out = SLOTS.map((slot) => pickFor(seed, slot)), have = new Set(out);
+    for (let n = 0; out.length < SHOP_SIZE; n++) {
+      const slot = SLOTS[hash(seed + '|extra|' + n) % SLOTS.length], id = pickFor(seed + '|x' + n, slot, have);
+      have.add(id); out.push(id);
+    }
+    return out;
   }
 
   // how likely an item is to be in a given day's shop (0..1): its tier gets picked for the slot, then it is one of that tier's items
@@ -202,9 +226,10 @@
     const list = ITEMS.filter((x) => x.slot === it.slot);
     const tiers = [1, 2, 3, 4].filter((t) => list.some((x) => x.tier === t));
     const total = tiers.reduce((n, t) => n + TIER_WEIGHT[t], 0);
-    return (TIER_WEIGHT[it.tier] / total) / list.filter((x) => x.tier === it.tier).length;
+    const perPick = (TIER_WEIGHT[it.tier] / total) / list.filter((x) => x.tier === it.tier).length;
+    return 1 - Math.pow(1 - perPick, 1 + (SHOP_SIZE - SLOTS.length) / SLOTS.length); // the main pick, plus the extra picks spread over the parts
   }
 
-  const api = { chanceOf, SLOTS, SLOT_NAMES, TIERS, PRICE, TIER_WEIGHT, ITEMS, byId, todayStr, offerFor, msUntilReset };
+  const api = { chanceOf, SLOTS, SLOT_NAMES, TIERS, PRICE, TIER_WEIGHT, ITEMS, byId, SHOP_SIZE, todayStr, periodStr, msUntilRotate, offerFor, msUntilReset };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.TungShop = api;
 })(typeof window !== 'undefined' ? window : globalThis);

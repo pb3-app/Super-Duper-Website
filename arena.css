@@ -56,6 +56,8 @@ canvas { display: block; width: 100vw; height: 100vh; }
 .shop__tabs button.on { background: #ff8c2a; color: #2b1a0e; }
 #shopMsg { min-height: 1.3em; color: #ffcf99; font-weight: 700; margin-bottom: 6px; }
 .shop__note { opacity: 0.85; margin-bottom: 14px; }
+.shop__refresh { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0 0 14px; }
+.shop__refresh small { opacity: 0.7; }
 .shop__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
 .shop__card { background: #3a2412; border: 2px solid #5a381c; border-radius: 14px; padding: 12px; display: grid; gap: 8px; justify-items: center; text-align: center; }
 .shop__card canvas { width: 132px; height: 132px; border-radius: 10px; }
