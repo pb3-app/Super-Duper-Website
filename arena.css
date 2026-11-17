@@ -202,3 +202,12 @@ canvas { display: block; width: 100vw; height: 100vh; }
 #chatInput { width: 100%; box-sizing: border-box; padding: 9px 12px; border-radius: 10px; border: 2px solid #ff8c2a; background: rgba(26, 15, 7, 0.95); color: #fff3e0; font: 600 15px "Nunito", sans-serif; outline: none; }
 #chatBtn { display: none; position: absolute; right: 18px; bottom: 244px; width: 52px; height: 52px; border-radius: 50%; border: none; background: #3d2412; color: #fff; font-size: 24px; z-index: 5; box-shadow: 0 4px 0 #1f1208; }
 @media (pointer: coarse) { #chatBtn { display: block; } #chat { right: 112px; bottom: 54px; width: min(300px, 52vw); } }
+
+.looks { margin-bottom: 14px; padding-bottom: 12px; border-bottom: 2px dashed rgba(224, 176, 122, .3); }
+.looks__head { margin-bottom: 8px; } .looks__head b { font-family: "Bungee", sans-serif; font-size: 14px; color: #e0b07a; } .looks__head small { opacity: .75; margin-left: 6px; }
+.looks__row { display: flex; flex-wrap: wrap; gap: 10px; }
+.look { background: #3a2412; border: 2px solid #5a381c; border-radius: 12px; padding: 6px; display: grid; justify-items: center; gap: 4px; width: 104px; color: #fff3e0; font: 700 12px "Nunito", sans-serif; }
+.look.on { border-color: #ff8c2a; background: #5a381c; } .look canvas { width: 84px; height: 96px; border-radius: 8px; }
+.look__name { max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.look__btns { display: flex; gap: 3px; flex-wrap: wrap; justify-content: center; } .look__btns button { font: 700 11px "Nunito", sans-serif; border: 0; border-radius: 6px; padding: 2px 6px; background: #7a4a1f; color: #fff3e0; cursor: pointer; } .look__btns button:hover { background: #a1631f; }
+.look--add { cursor: pointer; align-content: center; text-align: center; border-style: dashed; min-height: 150px; opacity: .85; } .look--add:hover { opacity: 1; border-color: #ff8c2a; } .look--add span { font-size: 26px; }

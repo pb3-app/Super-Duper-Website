@@ -780,6 +780,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
 
   // ---------- the shop and the wardrobe ----------
   let shopData = null, shopOpen = false, shopTab = "shop";
+  const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   let catTier = 0, catSlot = "all", catOwn = "all"; // the catalogue filters
   async function loadShop() {
     if (!T || !T.user) return;
@@ -799,10 +800,10 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     c.restore(); ctx = saved;
   }
   function previewItem(cv, id) {
-    const it = Shop.byId[id], o = { s: 1.15 };
-    if (it.slot === "bat") { o.s = 1.05; o.ox = -cv.width * 0.3; }
-    if (it.slot === "hat") { o.s = 1.0; o.oy = 0.67; }
-    if (it.slot === "trail") { o.trail = id; o.ox = cv.width * 0.14; o.s = 1.0; }
+    const it = Shop.byId[id], k = cv.width / 132, o = { s: 1.15 * k };
+    if (it.slot === "bat") { o.s = 0.85 * k; o.ox = -cv.width * 0.26; o.oy = 0.36; } // the whole bat has to fit in the frame
+    if (it.slot === "hat") { o.s = 1.0 * k; o.oy = 0.67; }
+    if (it.slot === "trail") { o.trail = id; o.ox = cv.width * 0.14; o.s = 1.0 * k; }
     previewTung(cv, o.trail ? {} : { [it.slot]: id }, o);
   }
   const tierBadge = (t) => `<b class="tierbadge t${t}">${Shop.TIERS[t]}</b>`;
@@ -824,9 +825,9 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     const body = $("shopBody");
     if (shopTab === "shop") {
       const mins = Math.max(1, Math.floor(d.resetsIn / 60000)), left = `${Math.floor(mins / 60)}h ${mins % 60}m`;
-      const refreshBtn = d.refreshUsed ? `<button class="shop__btn" disabled>🔄 Refreshed today (again after 8:00 AM Eastern)</button>`
+      const refreshBtn = d.refreshUsed ? `<button class="shop__btn" disabled>🔄 Refreshed (you can again in ${left})</button>`
         : d.balance >= d.refreshCost ? `<button class="shop__btn buy" data-act="refresh">🔄 Refresh the shop for 🪙 ${d.refreshCost}</button>` : `<button class="shop__btn" disabled>🔄 Refresh costs 🪙 ${d.refreshCost}</button>`;
-      body.innerHTML = `<p class="shop__note">Ten items on sale, and the shop changes every 6 hours (8:00 AM, 2:00 PM, 8:00 PM and 2:00 AM Eastern). There is always one for each part of your tung. The four tiers are Tung, Tung Tung, Tung Tung Tung and Triple T Sahur: the higher the tier, the rarer it is in the shop. You earn one tung buck for every multiplayer win. New items in ${left}.${d.refreshed ? " <b>You are looking at your refreshed shop.</b>" : ""}</p><div class="shop__refresh">${refreshBtn} <small>One refresh a day, ten new items just for you until the next change.</small></div><div class="shop__grid">${d.today.map(itemCard).join("")}</div>`;
+      body.innerHTML = `<p class="shop__note">Ten items on sale, and the shop changes every 6 hours (8:00 AM, 2:00 PM, 8:00 PM and 2:00 AM Eastern). There is always one for each part of your tung. The four tiers are Tung, Tung Tung, Tung Tung Tung and Triple T Sahur: the higher the tier, the rarer it is in the shop. You earn one tung buck for every multiplayer win. New items in ${left}.${d.refreshed ? " <b>You are looking at your refreshed shop.</b>" : ""}</p><div class="shop__refresh">${refreshBtn} <small>One refresh per 6 hours: ten new items just for you until the shop changes.</small></div><div class="shop__grid">${d.today.map(itemCard).join("")}</div>`;
     } else if (shopTab === "daily") {
       const dd = T.daily;
       if (!dd) { body.innerHTML = '<p class="shop__note">Loading your streak...</p>'; return; }
@@ -874,9 +875,15 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
         const tiles = mine.map((it) => `<button class="shop__tile tier-${it.tier}${wearing(it) ? " on" : ""}" data-act="equip" data-slot="${slot}" data-id="${it.id}" title="${it.name}"><canvas width="64" height="64" data-item="${it.id}"></canvas><span>${it.name}</span></button>`).join("");
         return `<div class="ward__row"><b>${Shop.SLOT_NAMES[slot]}</b><div class="ward__items">${none}${tiles}${mine.length ? "" : '<em>Nothing yet</em>'}</div></div>`;
       }).join("");
-      body.innerHTML = `<div class="ward"><div class="ward__me"><canvas id="mePreview" width="220" height="250" aria-label="Your tung"></canvas></div><div class="ward__rows">${rows}</div></div>`;
+      const sameGear = (a, b) => Shop.SLOTS.every((sl) => (a[sl] || "") === (b[sl] || ""));
+      const presets = d.presets || [];
+      const looks = presets.map((p, i) => `<div class="look${sameGear(p.gear, d.equipped) ? " on" : ""}"><canvas width="84" height="96" data-look="${i}" aria-label="${esc(p.name)}"></canvas><span class="look__name">${esc(p.name)}</span><div class="look__btns"><button data-act="lookwear" data-i="${i}" title="Wear this look">Wear</button><button data-act="lookupd" data-i="${i}" title="Save what you are wearing into this look">Update</button><button data-act="lookname" data-i="${i}" title="Rename">✎</button><button data-act="lookdel" data-i="${i}" title="Delete">🗑</button></div></div>`).join("");
+      const add = presets.length < (d.maxPresets || 8) ? `<button class="look look--add" data-act="looknew"><span>➕</span>Save what I'm wearing as a look</button>` : "";
+      body.innerHTML = `<div class="looks"><div class="looks__head"><b>🎭 My looks</b> <small>Save an outfit and swap to it in one click (${presets.length} of ${d.maxPresets || 8}).</small></div><div class="looks__row">${looks}${add}</div></div>
+        <div class="ward"><div class="ward__me"><canvas id="mePreview" width="220" height="250" aria-label="Your tung"></canvas></div><div class="ward__rows">${rows}</div></div>`;
       const g = {}; for (const slot of Shop.SLOTS) if (d.equipped[slot]) g[slot] = d.equipped[slot];
       previewTung($("mePreview"), g, { s: 1.6, oy: 0.6 });
+      body.querySelectorAll("canvas[data-look]").forEach((cv) => { const pg = presets[+cv.dataset.look].gear, o = { s: 0.62, oy: 0.6 }; if (pg.trail) { o.trail = pg.trail; o.ox = cv.width * 0.1; } const gg = { ...pg }; delete gg.trail; previewTung(cv, o.trail ? { ...gg } : gg, o); });
     }
     body.querySelectorAll("canvas[data-item]").forEach((cv) => previewItem(cv, cv.dataset.item));
   }
@@ -904,6 +911,16 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
       return;
     }
     if (b.dataset.act === "openwheel") { closeShop(); T.openDaily(); return; }
+    if (b.dataset.act.startsWith("look")) {
+      const i = Number(b.dataset.i), act = b.dataset.act; let body = null;
+      if (act === "lookwear") body = { action: "apply", index: i };
+      else if (act === "lookupd") body = { action: "save", index: i };
+      else if (act === "lookdel") { if (!confirm("Delete this look?")) return; body = { action: "delete", index: i }; }
+      else if (act === "lookname") { const n = prompt("Name this look (16 letters max)", shopData.presets[i].name); if (n == null) return; body = { action: "rename", index: i, name: n }; }
+      else if (act === "looknew") { const n = prompt("Name this look (16 letters max)", "Look " + ((shopData.presets || []).length + 1)); if (n == null) return; body = { action: "save", name: n }; }
+      try { shopData = await T.api("/api/shop/preset", { method: "POST", body }); shopMsg(act === "lookwear" ? "Look on!" : "Saved."); renderBucks(); } catch (err) { shopMsg(err.message); }
+      renderShop(); return;
+    }
     b.disabled = true; shopMsg("");
     try {
       if (b.dataset.act === "claimweek") {

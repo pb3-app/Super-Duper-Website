@@ -504,8 +504,9 @@ function dailyState(u) {
 }
 
 function shopOf(u) { return u.shop || (u.shop = { owned: [], equipped: {}, spent: 0 }); }
-// The shop rotates every 6 hours. Paying 1 tung buck refreshes your own shop (a different ten items) once per shop day;
-// it holds until the next 6 hour rotation, then you are back on the shared shop.
+const MAX_PRESETS = 8;
+// The shop rotates every 6 hours. Paying 1 tung buck refreshes your own shop (a different ten items) once per 6 hour window;
+// it holds until the next rotation, then you are back on the shared shop and can refresh again.
 function shopSeed(u) {
   const sh = u.shop, period = Shop.periodStr();
   return sh && sh.rr && sh.rr.period === period ? period + '|r' + sh.rr.salt : period;
@@ -513,8 +514,8 @@ function shopSeed(u) {
 const shopOffer = (u) => Shop.offerFor(shopSeed(u));
 function shopState(u) {
   const sh = u.shop || { owned: [], equipped: {}, spent: 0 }, wins = statsFor(u, 'all').w, bonus = sh.bonus || 0;
-  const day = Shop.todayStr(), usedToday = !!(sh.rr && sh.rr.day === day);
-  return { wins, bonus, spent: sh.spent, balance: wins + bonus - sh.spent, owned: sh.owned, equipped: sh.equipped, today: shopOffer(u), resetsIn: Shop.msUntilRotate(), dayResetsIn: Shop.msUntilReset(), refreshCost: 1, refreshUsed: usedToday, refreshed: !!(sh.rr && sh.rr.period === Shop.periodStr()) };
+  const usedNow = !!(sh.rr && sh.rr.period === Shop.periodStr());
+  return { wins, bonus, spent: sh.spent, balance: wins + bonus - sh.spent, owned: sh.owned, equipped: sh.equipped, presets: (sh.presets || []).map((p) => ({ name: p.name, gear: p.gear })), maxPresets: MAX_PRESETS, today: shopOffer(u), resetsIn: Shop.msUntilRotate(), dayResetsIn: Shop.msUntilReset(), refreshCost: 1, refreshUsed: usedNow, refreshed: usedNow };
 }
 // what a tung wears, as the numbers the arena sends (the item's place in the list + 1, 0 for nothing)
 function gearOf(u) { const eq = (u.shop && u.shop.equipped) || {}; return Shop.SLOTS.map((slot) => (eq[slot] && Shop.byId[eq[slot]] ? Shop.byId[eq[slot]].n : 0)); }
@@ -829,17 +830,46 @@ async function handleApi(req, res, url) {
       saveDb();
       return json(res, 200, shopState(u));
     }
-    case 'POST /api/shop/refresh': { // 1 tung buck, once per shop day: a different ten items until the next rotation
+    case 'POST /api/shop/refresh': { // 1 tung buck, once per 6 hour window: a different ten items until the next rotation
       rateLimit(ip, 'shop', 120, 3600e3);
       const key = sessionKey(bearer(req) || '');
       if (!key) throw httpErr(401, 'Log in to shop');
       const u = db.users[key], sh = shopOf(u), day = Shop.todayStr();
-      if (sh.rr && sh.rr.day === day) throw httpErr(409, 'You already refreshed the shop today. You can again after 8:00 AM Eastern.');
+      if (sh.rr && sh.rr.period === Shop.periodStr()) throw httpErr(409, 'You already refreshed the shop this time. You can again when it changes (every 6 hours).');
       if (shopState(u).balance < 1) throw httpErr(402, 'A refresh costs 1 tung buck');
       const before = shopOffer(u).join(), period = Shop.periodStr();
       let salt = crypto.randomBytes(4).toString('hex');
       for (let i = 0; i < 20 && Shop.offerFor(period + '|r' + salt).join() === before; i++) salt = crypto.randomBytes(4).toString('hex');
       sh.spent += 1; sh.rr = { day, period, salt };
+      saveDb();
+      return json(res, 200, shopState(u));
+    }
+    case 'POST /api/shop/preset': { // save what you are wearing as a named look, wear a saved look, rename it or delete it
+      rateLimit(ip, 'shop', 120, 3600e3);
+      const key = sessionKey(bearer(req) || '');
+      if (!key) throw httpErr(401, 'Log in first');
+      const b = await readJson(req, 1024);
+      const u = db.users[key], sh = shopOf(u); sh.presets = sh.presets || [];
+      const cleanName = (n) => String(n || '').replace(/[\u0000-\u001f\u007f\u200b-\u200f\u2028-\u202e<>&"]/g, '').replace(/\s+/g, ' ').trim().slice(0, 16);
+      const idx = Number.isInteger(b.index) ? b.index : -1;
+      if (b.action === 'save') {
+        const gear = {}; for (const slot of Shop.SLOTS) if (sh.equipped[slot]) gear[slot] = sh.equipped[slot];
+        if (idx >= 0 && sh.presets[idx]) { sh.presets[idx].gear = gear; if (cleanName(b.name)) sh.presets[idx].name = cleanName(b.name); }
+        else {
+          if (sh.presets.length >= MAX_PRESETS) throw httpErr(400, 'You can keep ' + MAX_PRESETS + ' looks. Delete one first.');
+          sh.presets.push({ name: cleanName(b.name) || 'Look ' + (sh.presets.length + 1), gear });
+        }
+      } else if (b.action === 'rename') {
+        if (!sh.presets[idx]) throw httpErr(400, 'No such look'); const n = cleanName(b.name); if (!n) throw httpErr(400, 'Give it a name'); sh.presets[idx].name = n;
+      } else if (b.action === 'delete') {
+        if (!sh.presets[idx]) throw httpErr(400, 'No such look'); sh.presets.splice(idx, 1);
+      } else if (b.action === 'apply') {
+        const p = sh.presets[idx]; if (!p) throw httpErr(400, 'No such look');
+        const eq = {}; for (const slot of Shop.SLOTS) { const id = p.gear[slot]; if (id && Shop.byId[id] && Shop.byId[id].slot === slot && sh.owned.includes(id)) eq[slot] = id; }
+        sh.equipped = eq;
+        const ap = arenaPlayers.get(key); if (ap) ap.q = gearOf(u);
+        sendUser(key, { t: 'profile', user: { ...publicUser(u), admin: isAdmin(key) } });
+      } else throw httpErr(400, 'Bad request');
       saveDb();
       return json(res, 200, shopState(u));
     }
