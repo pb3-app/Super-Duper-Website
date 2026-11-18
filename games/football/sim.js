@@ -28,7 +28,7 @@
     cover3: { name: 'Cover 3 Zone' }, zblitz: { name: 'Zone Blitz' }, cblitz: { name: 'Corner Blitz' }, spy: { name: 'QB Spy' }, goalline: { name: 'Goal Line Stack' }, runstop: { name: 'Run Stop' },
   };
   // catching: the ball has to come down inside the ring around the player, and he has to go for it (click / space) at the right moment
-  const CATCH_R = 3.2, WIN_OPEN = 0.24, WIN_LATE = 0.2, PERFECT = 0.1, CATCH_AT = 0.04;
+  const CATCH_R = 3.2, WIN_OPEN = 0.4, WIN_LATE = 0.34, PERFECT = 0.17, CATCH_AT = 0.04; // the catch bar is open for longer (and its green and yellow are wider) so there is time to see it and click
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -172,6 +172,7 @@
   function step(g, dt, ins) {
     dt = Math.min(dt, 0.05);
     if (g.textT > 0) g.textT -= dt;
+    if (g.clkShow && g.clkShow.t > 0) g.clkShow.t -= dt;
     if (g.over) return;
     switch (g.phase) {
       case 'call': {
@@ -201,25 +202,31 @@
     if (OFF_PLAYS[oc].kind === 'kick') return startKick(g, oc);
     lineUp(g); g.phase = 'presnap'; g.phaseT = 1.5; g.text = ''; g.textT = 0;
   }
-  function snap(g) { g.phase = 'live'; g.P.t = 0; }
+  function snap(g) { g.phase = 'live'; g.P.t = 0; g.clkShow = null; }
 
   // ---------------- a live play ----------------
   function mv(p, tx, ty, dt, mul) {
-    const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy) || 1, sp = SPD[p.role] * p.sp * (mul == null ? 1 : mul) * (p.stun > 0 ? 0 : 1);
+    const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy) || 1, sp = SPD[p.role] * p.sp * (mul == null ? 1 : mul) * (p.pm || 1) * (p.stun > 0 ? 0 : 1);
     const want = Math.min(sp, d / Math.max(dt, 0.001));
     const wx = (dx / d) * want, wy = (dy / d) * want, k = Math.min(1, dt * 9);
     p.vx += (wx - p.vx) * k; p.vy += (wy - p.vy) * k;
   }
   function drive(p, ix, iy, dt, mul) { // a person steering with a stick
-    const l = Math.hypot(ix, iy), sp = SPD[p.role] * p.sp * (mul == null ? 1 : mul) * (p.stun > 0 ? 0 : 1), k = Math.min(1, dt * 10);
+    const l = Math.hypot(ix, iy), sp = SPD[p.role] * p.sp * (mul == null ? 1 : mul) * (p.pm || 1) * (p.stun > 0 ? 0 : 1), k = Math.min(1, dt * 10);
     const wx = l > 0.1 ? (ix / Math.max(1, l)) * sp : 0, wy = l > 0.1 ? (iy / Math.max(1, l)) * sp : 0;
     p.vx += (wx - p.vx) * k; p.vy += (wy - p.vy) * k;
   }
   const carrierOf = (g) => (g.P && g.P.carrier >= 0 ? g.players[g.P.carrier] : null);
 
+  // The play's pace: the offence comes off the line quick (30% faster for the first 1.8 seconds, then easing back to normal by 3.6 seconds);
+  // after that the defence gets a little faster the longer the play goes on, up to 18% faster.
+  const offBurst = (t, P) => (P && P.kind === 'kick' ? 1 : t <= 1.8 ? 1.3 : t < 3.6 ? 1.3 - 0.3 * ((t - 1.8) / 1.8) : 1);
+  const defRamp = (t, P) => (P && P.kind === 'kick' ? 1 : t <= 3.6 ? 1 : Math.min(1.18, 1 + 0.022 * (t - 3.6)));
   function live(g, dt, ins) {
     const P = g.P, dir = dirOf(g), offT = g.off, defT = 1 - g.off, O = g.players.slice(offT * 11, offT * 11 + 11), D = g.players.slice(defT * 11, defT * 11 + 11);
-    P.t += dt; if (P.caught && P.carrier >= 0) P.catchT = (P.catchT || 0) + dt; g.clock = Math.max(0, g.clock - dt * CLOCK_RATE); if (g.clock === 0) g.endAfter = true;
+    P.t += dt;
+    { const om = offBurst(P.t, P), dm = defRamp(P.t, P); for (const q of O) q.pm = om; for (const q of D) q.pm = dm; }
+    if (P.caught && P.carrier >= 0) P.catchT = (P.catchT || 0) + dt; g.clock = Math.max(0, g.clock - dt * CLOCK_RATE); if (g.clock === 0) g.endAfter = true;
     const inO = ins[offT] || {}, inD = ins[defT] || {}, lastO = g.lastIn[offT] || {}, lastD = g.lastIn[defT] || {};
     const press = (inp, last, key) => (inp[key] || 0) !== (last[key] || 0);
     const humanO = g.human[offT], humanD = g.human[defT];
@@ -412,7 +419,7 @@
   // Whoever clicks closer to the perfect moment wins the ball. Every click error is scaled down ("dispersion removed") by the offence's 10% edge and by
   // 20% for each extra player a team has in the catch zone. If neither is close enough it is incomplete; if the offence wins it is a catch; if the defence
   // wins it is an interception 40% of the time and a knocked-down ball the other 60%.
-  const CLICK_OK = 0.22, OFF_EDGE = 0.10, EXTRA_EDGE = 0.20, PICK_CHANCE = 0.4;
+  const CLICK_OK = 0.38, OFF_EDGE = 0.10, EXTRA_EDGE = 0.20, PICK_CHANCE = 0.4;
   const gauss = (g) => Math.sqrt(-2 * Math.log(1 - g.rng() * 0.999999)) * Math.cos(6.283185307 * g.rng());
   const aiError = (g, sigma) => Math.abs(gauss(g)) * sigma; // how far from perfect a computer player clicks
   function zoneCounts(g, R) {
@@ -423,7 +430,7 @@
   function resolveCatch(g, R, humanOff, humanDef, sel) {
     const P = g.P, b = g.ball, flash = (t, sec) => { g.text = t; g.textT = sec || 1; };
     const z = zoneCounts(g, R), nO = z.off.length, nD = z.def.length;
-    const skill = { easy: [0.2, 0.17], medium: [0.14, 0.12], hard: [0.09, 0.08] }[g.level] || [0.14, 0.12]; // [computer defender, computer receiver] click spread
+    const skill = { easy: [0.34, 0.29], medium: [0.24, 0.2], hard: [0.15, 0.14] }[g.level] || [0.24, 0.2]; // [computer defender, computer receiver] click spread
     // raw click errors (seconds away from the perfect moment)
     let eO = Infinity, eD = Infinity, dWho = null;
     if (P.clk.o) eO = P.clk.o.raw; else if (!humanOff && z.off.some((p) => p.id === R.id)) eO = aiError(g, skill[1]);
@@ -433,6 +440,8 @@
     const extraO = Math.max(0, nO - nD), extraD = Math.max(0, nD - nO);
     const mulO = 1 - Math.min(0.7, OFF_EDGE + EXTRA_EDGE * extraO), mulD = 1 - Math.min(0.6, EXTRA_EDGE * extraD);
     const aO = eO * mulO, aD = eD * mulD, okO = aO <= CLICK_OK, okD = aD <= CLICK_OK;
+    const sgn = () => (g.rng() < 0.5 ? -1 : 1), tlOf = (c, e) => (c ? c.tl : Number.isFinite(e) ? CATCH_AT + sgn() * e : null);
+    g.clkShow = { o: tlOf(P.clk.o, eO), d: tlOf(P.clk.d, eD), t: 1.8 };
     P.contest = { nO, nD, aO: Number.isFinite(aO) ? Math.round(aO * 1000) / 1000 : null, aD: Number.isFinite(aD) ? Math.round(aD * 1000) / 1000 : null };
     if (!okO && !okD) { flash('INCOMPLETE', 1.2); b.state = 'dead'; b.carrier = null; endPlay(g, 'incomplete', g.los); return; }
     if (okO && (!okD || aO <= aD)) { flash(eO <= PERFECT ? 'PERFECT CATCH!' : 'CAUGHT IT!', 1); return caught(g, R); }
@@ -454,12 +463,12 @@
     if (humanDef && c.pressD && !P.clk.d && !(P.lockD > 0)) {
       const d = g.players.find((p) => p.id === c.sel && p.team !== R.team), guard = guardOf(g, R);
       if (d && d.id !== guard.id) { P.lockD = 0.45; flash('PRESS E: COVER THE RECEIVER', 1); }
-      else if (d && open && Math.hypot(d.x - b.x, d.y - b.y) <= CATCH_R) P.clk.d = { raw: Math.abs(tl - CATCH_AT), id: d.id };
+      else if (d && open && Math.hypot(d.x - b.x, d.y - b.y) <= CATCH_R) P.clk.d = { raw: Math.abs(tl - CATCH_AT), id: d.id, tl };
       else if (d) { P.lockD = 0.45; flash(tl > WIN_OPEN ? 'TOO EARLY!' : 'OUT OF RANGE!', 0.7); }
     }
     // a person on offence goes for it
     if (humanOff && c.pressO && !P.clk.o && !(P.lockO > 0)) {
-      if (open && Math.hypot(R.x - b.x, R.y - b.y) <= CATCH_R) P.clk.o = { raw: Math.abs(tl - CATCH_AT) };
+      if (open && Math.hypot(R.x - b.x, R.y - b.y) <= CATCH_R) P.clk.o = { raw: Math.abs(tl - CATCH_AT), tl };
       else { P.lockO = 0.45; flash(tl > WIN_OPEN ? 'TOO EARLY!' : 'OUT OF RANGE!', 0.7); }
     }
     // who is still to click? (a person who has not clicked yet gets until the window closes)
@@ -677,8 +686,9 @@
       pl: g.players.map((p) => [Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10, p.team, ROLE_CODE[p.role] || 0, (p.jukeT > 0 ? 1 : 0) | (p.stun > 0 ? 2 : 0) | (p.dive > 0 ? 4 : 0) | (g.ball.carrier === p.id ? 8 : 0) | (g.ctl[p.team] === p.id ? 16 : 0), Math.round(p.vx * 10) / 10, Math.round(p.vy * 10) / 10]),
       ball: [Math.round(g.ball.x * 10) / 10, Math.round(g.ball.y * 10) / 10, Math.round(g.ball.z * 10) / 10, g.ball.state === 'held' ? 0 : g.ball.state === 'air' ? 1 : g.ball.state === 'kick' ? 2 : 3],
       routes: g.phase === 'presnap' || g.phase === 'live' ? g.players.filter((p) => p.team === g.off && p.mode === 'route' && p.route.length && !(P && P.thrown)).map((p) => [p.id, p.route.slice(p.ri).map((w) => [Math.round(w[0] * 10) / 10, Math.round(w[1] * 10) / 10])]) : [],
-      catch: P && P.thrown && !P.caught && !P.intercepted && g.ball.state === 'air' && P.target >= 0 ? { r: P.target, R: CATCH_R, tl: Math.round((P.tl || 0) * 100) / 100, lx: Math.round(g.ball.tx * 10) / 10, ly: Math.round(g.ball.ty * 10) / 10, in: dist(g.ball, g.players[P.target]) <= CATCH_R, ho: g.human[g.players[P.target].team], hd: g.human[1 - g.players[P.target].team], d: g.ctl[1 - g.players[P.target].team], g: guardOf(g, g.players[P.target]).id } : null,
+      catch: P && P.thrown && !P.caught && !P.intercepted && g.ball.state === 'air' && P.target >= 0 ? { r: P.target, R: CATCH_R, tl: Math.round((P.tl || 0) * 100) / 100, co: P.clk && P.clk.o ? Math.round(P.clk.o.tl * 100) / 100 : null, cd: P.clk && P.clk.d ? Math.round(P.clk.d.tl * 100) / 100 : null, lx: Math.round(g.ball.tx * 10) / 10, ly: Math.round(g.ball.ty * 10) / 10, in: dist(g.ball, g.players[P.target]) <= CATCH_R, ho: g.human[g.players[P.target].team], hd: g.human[1 - g.players[P.target].team], d: g.ctl[1 - g.players[P.target].team], g: guardOf(g, g.players[P.target]).id } : null,
       canThrow: !!(P && P.kind === 'pass' && !P.thrown && !P.scrambling && g.phase === 'live' && (g.players[P.qb].x - g.los) * dirOf(g) <= 0.4),
+      clk: g.clkShow && g.clkShow.t > 0 ? [g.clkShow.o == null ? null : Math.round(g.clkShow.o * 100) / 100, g.clkShow.d == null ? null : Math.round(g.clkShow.d * 100) / 100] : null,
       zone: P && P.thrown && g.ball.state === 'air' && P.target >= 0 ? (() => { const z = zoneCounts(g, g.players[P.target]); return [z.off.length, z.def.length]; })() : null,
       stiff: (() => { const id = g.ctl[g.off]; const p = id != null ? g.players[id] : null; return p ? Math.round(Math.max(0, p.jcd || 0) * 10) / 10 : 0; })(),
       thrown: P ? P.thrown : false, target: P ? P.target : -1, ctl: g.ctl, pcall: g.calls[g.off] || null, dcall: g.calls[1 - g.off] || null, plays: g.plays, kick: g.kickAnim ? g.kickAnim.kind : null,

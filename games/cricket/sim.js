@@ -135,7 +135,7 @@
     const seed = (o.seed >>> 0) || 12345, overs = [1, 2, 3, 5, 10, 20].includes(+o.overs) ? +o.overs : 5;
     const m = {
       seed, rng: rngFrom(seed), brng: rngFrom(seed ^ 0x9e3779b9 ^ ((Date.now() & 0xffff) * (o.noRandomBot ? 0 : 1))),
-      cfg: { overs, wk: 10, level: o.level || 'medium', pp: Math.max(1, Math.ceil(overs * 0.2)), maxOv: Math.max(1, Math.ceil(overs / 5)), bot: [!!(o.bot && o.bot[0]), !!(o.bot && o.bot[1])], timers: !!o.timers, follow: !!o.follow },
+      cfg: { overs, wk: 10, level: o.level || 'medium', pp: Math.max(1, Math.ceil(overs * 0.2)), maxOv: Math.max(1, Math.ceil(overs / 5)), bot: [!!(o.bot && o.bot[0]), !!(o.bot && o.bot[1])], timers: !!o.timers, follow: !!o.follow, drs: !!o.drs, autoRuns: o.autoRuns !== false, autoBat: o.autoBat !== false },
       teams: [makeTeam(o.teams ? o.teams[0] : 'titans'), makeTeam(o.teams ? o.teams[1] : 'blasters')],
       names: o.names || ['You', 'Opponent'],
       phase: 'toss', t: 0, hold: 0, toss: { caller: 0, call: null, coin: null, winner: null, choice: null },
@@ -175,7 +175,7 @@
     const I = {
       bat, bowl, overs, wk, target: target == null ? null : target, so: !!so, runs: 0, wkts: 0, balls: 0, ex: { wd: 0, nb: 0, b: 0, lb: 0 }, order,
       striker: order[0], non: order[1], next: 2, bats: {}, bowls: {}, overs_: [], fow: [], part: { runs: 0, balls: 0, a: order[0], b: order[1] }, wagon: [], map: [],
-      bowler: -1, lastBowler: -1, revs: 1, free: false, over: null, bounc: 0, fours: 0, sixes: 0, done: false, reason: '',
+      bowler: -1, lastBowler: -1, revs: m.cfg.drs ? 1 : 0, bowlRevs: m.cfg.drs ? 1 : 0, free: false, over: null, bounc: 0, fours: 0, sixes: 0, done: false, reason: '',
     };
     I.bats[order[0]] = { r: 0, b: 0, f: 0, s: 0, out: null, in: true }; I.bats[order[1]] = { r: 0, b: 0, f: 0, s: 0, out: null, in: true };
     m.innings.push(I); m.inn = m.innings.length - 1;
@@ -728,7 +728,7 @@
     if (r.dec && r.dec.initial !== r.dec.truth || (r.dec && r.dec.pending)) {
       // is there a review left on the side that would want one?
       const out = r.dec.initial, rev = out ? I.bat : I.bowl;
-      const left = out ? I.revs : (I.bowlRevs == null ? 1 : I.bowlRevs);
+      const left = m.cfg.drs ? (out ? I.revs : (I.bowlRevs == null ? 1 : I.bowlRevs)) : 0;
       if (left > 0 && r.dec.initial !== r.dec.truth) {
         m.pend = { r, reviewer: rev, dec: true }; m.phase = 'review'; m.t = 0; m.think = 0;
         emit(m, { k: 'dec', kind: r.dec.kind, initial: r.dec.initial, reviewer: rev });
@@ -756,6 +756,7 @@
       // ask the batters how many runs to go for
       m.pend = { r }; m.phase = 'runs'; m.t = 0; m.think = 0;
       emit(m, { k: 'runs', info: r.live, path: r.path, del: r.del, r: slimResult(m, r) });
+      if (m.cfg.autoRuns) return doRuns(m, r, r.live.safe); // the simple game: the batters run as many as are safe
       return true;
     }
     const I = inn(m);
@@ -894,6 +895,30 @@
     return { t: 'runs', n };
   }
 
+  // The simple controls: "defend / hit / big hit" and a side (off, leg or auto) become a real shot for this ball:
+  // the shot that suits the delivery best, aimed into the biggest gap in the field on that side.
+  function suggest(m, del, intent, dir) {
+    if (intent === 'defend') return { type: 'defend', ang: 0, air: false, step: false };
+    const fl = fielders(m), uE = del.uEff, vE = del.v, big = intent === 'big';
+    const ids = big ? ['loft', 'pull', 'drive', 'flick'] : ['drive', 'cut', 'pull', 'flick', 'sweep'];
+    let best = null;
+    for (const id of ids) {
+      const sh = Object.assign({ id }, SHOTS[id]);
+      let bestA = null, bd = -1;
+      for (let k = -4; k <= 4; k++) {
+        const a = wrapTo(sh.c + (k / 4) * sh.h, sh.c, sh.h);
+        if (dir === 'off' && !(a >= 8 && a <= 172)) continue; if (dir === 'leg' && !(a <= -8 && a >= -172)) continue;
+        let mn = 1e9; for (const f of fl) { if (f.role === 'keeper') continue; const d = dist2(xy(f.a, f.r), xy(a, 40)); if (d < mn) mn = d; }
+        if (mn > bd) { bd = mn; bestA = a; }
+      }
+      if (bestA == null) continue;
+      const fit = shotFit(sh, uE, vE, false, del.spin) * (big && id !== 'loft' ? 0.9 : 1) + Math.min(bd, 60) / 600;
+      if (!best || fit > best.fit) best = { fit, type: id, ang: Math.round(bestA), air: big && id !== 'loft' };
+    }
+    if (!best) return { type: big ? 'loft' : 'drive', ang: dir === 'leg' ? -40 : dir === 'off' ? 40 : 0, air: false, step: false };
+    return { type: best.type, ang: best.ang, air: best.air, step: false };
+  }
+
   // one step of whatever the computer (or a timed-out human) should do for the phase we are in
   function autoAction(m) {
     const I = inn(m), ph = m.phase;
@@ -935,6 +960,7 @@
       for (const s of [0, 1]) if (!m.ready[s] && (m.cfg.bot[s] || (m.cfg.timers && m.t > 75))) { act(m, s, { t: 'ready' }); n++; }
       return n;
     }
+    if (ph === 'newbat' && m.cfg.autoBat) { if (m.t >= 0.6) { const av = availableBatters(m); if (av.length && act(m, inn(m).bat, { t: 'batter', i: av[0] })) n++; } return n; }
     const side = phaseSide(m);
     const bot = side >= 0 && m.cfg.bot[side];
     const limit = { toss: 20, tosspick: 20, pickBowler: 45, bowl: 30, flight: 0, runs: 9, review: 8, newbat: 25 }[ph];
@@ -968,5 +994,5 @@
   }
   function rosterView(m, team) { return m.teams[team].players.map((p) => ({ id: p.id, name: p.name, role: p.role, bat: p.bat, pow: p.pow, bowl: p.bowl, bt: p.bt, canBowl: p.canBowl, fld: p.fld, wk: p.wk, spd: p.spd })); }
 
-  return { BOUNDARY, CIRCLE, STUMP, WIDE_OFF, WIDE_LEG, TEAMS, PITCHES, WEATHER, KINDS, SHOTS, SHOT_IDS, FIELDS, BT_NAME, create, act, tick, autoAction, status, fielders, bowlerOptions, availableBatters, kindsFor, validField, outsideCount, maxOutside, isPP, isSpin, xy, wrap, oversText, shotFit, rosterView, makeTeam, aiFieldChoice, inn, pl, phaseSide, flightSec, adiff };
+  return { BOUNDARY, CIRCLE, STUMP, WIDE_OFF, WIDE_LEG, TEAMS, PITCHES, WEATHER, KINDS, SHOTS, SHOT_IDS, FIELDS, BT_NAME, create, act, tick, autoAction, suggest, status, fielders, bowlerOptions, availableBatters, kindsFor, validField, outsideCount, maxOutside, isPP, isSpin, xy, wrap, oversText, shotFit, rosterView, makeTeam, aiFieldChoice, inn, pl, phaseSide, flightSec, adiff };
 });

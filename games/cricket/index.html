@@ -37,6 +37,7 @@
     .cx-btn:hover:not(:disabled) { border-color: var(--accent); background: rgba(125, 78, 33, .95); } .cx-btn:disabled { opacity: .4; cursor: not-allowed; }
     .cx-btn.on { border-color: var(--accent); background: rgba(160, 100, 30, .95); box-shadow: 0 0 0 2px rgba(255,201,51,.35); }
     .cx-btn small { display: block; opacity: .8; font-size: .72rem; } .cx-btn kbd { background: #fff3e0; color: #2b1a0e; border-radius: 4px; padding: 0 5px; font-size: .7rem; font-weight: 800; margin-right: 4px; }
+    .cx-btn.big { padding: .55rem .9rem; font-size: 1.02rem; }
     .cx-btn.go { background: #2e9a4a; border-color: #7ee08f; font-weight: 900; font-size: 1.05rem; padding: .5rem 1.2rem; } .cx-btn.go:hover:not(:disabled) { background: #36b556; }
     .cx-btn.safe { border-color: #7ee08f; } .cx-btn.risky { border-color: #ffb347; } .cx-btn.danger { border-color: #ff6b5b; }
     .cx-two { display: grid; grid-template-columns: 1fr auto; gap: .8rem; align-items: start; } @media (max-width: 760px) { .cx-two { grid-template-columns: 1fr; } }
@@ -86,7 +87,7 @@
           <label>Pitch <select id="pitch"><option value="random">Random</option><option value="flat">Flat deck</option><option value="green">Green top</option><option value="dusty">Dusty turner</option><option value="damp">Damp and slow</option></select></label>
         </div>
         <div class="btn-row"><button class="btn" id="startBtn" style="font-size:1.15rem;padding:.7rem 1.8rem">🏏 Toss up</button></div>
-        <p class="np-hint">A full limited-overs match: eleven a side, ten wickets, a toss, a batting order, a pitch and weather report, a powerplay, free hits, DRS reviews and a super over if it ends level. You set the field and choose the bowler and each delivery's line, length and type. When you bat you pick a shot and time it. Playing the computer never counts toward the leaderboard (solo wins and losses have their own board).</p>
+        <p class="np-hint">A quick game of cricket. When you bat: choose Defend, Hit or Big hit and press Space as the ring closes on the bat. When you bowl: pick a bowler, pick a delivery and bowl. Everything else is automatic. Playing the computer never counts toward the leaderboard (solo wins and losses have their own board).</p>
       </div>
       <div id="mpPanel" hidden></div>
       <div id="play" hidden>
@@ -96,7 +97,7 @@
           <div class="cx-panel" id="ctl"></div>
         </div>
         <div class="cx-centre">
-          <div class="tabs" id="tabs"><button data-t="comm" class="on">💬 Commentary</button><button data-t="card">📋 Scorecard</button><button data-t="charts">📈 Charts</button><button data-t="teams">👥 Teams</button><button data-t="help">❓ How to play</button><button id="quitBtn" style="margin-left:auto">☰ Menu (Esc)</button></div>
+          <div class="tabs" id="tabs"><button data-t="comm" class="on">💬 Commentary</button><button data-t="card">📋 Scorecard</button><button data-t="help">❓ How to play</button><button id="quitBtn" style="margin-left:auto">☰ Menu (Esc)</button></div>
           <div id="tabBody"></div>
         </div>
         <div class="cx-result" id="result" hidden></div>

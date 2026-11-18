@@ -96,7 +96,31 @@
   }
   // the catch: a ring around the player (the ball has to come down inside it) and a bar at the bottom of the screen. A marker slides across the bar and you click
   // (or press space) when it is in the green middle: the middle is the perfect catch, the yellow either side is a good catch, red is a miss.
-  const SPAN = 1.1, CATCH_AT = 0.04, OPEN_FROM = 0.24, OPEN_TO = -0.2, PERFECT = 0.1;
+  const SPAN = 1.9, CATCH_AT = 0.04, OPEN_FROM = 0.4, OPEN_TO = -0.34, PERFECT = 0.17; // (the same numbers as the rules: the bar is open longer, so it sweeps slower)
+  const barGeo = () => { const bw = 230, bh = 11, bx = Math.round(IW / 2 - bw / 2), by = IH - 30; return { bw, bh, bx, by, at: (tl) => bx + bw * (0.5 + (CATCH_AT - tl) / SPAN) }; };
+  function drawBarBase(B) {
+    const { bw, bh, bx, by, at } = B;
+    ctx.fillStyle = "#000"; ctx.fillRect(bx - 3, by - 3, bw + 6, bh + 6);
+    ctx.fillStyle = "#7a2a24"; ctx.fillRect(bx, by, bw, bh);                                           // miss
+    ctx.fillStyle = "#c9b73a"; ctx.fillRect(at(OPEN_FROM), by, at(OPEN_TO) - at(OPEN_FROM), bh);        // a good catch
+    ctx.fillStyle = "#3be86b"; ctx.fillRect(at(CATCH_AT + PERFECT), by, at(CATCH_AT - PERFECT) - at(CATCH_AT + PERFECT), bh); // the perfect catch, in the middle
+    ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.fillRect(Math.round(bx + bw / 2), by - 2, 1, bh + 4);
+  }
+  // a click is a little flag on the bar: blue for the offence (the receiver), red for the defence
+  function drawClickTicks(B, co, cd) {
+    const xs = [co, cd].map((tl) => (tl == null ? null : Math.round(Math.max(B.bx, Math.min(B.bx + B.bw, B.at(tl))))));
+    const near = xs[0] != null && xs[1] != null && Math.abs(xs[0] - xs[1]) < 26;
+    [[xs[0], "#4aa8f0", "OFF", near ? -13 : 0], [xs[1], "#ff5a4a", "DEF", near ? 13 : 0]].forEach(([x, col, lab, nudge]) => {
+      if (x == null) return;
+      ctx.fillStyle = col; ctx.fillRect(x - 1, B.by - 7, 3, B.bh + 14);
+      ctx.fillStyle = "#000"; ctx.fillRect(x + nudge - 11, B.by + B.bh + 7, 22, 10);
+      text(lab, x + nudge, B.by + B.bh + 12, col, 5, "center");
+    });
+  }
+  function drawClicks(v) { // after the catch is settled the bar stays up for a moment with both clicks on it
+    if (!v.clk || v.catch) return;
+    const B = barGeo(); drawBarBase(B); drawClickTicks(B, v.clk[0], v.clk[1]);
+  }
   function drawCatch(v, t) {
     const c = v.catch; if (!c) return;
     let id = null;
@@ -112,17 +136,15 @@
       if (c.d !== c.g) text("PRESS E: COVER THE RECEIVER", IW / 2, 24 + 26, "#ffd23f", 7, "center");
     }
     // the bar
-    const bw = 230, bh = 11, bx = Math.round(IW / 2 - bw / 2), by = IH - 30, at = (tl) => bx + bw * (0.5 + (CATCH_AT - tl) / SPAN);
-    ctx.fillStyle = "#000"; ctx.fillRect(bx - 3, by - 3, bw + 6, bh + 6);
-    ctx.fillStyle = "#7a2a24"; ctx.fillRect(bx, by, bw, bh);                                           // miss
-    ctx.fillStyle = "#c9b73a"; ctx.fillRect(at(OPEN_FROM), by, at(OPEN_TO) - at(OPEN_FROM), bh);        // a good catch
-    ctx.fillStyle = "#3be86b"; ctx.fillRect(at(CATCH_AT + PERFECT), by, at(CATCH_AT - PERFECT) - at(CATCH_AT + PERFECT), bh); // the perfect catch, in the middle
-    ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.fillRect(Math.round(bx + bw / 2), by - 2, 1, bh + 4);
-    const mk = Math.max(bx, Math.min(bx + bw, at(c.tl)));                                                // the marker
-    ctx.fillStyle = c.in ? "#ffffff" : "#ff9a8a"; ctx.fillRect(Math.round(mk) - 1, by - 4, 3, bh + 8); ctx.fillRect(Math.round(mk) - 3, by - 6, 7, 3);
+    const B = barGeo();
+    drawBarBase(B);
+    const mk = Math.max(B.bx, Math.min(B.bx + B.bw, B.at(c.tl)));                                         // the marker
+    ctx.fillStyle = c.in ? "#ffffff" : "#ff9a8a"; ctx.fillRect(Math.round(mk) - 1, B.by - 4, 3, B.bh + 8); ctx.fillRect(Math.round(mk) - 3, B.by - 6, 7, 3);
+    drawClickTicks(B, c.co, c.cd); // where the offence and the defence have clicked on the bar: both players can see the other one's click
+    const bx = B.bx, by = B.by, bh = B.bh;
     if (v.zone) { // how many are in the catch zone: more players than the other side = a better click for them
       const [no, nd] = v.zone, lead = no > nd ? "OFFENCE +" + Math.min(60, 10 + 20 * (no - nd)) + "% " : nd > no ? "DEFENCE +" + Math.min(60, 20 * (nd - no)) + "% " : "OFFENCE +10% ";
-      text(`ZONE: OFF ${no} v DEF ${nd}  (${lead.trim()})`, bx - 3, by + bh + 9, "#cfe8cf", 5, "left");
+      text(`ZONE: OFF ${no} v DEF ${nd}  (${lead.trim()})`, bx - 3, by - 24, "#cfe8cf", 5, "left");
     }
     const msg = !c.in ? (c.tl < 0.4 ? (myTeam === v.off ? "OUT OF RANGE" : "GET INTO THE RING") : "") : open ? "CLICK!" : "";
     if (msg) text(msg, IW / 2, by - 10, !c.in ? "#ff6b5e" : "#ffd23f", 7, "center");
@@ -168,7 +190,7 @@
     // everyone, back to front
     const order = v.pl.map((p, i) => i).sort((a, b) => v.pl[a][1] - v.pl[b][1]);
     for (const i of order) sprite(v.pl[i], v, t);
-    drawBall(v); drawCatch(v, t); drawLabels(v); hud(v, t);
+    drawBall(v); drawCatch(v, t); drawClicks(v); drawLabels(v); hud(v, t);
   }
 
   // ------------- play calling -------------

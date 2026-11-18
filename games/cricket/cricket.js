@@ -15,7 +15,7 @@
 
   let sim = null, role = "idle", my = 0, np = null, raf = 0, last = 0, ctxInfo = null, finished = false, sentN = 0;
   let anim = null, busyUntil = 0, logLines = [], banner = null, bannerT = 0, coin = null, gears = [null, null], names = ["You", "Computer"];
-  let sel = { team: "titans", kind: null, u: 0.05, v: 0.38, eff: 0.6, shot: "defend", ang: null, air: false, step: false, preset: null, tab: "comm" };
+  let sel = { team: "titans", kind: null, u: 0.05, v: 0.38, eff: 0.65, intent: "hit", dir: "auto", fieldMode: "balanced", tab: "comm" };
   let edit = { on: false, f: null, drag: -1 }, ckey = "", picks = { mine: null, opp: null }, pickBox = false, aimAt = null, mouse = [480, 300];
 
   // ---------------- sound ----------------
@@ -360,42 +360,58 @@
     const ov = i.over ? i.over.balls.map(chip).join("") : "";
     const maxOv = i.so ? 1 : sim.cfg.maxOv;
     el.innerHTML = `<div class="cx-score"><span class="tm"><i style="background:${teamCol(i.bat)}"></i>${esc(sim.teams[i.bat].short)}</span><span class="big">${i.runs}/${i.wkts}</span><span class="mid">(${s.overs} / ${i.overs}) · CRR <b>${s.crr}</b></span>${target}<span class="grow"></span>${chipsH.join("")}</div>
-      <div class="cx-lines">${bat(i.striker, true)}${bat(i.non, false)}${bw}<span class="grow"></span><span>This over <span class="balls">${ov || "-"}</span></span><span class="rt">Reviews: bat ${i.revs} · field ${i.bowlRevs == null ? 1 : i.bowlRevs} · max ${maxOv} ov each</span></div>`;
+      <div class="cx-lines">${bat(i.striker, true)}${bat(i.non, false)}${bw}<span class="grow"></span><span>This over <span class="balls">${ov || "-"}</span></span></div>`;
   }
 
   // ---------------- the control panel ----------------
   const ctl = $("ctl");
   const waiting = (t) => `<p class="hint">${t}</p>`;
   const timer = `<div class="cx-timer"><i id="tm"></i></div>`;
+  // The simple batting controls: choose how you want to play, which side, and time the swing.
+  const INTENTS = [["defend", "🛡️", "Defend", "Safe. Blocks it for no runs", "1"], ["hit", "🏏", "Hit", "The best shot for the ball", "2"], ["big", "💥", "Big hit", "Go for six. Risky!", "3"], ["leave", "🚫", "Leave", "Let it go past", "4"]];
+  const DIRS = [["leg", "◀ Leg side", "←"], ["auto", "Anywhere", "↓"], ["off", "Off side ▶", "→"]];
   function shotPanel(canSwing) {
-    const i = I(), btns = S.SHOT_IDS.map((id) => { const sh = S.SHOTS[id]; return `<button class="cx-btn${sel.shot === id ? " on" : ""}" data-a="shot:${id}" title="${esc(sh.d)}"><kbd>${sh.key}</kbd>${sh.n}<small>${esc(sh.d)}</small></button>`; }).join("");
-    return `<div class="cx-two"><div><h3>🏏 You are batting${i && i.free ? " · FREE HIT!" : ""}</h3><div class="cx-row">${btns}</div>
-      <div class="cx-row" style="margin-top:.4rem"><button class="cx-btn${sel.air ? " on" : ""}" data-a="air"><kbd>L</kbd>Lofted<small>More distance, more risk of a catch</small></button><button class="cx-btn${sel.step ? " on" : ""}" data-a="step"><kbd>S</kbd>Step out<small>Come down the track. Stumped if you miss</small></button>
-      <button class="cx-btn go" data-a="swing" ${canSwing ? "" : "disabled"}>SWING! <kbd>Space</kbd></button></div>
-      <p class="hint">Pick a shot that suits the ball, aim it into a gap on the little field, then press <b>Space</b> (or click the pitch) just as the ring closes on the ball.</p>${timer}</div><canvas id="aim" width="210" height="210"></canvas></div>`;
+    const i = I();
+    const ib = INTENTS.map(([id, ic, n, d, k]) => `<button class="cx-btn big${sel.intent === id ? " on" : ""}" data-a="intent:${id}"><kbd>${k}</kbd>${ic} ${n}<small>${d}</small></button>`).join("");
+    const db = DIRS.map(([id, n, k]) => `<button class="cx-btn${sel.dir === id ? " on" : ""}" data-a="dir:${id}"><kbd>${k}</kbd>${n}</button>`).join("");
+    return `<h3>🏏 You are batting${i && i.free ? " · FREE HIT!" : ""}</h3>
+      <div class="cx-row">${ib}</div>
+      <div class="cx-row" style="margin-top:.4rem"><span class="rt" style="align-self:center">Aim:</span>${db}<button class="cx-btn go" data-a="swing" ${canSwing ? "" : "disabled"}>SWING! <kbd>Space</kbd></button></div>
+      <p class="hint">👉 Press <b>SPACE</b> (or click the pitch) just as the ring closes on the bat. Good timing is a good shot.</p>${timer}`;
   }
+  // The simple bowling controls: pick a delivery and bowl. (Click the pitch if you want to aim it yourself.)
+  const SIMPLE = {
+    pace: [["good", "Normal", "A good length"], ["yorker", "Yorker", "At the toes. Hard to hit"], ["bouncer", "Bouncer", "Short and quick (2 an over)"], ["swing", "Swing", "Curves in the air"], ["slower", "Slower ball", "Fools the timing"]],
+    spin: [["stock", "Normal", "Turns a little"], ["googly", "Googly", "Turns the other way"], ["flight", "Flighted", "Loopy and slow"], ["quick", "Quick", "Fast and flat"]],
+  };
+  const realKind = (k) => (k === "swing" ? "outswing" : k);
   function bowlPanel() {
-    const i = I(), B = P(i.bowl, i.bowler), list = S.kindsFor(B), ft = sim.fat[i.bowl + ":" + B.id] || 0;
-    if (!sel.kind || !list.includes(sel.kind)) { sel.kind = list[0]; sel.u = S.KINDS[sel.kind].u; sel.v = S.KINDS[sel.kind].v; }
-    const btns = list.map((k) => { const K = S.KINDS[k]; return `<button class="cx-btn${sel.kind === k ? " on" : ""}" data-a="kind:${k}" title="${esc(K.d)}">${K.n}<small>${esc(K.d)}</small></button>`; }).join("");
-    const bncOk = i.bounc < 2;
-    return `<h3>🎯 You are bowling: ${esc(B.name)} <span class="rt">${S.BT_NAME[B.bt]} · accuracy <b>${B.acc}</b> · tiredness <b>${Math.round(ft * 100)}%</b> · over ${Math.floor(i.balls / 6) + 1}, ball ${(i.over ? i.over.balls.filter((b) => !/Wd|Nb/.test(b)).length : 0) + 1}${bncOk ? "" : " · NO MORE BOUNCERS THIS OVER"}</span></h3>
+    const i = I(), B = P(i.bowl, i.bowler), list = SIMPLE[S.isSpin(B) ? "spin" : "pace"];
+    if (!sel.kind || !list.some((x) => x[0] === sel.kind)) { sel.kind = list[0][0]; sel.u = S.KINDS[realKind(sel.kind)].u; sel.v = S.KINDS[realKind(sel.kind)].v; }
+    const btns = list.map(([k, n, d]) => `<button class="cx-btn big${sel.kind === k ? " on" : ""}" data-a="kind:${k}">${n}<small>${d}</small></button>`).join("");
+    const left = i.over ? i.over.balls.filter((b) => !/Wd|Nb/.test(b)).length : 0;
+    return `<h3>🎯 You are bowling: ${esc(B.name)} <span class="rt">ball ${left + 1} of 6</span></h3>
       <div class="cx-row">${btns}</div>
-      <div class="cx-slider"><span>Effort</span><input type="range" id="eff" min="0" max="100" value="${Math.round(sel.eff * 100)}"><span class="rt">Harder = quicker but less accurate and more tiring. Over-stepping gives a no-ball.</span></div>
-      <div class="cx-row" style="margin-top:.5rem"><button class="cx-btn go" data-a="bowl" ${animBusy() ? "disabled" : ""}>BOWL! <kbd>Space</kbd></button><button class="cx-btn" data-a="editfield">🧤 Change the field</button></div>
-      <p class="hint">Click the pitch to aim: left to right is the line (off stump on the right), further up is a fuller or shorter length. Watch the swing and the turn.</p>`;
+      <div class="cx-row" style="margin-top:.5rem"><button class="cx-btn go" data-a="bowl" ${animBusy() ? "disabled" : ""}>BOWL! <kbd>Space</kbd></button></div>
+      <p class="hint">👉 Pick a delivery and bowl. Want to aim? Click the pitch where you want it to land (the right is the off side).${i.bounc >= 2 ? " <b>No more bouncers this over.</b>" : ""}</p>`;
   }
+  const FIELD_MODES = [["attack", "😈 Attack", "Fielders close in to catch"], ["balanced", "⚖️ Balanced", "A bit of everything"], ["defend", "🛡️ Defend", "Fielders on the boundary"]];
+  const fieldPreset = (mode, bowler) => {
+    const pp = S.isPP(sim);
+    if (mode === "attack") return "attack";
+    if (mode === "defend") return pp ? "pp" : "defensive";
+    return pp ? "pp" : bowler && S.isSpin(bowler) ? "spin" : "balanced";
+  };
   function pickBowlerPanel() {
-    const i = I(), opts = S.bowlerOptions(sim).sort((a, b) => b.p.bowl - a.p.bowl);
-    const cards = opts.map((o) => { const p = o.p, ft = Math.round((sim.fat[i.bowl + ":" + p.id] || 0) * 100); return `<button class="cx-btn" data-a="bowler:${p.id}" ${o.ok ? "" : "disabled"}><b>${esc(p.name)}</b><small>${S.BT_NAME[p.bt]} · bowling ${p.bowl} · acc ${p.acc} · ${o.ov} ov bowled, ${Math.max(0, o.left)} left${ft ? " · tired " + ft + "%" : ""}${p.id === i.lastBowler ? " · bowled last over" : ""}</small></button>`; }).join("");
-    const pre = Object.entries(S.FIELDS).map(([id, f]) => { const ok = S.outsideCount(f.f) <= S.maxOutside(sim); return `<button class="cx-btn${sim.fieldName === id || sel.preset === id ? " on" : ""}" data-a="preset:${id}" ${ok ? "" : "disabled"} title="${esc(f.note)}">${f.n}<small>${esc(f.note)}${ok ? "" : " (not allowed in the powerplay)"}</small></button>`; }).join("");
-    return `<h3>🧢 Over ${Math.floor(i.balls / 6) + 1}: choose your bowler</h3><div class="cx-row">${cards}</div><h3 style="margin-top:.6rem">🧤 Field: <span class="rt">${sim.fieldName === "custom" ? "custom" : esc((S.FIELDS[sim.fieldName] || {}).n || "")}</span></h3><div class="cx-row">${pre}<button class="cx-btn" data-a="editfield">✏️ Place the fielders yourself</button></div>
-      <p class="hint">${S.isPP(sim) ? "Powerplay: only 2 fielders may be outside the ring." : "No more than 5 fielders outside the ring."} Pace likes the new ball and a green pitch, spin takes over as the pitch wears.</p>${sim.cfg.timers ? timer : ""}`;
+    const i = I(), opts = S.bowlerOptions(sim).filter((o) => o.ok).sort((a, b) => b.p.bowl - a.p.bowl), best = opts[0];
+    const card = (o) => { const p = o.p, tired = Math.round((sim.fat[i.bowl + ":" + p.id] || 0) * 100); return `<button class="cx-btn" data-a="bowler:${p.id}"><b>${esc(p.name)}</b>${best && o === best ? ' <span class="chip2 ok">⭐ best</span>' : ""}<small>${S.BT_NAME[p.bt]} · rating ${p.bowl}${tired > 5 ? " · tired" : ""}</small></button>`; };
+    const modes = FIELD_MODES.map(([id, n, d]) => `<button class="cx-btn${sel.fieldMode === id ? " on" : ""}" data-a="fmode:${id}">${n}<small>${d}</small></button>`).join("");
+    return `<h3>🧢 Over ${Math.floor(i.balls / 6) + 1}: who bowls?</h3><div class="cx-row">${best ? `<button class="cx-btn go" data-a="bowler:${best.p.id}">⭐ Pick for me</button>` : ""}${opts.map(card).join("")}</div>
+      <h3 style="margin-top:.6rem">🧤 Fielders</h3><div class="cx-row">${modes}</div>${sim.cfg.timers ? timer : ""}`;
   }
   function setupPanel() {
-    const t = sim.teams[my], mine = my, rows = t.order.map((id, k) => { const p = t.players[id]; return `<div><b>${k + 1}</b><span>${esc(p.name)} <span class="rt">${p.role}${p.canBowl ? " · " + S.BT_NAME[p.bt] : ""}${p.wk ? " · keeper" : ""}</span></span><span class="rt">bat <b>${p.bat}</b> pow <b>${p.pow}</b> bowl <b>${p.bowl}</b> fld <b>${p.fld}</b></span><span><button data-a="up:${k}" ${k && !sim.ready[mine] ? "" : "disabled"}>▲</button><button data-a="down:${k}" ${k < 10 && !sim.ready[mine] ? "" : "disabled"}>▼</button></span></div>`; }).join("");
-    const opp = sim.teams[1 - my], I1 = sim.toss.choice === "bat" ? sim.toss.winner : 1 - sim.toss.winner;
-    return `<h3>📋 ${esc(t.name)}: set your batting order</h3><div class="cx-two"><div class="order">${rows}</div><div style="max-width:300px"><p class="rt"><b>${esc(sim.pitch.name)}</b>: ${esc(sim.pitch.note)}<br><b>${esc(sim.weather.name)}</b>${sim.weather.swing > 0.35 ? ": the ball will swing." : "."}<br>${esc(sim.names[I1])} bat first.<br>Opponents: <b>${esc(opp.name)}</b></p><button class="cx-btn go" data-a="ready" ${sim.ready[my] ? "disabled" : ""}>${sim.ready[my] ? "Waiting for the other side…" : "READY"}</button></div></div>`;
+    const t = sim.teams[my], opp = sim.teams[1 - my], I1 = sim.toss.choice === "bat" ? sim.toss.winner : 1 - sim.toss.winner;
+    return `<h3>📋 ${esc(t.name)} v ${esc(opp.name)}</h3><p class="hint" style="margin:0 0 .5rem"><b>${esc(sim.pitch.name)}</b>: ${esc(sim.pitch.note)} <b>${esc(sim.weather.name)}</b>${sim.weather.swing > 0.35 ? ": the ball should swing." : "."} ${esc(sim.names[I1])} bat first.</p><div class="cx-row"><button class="cx-btn go" data-a="ready" ${sim.ready[my] ? "disabled" : ""}>${sim.ready[my] ? "Waiting for the other side…" : "▶ START THE MATCH"}</button></div>`;
   }
   function renderCtl() {
     if (!sim) return;
@@ -430,16 +446,17 @@
     switch (k) {
       case "call": submit({ t: "call", v }); break; case "choose": submit({ t: "choose", v }); break; case "ready": submit({ t: "ready" }); break;
       case "up": case "down": { const o = sim.teams[my].order.slice(), x = +v, y = k === "up" ? x - 1 : x + 1; if (y < 0 || y > 10) break; [o[x], o[y]] = [o[y], o[x]]; submit({ t: "order", order: o }); break; }
-      case "bowler": { const id = +v; submit({ t: "bowler", i: id }); if (sel.preset) submit({ t: "field", preset: sel.preset }); else if (sim.fieldName !== "custom" || !S.validField(sim, sim.field)) submit({ t: "field", preset: S.aiFieldChoice ? "balanced" : "balanced" }); break; }
+      case "bowler": { const id = +v; submit({ t: "bowler", i: id }); submit({ t: "field", preset: fieldPreset(sel.fieldMode, P(I().bowl, id)) }); break; }
+      case "fmode": sel.fieldMode = v; renderCtl(); break;
+      case "intent": sel.intent = v; renderCtl(); break;
+      case "dir": sel.dir = v; renderCtl(); break;
       case "preset": sel.preset = v; if (sim.phase === "bowl") submit({ t: "field", preset: v }); else { submit({ t: "field", preset: v }); } ckey = ""; break;
       case "editfield": edit = { on: true, f: sim.field.map((p) => p.slice()), drag: -1 }; ckey = ""; break;
       case "editpreset": edit.f = S.FIELDS[v].f.map((p) => p.slice()); break;
       case "fieldok": if (S.validField(sim, edit.f)) { submit({ t: "field", f: edit.f }); sel.preset = null; edit.on = false; ckey = ""; } else setBanner("Too many outside the ring", "", "#ff6b5b"); break;
       case "fieldcancel": edit.on = false; ckey = ""; break;
-      case "kind": sel.kind = v; sel.u = S.KINDS[v].u; sel.v = S.KINDS[v].v; ckey = ""; renderCtl(); break;
-      case "bowl": if (!animBusy() && sim.phase === "bowl" && i.bowl === my) { submit({ t: "deliver", kind: sel.kind, u: +sel.u.toFixed(2), v: +sel.v.toFixed(2), eff: +sel.eff.toFixed(2) }); busyUntil = performance.now() + 400; } break;
-      case "shot": sel.shot = v; sel.ang = null; renderCtl(); break;
-      case "air": sel.air = !sel.air; renderCtl(); break; case "step": sel.step = !sel.step; renderCtl(); break;
+      case "kind": sel.kind = v; sel.u = S.KINDS[realKind(v)].u; sel.v = S.KINDS[realKind(v)].v; ckey = ""; renderCtl(); break;
+      case "bowl": if (!animBusy() && sim.phase === "bowl" && i.bowl === my) { submit({ t: "deliver", kind: realKind(sel.kind), u: +sel.u.toFixed(2), v: +sel.v.toFixed(2), eff: +sel.eff.toFixed(2) }); busyUntil = performance.now() + 400; } break;
       case "swing": swing(); break;
       case "runs": submit({ t: "runs", n: +v }); break;
       case "review": submit({ t: "review", v: v === "y" }); break;
@@ -450,10 +467,10 @@
   function swing() {
     const i = I(); if (!sim || sim.phase !== "flight" || !i || i.bat !== my || !anim || anim.swingE != null || !sim.pend || anim.del !== sim.pend.del) return;
     const e = performance.now() - anim.t0;
-    if (sel.shot === "leave") { submit({ t: "noswing" }); anim.swingE = null; return; }
+    if (sel.intent === "leave") { submit({ t: "noswing" }); anim.swingE = null; return; }
     anim.swingE = e / 1000; snd("whoosh");
-    const sh = S.SHOTS[sel.shot], ang = sel.ang == null ? sh.c : sel.ang;
-    submit({ t: "swing", type: sel.shot, ang: Math.round(ang), air: sel.air, step: sel.step, at: Math.round(e) });
+    const sg = S.suggest(sim, anim.del, sel.intent, sel.dir); // the game picks the shot that suits this ball and aims it
+    submit({ t: "swing", type: sg.type, ang: sg.ang, air: sg.air, step: false, at: Math.round(e) });
   }
 
   // ---------------- input ----------------
@@ -480,8 +497,10 @@
   addEventListener("keydown", (e) => {
     if (!sim || /input|select|textarea/i.test(e.target.tagName)) return; const i = I();
     if (e.code === "Space") { e.preventDefault(); if (sim.phase === "bowl" && i.bowl === my) doAction("bowl"); else if (sim.phase === "flight" && i.bat === my) swing(); else if (sim.phase === "break") doAction("go"); return; }
-    if (i && i.bat === my && (sim.phase === "bowl" || sim.phase === "flight") && /^[1-9]$/.test(e.key)) { const id = S.SHOT_IDS.find((s) => S.SHOTS[s].key === e.key); if (id) { sel.shot = id; sel.ang = null; renderCtl(); } return; }
-    if (e.key === "l" || e.key === "L") { sel.air = !sel.air; renderCtl(); } if (e.key === "s" || e.key === "S") { sel.step = !sel.step; renderCtl(); }
+    if (i && i.bat === my && (sim.phase === "bowl" || sim.phase === "flight")) {
+      const it = { 1: "defend", 2: "hit", 3: "big", 4: "leave" }[e.key]; if (it) { sel.intent = it; renderCtl(); return; }
+      const dr = { ArrowLeft: "leg", ArrowRight: "off", ArrowDown: "auto" }[e.key]; if (dr) { e.preventDefault(); sel.dir = dr; renderCtl(); return; }
+    }
     if (sim.phase === "runs" && i.bat === my) { if (/^[0-3]$/.test(e.key)) submit({ t: "runs", n: +e.key }); else if (e.key === "Enter") { const L = anim && anim.res && anim.res.live; submit({ t: "runs", n: L ? L.safe : 1 }); } }
     if (sim.phase === "review" && sim.pend && sim.pend.reviewer === my) { if (e.key === "r" || e.key === "R") submit({ t: "review", v: true }); if (e.key === "n" || e.key === "N") submit({ t: "review", v: false }); }
   });
@@ -538,7 +557,7 @@
   function teamsHtml() {
     return `<div class="teamstats">${[0, 1].map((t) => `<div><div class="sc-h"><span>${esc(sim.teams[t].name)}</span></div><table class="sc"><tr><th>Player</th><th>Bat</th><th>Pow</th><th>Bowl</th><th>Fld</th></tr>${sim.teams[t].players.map((p) => `<tr><td>${esc(p.name)} <span class="rt">${p.wk ? "wk" : p.canBowl ? S.BT_NAME[p.bt] : ""}</span></td><td>${p.bat}</td><td>${p.pow}</td><td>${p.canBowl ? p.bowl : "-"}</td><td>${p.fld}</td></tr>`).join("")}</table></div>`).join("")}</div>`;
   }
-  const HELP = `<div class="comm" style="max-height:none"><p class="big">Bowling</p><p>Choose a bowler each over (nobody bowls two in a row, and each has an over limit). Pick a delivery, click the pitch to aim, set your effort and bowl. Fast bowlers swing it when it is overcast and seam it on a green pitch; spinners turn it more as the pitch wears. Three bouncers in an over is a no-ball. Tired bowlers lose accuracy.</p><p class="big">Batting</p><p>Pick a shot that suits the ball (drive the full ones, cut the short wide ones, pull the short ones at your body, sweep the spinners), aim it into a gap on the little field and press Space as the ring closes. Perfect timing is power, a mistimed shot is an edge or a catch. Step out to spinners for a big hit, but miss and you are stumped.</p><p class="big">Running</p><p>After a shot you pick how many to run. Green is safe, orange risky, red is a probable run out. Better fielders and shorter throws make it harder.</p><p class="big">The rules</p><p>10 wickets, a powerplay at the start (2 fielders outside the ring), free hit after a no-ball (only run outs), wides and extras, DRS reviews on LBW and edges (one each per innings, umpire's call keeps it), and a super over if the scores are level.</p></div>`;
+  const HELP = `<div class="comm" style="max-height:none"><p class="big">🏏 Batting</p><p>1. Choose how to play: <b>Defend</b> (safe), <b>Hit</b> (the game picks the best shot for the ball) or <b>Big hit</b> (go for six). 2. Optionally pick a side to aim at. 3. Press <b>Space</b> just as the ring closes on the bat. Good timing means a good shot, bad timing means a miss, an edge or a catch. You run automatically.</p><p class="big">🎯 Bowling</p><p>Pick who bowls each over (the star is the best choice), pick how the fielders stand, then choose a delivery and press <b>Bowl</b>. Yorkers and bouncers are tricky to hit. Click the pitch if you want to aim the ball yourself. Bowlers get tired.</p><p class="big">📖 The rules</p><p>Ten wickets, a few overs each. The team with the most runs wins, and a tie goes to a super over. The first few overs are a powerplay with fewer fielders on the boundary. A no-ball gives a free hit.</p></div>`;
   function setTab(t) { sel.tab = t; document.querySelectorAll("#tabs [data-t]").forEach((b) => b.classList.toggle("on", b.dataset.t === t)); renderTab(); }
   function renderTab() {
     const el = $("tabBody"); if (!sim) { el.innerHTML = ""; return; }
