@@ -211,3 +211,5 @@ canvas { display: block; width: 100vw; height: 100vh; }
 .look__name { max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .look__btns { display: flex; gap: 3px; flex-wrap: wrap; justify-content: center; } .look__btns button { font: 700 11px "Nunito", sans-serif; border: 0; border-radius: 6px; padding: 2px 6px; background: #7a4a1f; color: #fff3e0; cursor: pointer; } .look__btns button:hover { background: #a1631f; }
 .look--add { cursor: pointer; align-content: center; text-align: center; border-style: dashed; min-height: 150px; opacity: .85; } .look--add:hover { opacity: 1; border-color: #ff8c2a; } .look--add span { font-size: 26px; }
+
+#sd .sd__hp { margin-top: 6px; display: grid; gap: 3px; } #sd .sd__bar { height: 10px; border-radius: 6px; background: rgba(0, 0, 0, .55); overflow: hidden; } #sd .sd__bar i { display: block; height: 100%; border-radius: 6px; transition: width .2s; } #sd .sd__hp small { opacity: .8; font-size: 11px; }

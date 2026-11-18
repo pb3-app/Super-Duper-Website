@@ -64,6 +64,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
       case "arena_event":
         if (m.type === "bonk") {
           effects.push({ x: m.x, y: m.y, life: 0.7, text: "TUNG!" }); feed(`${m.from} bonked ${m.to}`);
+          if (m.dmg) { effects.push({ x: m.x, y: m.y - 34, life: 0.9, text: m.ko ? "KO!" : "-" + m.dmg, color: m.ko ? "#ff3b2f" : "#ff6b5b" }); if (m.ko) feed(`${m.from} knocked out ${m.to}!`); }
           const me = rendered().find((p) => p.id === myId), d = me ? Math.hypot(me.x - m.x, me.y - m.y) : 0; // quieter the further away it is
           if (d < 1400) bonkSound(1 - d / 1500);
         }
@@ -386,7 +387,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     // the signs
     ctx.fillStyle = "#ff8c2a"; ctx.font = "58px Bungee, sans-serif"; ctx.textAlign = "center"; ctx.lineWidth = 8; ctx.strokeStyle = "#1a0f07"; ctx.lineJoin = "round";
     ctx.strokeText("TUNG SHOWDOWN", cx, cy - abyss - 42); ctx.fillText("TUNG SHOWDOWN", cx, cy - abyss - 42);
-    ctx.font = "700 20px Nunito, sans-serif"; ctx.fillStyle = "#ffe9b8"; ctx.fillText("bonk tungs off the platform for a streak · falling or leaving loses it", cx, cy - abyss - 12);
+    ctx.font = "700 20px Nunito, sans-serif"; ctx.fillStyle = "#ffe9b8"; ctx.fillText("bonk tungs off the platform or drain their health for a streak · falling, losing all your health or leaving ends it", cx, cy - abyss - 12);
     ctx.fillStyle = "rgba(26, 15, 7, 0.78)"; rr(cx - 150, by1 + 18, 300, 40, 12); ctx.fill();
     ctx.fillStyle = "#ffcf99"; ctx.font = "26px Bungee, sans-serif"; ctx.fillText("▲ SHOWDOWN BRIDGE", cx, by1 + 47);
   }
@@ -488,6 +489,11 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
       return;
     }
     ctx.save(); ctx.translate(p.x, p.y); drawTung(p); ctx.restore();
+    if (p.hp >= 0 && showdown) { // Showdown health: a bar under the feet
+      const mx = showdown.hp || 100, f = Math.max(0, Math.min(1, p.hp / mx)), w = 64, h = 9, x = p.x - w / 2, y = p.y + r * 1.55;
+      ctx.fillStyle = "rgba(0,0,0,.65)"; rr(x - 2, y - 2, w + 4, h + 4, 6); ctx.fill();
+      ctx.fillStyle = f > 0.55 ? "#4cd964" : f > 0.25 ? "#ffcc33" : "#ff4d3d"; if (f > 0) { rr(x, y, w * f, h, 4); ctx.fill(); }
+    }
     if (p.k > 0) { ctx.fillStyle = "#ff8c2a"; ctx.font = "bold 16px Nunito, sans-serif"; ctx.textAlign = "center"; ctx.fillText("🔥 " + p.k, p.x, p.y - r * 2.1 - (gearIds(p).hat ? 22 : 0) - 20); }
     ctx.fillStyle = isMe ? "#ffcf99" : "#fff3e0"; ctx.font = "bold 15px Nunito, sans-serif"; ctx.textAlign = "center";
     ctx.fillText(p.n, p.x, p.y - r * 2.1 - (gearIds(p).hat ? 22 : 0));
@@ -539,8 +545,9 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     if (me && me.z) {
       const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
       const list = (rows) => rows.length ? `<ol>${rows.map(([n, v], i) => `<li><span class="n">${i + 1}</span><span class="who">${esc(n)}</span><b>${v}</b></li>`).join("")}</ol>` : `<div class="none">nobody yet</div>`;
+      const hpPct = Math.max(0, Math.min(100, (me.hp < 0 ? 100 : me.hp) / ((showdown && showdown.hp) || 100) * 100));
       const k = me.k || 0, next = (Math.floor(k / 10) + 1) * 10, coins = Math.min(16, 2 ** (next / 10 - 1));
-      const html = `<h2>⚔️ Tung Showdown</h2><div class="sd__me">Your streak <b>${k}</b><small>${next} knock-offs: +${coins} tung ${coins === 1 ? "buck" : "bucks"}</small></div><h3>Streaks right now</h3>${list(sdBoard.cur)}<h3>Best ever</h3>${list(sdBoard.all)}`;
+      const html = `<h2>⚔️ Tung Showdown</h2><div class="sd__me">Your streak <b>${k}</b><small>${next} knock-offs: +${coins} tung ${coins === 1 ? "buck" : "bucks"}</small></div><div class="sd__hp"><div class="sd__bar"><i style="width:${hpPct}%;background:${hpPct > 55 ? "#4cd964" : hpPct > 25 ? "#ffcc33" : "#ff4d3d"}"></i></div><small>❤️ Health ${me.hp < 0 ? 100 : me.hp} · every bat hits for ${(showdown && showdown.dmg) || 20}, so ${Math.ceil(100 / ((showdown && showdown.dmg) || 20))} bonks put someone down</small></div><h3>Streaks right now</h3>${list(sdBoard.cur)}<h3>Best ever</h3>${list(sdBoard.all)}`;
       if (html !== sdBox._html) { sdBox.innerHTML = html; sdBox._html = html; }
       sdBox.hidden = false;
     } else sdBox.hidden = true;
@@ -582,7 +589,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     for (const p of players) drawPlayer(p, p.id === myId);
     for (const l of logs) drawCountdown(l);
     for (const fx of effects) {
-      fx.life -= dt; ctx.globalAlpha = Math.max(0, fx.life / 0.7); ctx.fillStyle = "#ff8c2a";
+      fx.life -= dt; ctx.globalAlpha = Math.max(0, Math.min(1, fx.life / 0.7)); ctx.fillStyle = fx.color || "#ff8c2a";
       ctx.font = "28px Bungee, sans-serif"; ctx.textAlign = "center"; ctx.fillText(fx.text, fx.x, fx.y - 50 - (0.7 - fx.life) * 60); ctx.globalAlpha = 1;
     }
     for (let i = effects.length - 1; i >= 0; i--) if (effects[i].life <= 0) effects.splice(i, 1);

@@ -2344,6 +2344,9 @@ const sdPitAt = (x, y) => Math.hypot(x - SD.cx, y - SD.cy) <= SD.abyss;
 const sdZoneAt = (x, y) => sdPitAt(x, y) || sdBridgeAt(x, y);
 const sdOnBridge = (p) => sdBridgeAt(p.x, p.y);
 const sdInPit = (p) => sdPitAt(p.x, p.y);
+// Health in the Showdown: everybody starts with the same, and every bat takes the same bite whatever it looks like (the bat in the shop is only for show).
+const SD_HP = 100, SD_DAMAGE = 20;
+SD.hp = SD_HP; SD.dmg = SD_DAMAGE; // the page shows these
 const SD_COIN_CAP = 16; // tung coins per 10-streak step: 1, 2, 4, 8, 16, then 16 each
 let sdDirty = true, sdSentAt = 0;
 function sdBoard() {
@@ -2393,7 +2396,7 @@ function arenaJoin(ws) {
     const sp = arenaSpawn(), u = db.users[ws.key];
     p = { key: ws.key, name: u.username, color: AR_COLORS[[...ws.key].reduce((a, c) => a + c.charCodeAt(0), 0) % AR_COLORS.length],
       x: sp.x, y: sp.y, vx: 0, vy: 0, facing: 0, input: { up: false, down: false, left: false, right: false, aim: 0 },
-      cooldown: 0, swing: 0, stunned: 0, score: 0, q: gearOf(u), boost: bonkBoost(u.bonks), streak: 0, z: false, fall: 0, lastHit: null, ws };
+      cooldown: 0, swing: 0, stunned: 0, score: 0, q: gearOf(u), boost: bonkBoost(u.bonks), streak: 0, z: false, hp: SD_HP, fall: 0, lastHit: null, ws };
     arenaPlayers.set(ws.key, p);
     arenaBroadcast({ t: 'arena_event', type: 'join', name: p.name });
   }
@@ -2456,7 +2459,12 @@ function onArena(ws, msg) {
         if (diff > Math.PI) diff = Math.PI * 2 - diff;
         if (diff > Math.PI / 2) continue;
         o.vx += (dx / (d || 1)) * AR.knock; o.vy += (dy / (d || 1)) * AR.knock; o.stunned = 0.35; p.score++; landed++; o.lastHit = { key: p.key, at: Date.now() };
-        arenaBroadcast({ t: 'arena_event', type: 'bonk', from: p.name, to: o.name, x: Math.round(o.x), y: Math.round(o.y) });
+        let dmg = 0, ko = false;
+        if (p.z && o.z) { // in the Showdown a bonk hurts, and the same for every bat; at zero health you go down the pit and the hitter gets the knock-off
+          dmg = SD_DAMAGE; o.hp = Math.max(0, (o.hp == null ? SD_HP : o.hp) - dmg);
+          if (o.hp <= 0) { ko = true; sdFall(o); }
+        }
+        arenaBroadcast({ t: 'arena_event', type: 'bonk', from: p.name, to: o.name, x: Math.round(o.x), y: Math.round(o.y), dmg, hp: o.z ? Math.round(o.hp) : -1, ko });
       }
       if (landed) { // every landed bonk counts towards your lifetime total, which sets your speed
         const u = db.users[p.key];
@@ -2509,7 +2517,7 @@ function arenaStep() {
     const inZone = sdInPit(p) || sdOnBridge(p);
     if (inZone && !sdOnPlatform(p) && !sdOnBridge(p)) { sdFall(p); p.z = true; continue; }
     if (p.z && !inZone) sdEndStreak(p);
-    if (p.z !== inZone) { p.z = inZone; sdDirty = true; }
+    if (p.z !== inZone) { p.z = inZone; sdDirty = true; if (inZone) p.hp = SD_HP; } // everybody walks in on full health
   }
   // the logs: who stands on which, and when the 10 seconds are up
   const gone = [];
@@ -2528,7 +2536,7 @@ function arenaStep() {
   if (arenaTickNo % 3 === 2) return; // snapshots go out at 20 per second
   const players = [...arenaPlayers.values()].map((p) => ({
     id: p.key, n: p.name, c: p.color, x: Math.round(p.x), y: Math.round(p.y),
-    f: Math.round(p.facing * 100) / 100, s: p.swing > 0 ? 1 : 0, st: p.stunned > 0 ? 1 : 0, sc: p.score, q: p.q, z: p.z ? 1 : 0, k: p.streak, fl: p.fall > 0 ? Math.round(p.fall * 100) / 100 : 0,
+    f: Math.round(p.facing * 100) / 100, s: p.swing > 0 ? 1 : 0, st: p.stunned > 0 ? 1 : 0, sc: p.score, q: p.q, z: p.z ? 1 : 0, hp: p.z ? Math.max(0, Math.round(p.hp == null ? SD_HP : p.hp)) : -1, k: p.streak, fl: p.fall > 0 ? Math.round(p.fall * 100) / 100 : 0,
   }));
   const logsOn = arenaLogs.filter((l) => l.order.length).map((l) => [l.id, l.order.length, l.since === null ? -1 : Math.max(0, Math.ceil(AR.hold - (now - l.since) / 1000))]);
   arenaBroadcast({ t: 'arena_state', ts: now, players, logs: logsOn });
