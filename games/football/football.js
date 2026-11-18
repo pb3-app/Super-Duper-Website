@@ -127,9 +127,10 @@
     if (myTeam === v.off && c.ho) id = c.r; else if (myTeam !== v.off && c.hd && c.d != null) id = c.d;
     if (id == null) return;
     const p = v.pl[id], X = sx(p[0]), Y = sy(p[1]) + 1, rx = c.R * PXX, ry = c.R * PXY, open = c.tl <= OPEN_FROM && c.tl >= OPEN_TO;
+    const mine = myTeam === v.off ? c.in : c.ind; // is the player you are steering inside the ring? (the defender's own ring, not the receiver's)
     // where the ball is coming down, and the ring around the player
     const lx = sx(c.lx), ly = sy(c.ly); ctx.strokeStyle = "rgba(255,255,255,.8)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(lx - 3, ly - 1); ctx.lineTo(lx + 3, ly + 2); ctx.moveTo(lx + 3, ly - 1); ctx.lineTo(lx - 3, ly + 2); ctx.stroke();
-    ctx.save(); ctx.globalAlpha = 0.9; ctx.strokeStyle = c.in ? (open ? "#3be86b" : "#d8ffd8") : "#ff6b5e"; ctx.lineWidth = c.in ? 2 : 1; ctx.beginPath(); ctx.ellipse(X, Y, rx, ry, 0, 0, 7); ctx.stroke(); ctx.restore();
+    ctx.save(); ctx.globalAlpha = 0.9; ctx.strokeStyle = mine ? (open ? "#3be86b" : "#d8ffd8") : "#ff6b5e"; ctx.lineWidth = mine ? 2 : 1; ctx.beginPath(); ctx.ellipse(X, Y, rx, ry, 0, 0, 7); ctx.stroke(); ctx.restore();
     if (myTeam !== v.off && c.g != null) { // the defender covering the receiver is the one who can pick it off: E puts you on him
       const gp = v.pl[c.g], GX = sx(gp[0]), GY = sy(gp[1]) - 16;
       ctx.fillStyle = "#ffd23f"; ctx.beginPath(); ctx.moveTo(GX - 4, GY - 5); ctx.lineTo(GX + 4, GY - 5); ctx.lineTo(GX, GY); ctx.closePath(); ctx.fill();
@@ -139,14 +140,17 @@
     const B = barGeo();
     drawBarBase(B);
     const mk = Math.max(B.bx, Math.min(B.bx + B.bw, B.at(c.tl)));                                         // the marker
-    ctx.fillStyle = c.in ? "#ffffff" : "#ff9a8a"; ctx.fillRect(Math.round(mk) - 1, B.by - 4, 3, B.bh + 8); ctx.fillRect(Math.round(mk) - 3, B.by - 6, 7, 3);
+    ctx.fillStyle = mine ? "#ffffff" : "#ff9a8a"; ctx.fillRect(Math.round(mk) - 1, B.by - 4, 3, B.bh + 8); ctx.fillRect(Math.round(mk) - 3, B.by - 6, 7, 3);
     drawClickTicks(B, c.co, c.cd); // where the offence and the defence have clicked on the bar: both players can see the other one's click
     const bx = B.bx, by = B.by, bh = B.bh;
     if (v.zone) { // how many are in the catch zone: more players than the other side = a better click for them
       const [no, nd] = v.zone, lead = no > nd ? "OFFENCE +" + Math.min(60, 10 + 20 * (no - nd)) + "% " : nd > no ? "DEFENCE +" + Math.min(60, 20 * (nd - no)) + "% " : "OFFENCE +10% ";
       text(`ZONE: OFF ${no} v DEF ${nd}  (${lead.trim()})`, bx - 3, by - 24, "#cfe8cf", 5, "left");
     }
-    const msg = !c.in ? (c.tl < 0.4 ? (myTeam === v.off ? "OUT OF RANGE" : "GET INTO THE RING") : "") : open ? "CLICK!" : "";
+    // what the bar says to you right now: before the window opens nothing, then CLICK! (or OUT OF THE ZONE if you are not in the ring), and TOO LATE once it has shut
+    const msg = c.tl > OPEN_FROM ? "" : c.tl < OPEN_TO ? "TOO LATE!" : !mine ? "OUT OF ZONE!" : "CLICK!";
+    const bad = c.tl < OPEN_TO || (!mine && c.tl <= OPEN_FROM);
+    if (msg) text(msg, IW / 2, by - 10, bad ? "#ff6b5e" : "#ffd23f", 7, "center");
     if (msg) text(msg, IW / 2, by - 10, !c.in ? "#ff6b5e" : "#ffd23f", 7, "center");
   }
   function drawLabels(v) {
