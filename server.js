@@ -2357,6 +2357,7 @@ function sdBoard() {
 function sdEndStreak(p) { if (p.streak) { p.streak = 0; sdDirty = true; } }
 function sdAddStreak(a) {
   a.streak++; sdDirty = true;
+  a.hp = SD_HP; wsSend(a.ws, { t: 'arena_event', type: 'heal' }); // knocking somebody off refills your health
   const u = db.users[a.key]; if (!u) return;
   u.showdown = u.showdown || { best: 0 };
   if (a.streak > u.showdown.best) { u.showdown.best = a.streak; saveDb(); }

@@ -68,6 +68,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
           const me = rendered().find((p) => p.id === myId), d = me ? Math.hypot(me.x - m.x, me.y - m.y) : 0; // quieter the further away it is
           if (d < 1400) bonkSound(1 - d / 1500);
         }
+        else if (m.type === "heal") { const me = rendered().find((p) => p.id === myId); if (me) effects.push({ x: me.x, y: me.y - 20, life: 0.9, text: "❤️ FULL HEALTH", color: "#4cd964" }); }
         else if (m.type === "coins") { feed(`+${m.n} tung ${m.n === 1 ? "buck" : "bucks"} for a ${m.streak} streak!`); loadShop(); }
         else if (m.type === "streak") feed(`${m.name} is on a ${m.streak} streak in the Showdown`);
         else if (m.type === "chatslow") feed("Slow down a little: too many chat messages")
