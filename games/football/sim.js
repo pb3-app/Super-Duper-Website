@@ -497,15 +497,37 @@
   }
 
   // ---------------- defence ----------------
+  // Chase somebody the smart way: not at where he is, but at where he will be when we get there (a few passes of the estimate),
+  // so a defender coming from the side takes the angle and cuts him off instead of trailing him.
+  function pursue(g, d, c, dt, mul) {
+    const sp = Math.max(1, SPD[d.role] * d.sp * (mul == null ? 1 : mul) * (d.pm || 1));
+    let tx = c.x, ty = c.y;
+    for (let k = 0; k < 3; k++) { const t = Math.min(1.6, Math.hypot(tx - d.x, ty - d.y) / sp); tx = c.x + c.vx * t * 0.95; ty = c.y + c.vy * t * 0.95; }
+    mv(d, clamp(tx, 1, L - 1), clamp(ty, 0.5, W - 0.5), dt, mul);
+  }
+  // On a run the defence reads it and flows to the hole: the line fires through the gap, linebackers and safeties fill it, corners keep the edge.
+  function runRead(g, d, P, dt, dir) {
+    const gy = CY + (P.gap ? P.gap.side * P.gap.w : 0), role = d.role, los = g.los;
+    if (d.mode === 'rush' || role === 'DL') { mv(d, los + dir * 0.5, d.y + clamp(gy - d.y, -3.2, 3.2), dt, 0.93); return; }
+    if (role === 'LB') { mv(d, los + dir * 2.6, d.y + clamp(gy - d.y, -5, 5), dt, 1); return; }
+    if (role === 'S') { mv(d, los + dir * 6.5, d.y + clamp(gy - d.y, -6, 6), dt, 0.95); return; }
+    // corners: stay outside the play and set the edge
+    const out = d.y < gy ? -1 : 1; mv(d, los + dir * 4.5, clamp(Math.min(Math.max(gy + out * 8, 2), W - 2), 2, W - 2) * 0.5 + d.y * 0.5, dt, 0.9);
+  }
   function defAI(g, d, dt, P, O, D, dir) {
-    if (d.mode === 'chase') { const c = carrierOf(g); if (c) mv(d, c.x + c.vx * 0.3, c.y + c.vy * 0.3, dt, 1); return; }
+    if (d.mode === 'chase') { const c = carrierOf(g); if (c) pursue(g, d, c, dt, 1); return; }
     if (d.mode === 'block') { chaseBlock2(g, d, dt); return; }
     if (d.mode === 'runner2') { const D2 = g.players.filter((p) => p.team !== d.team); carrierAI(g, d, dt, D2, d.team === 0 ? 1 : -1); return; }
     if (d.eng >= 0) return; // being blocked: blocking() moves him
     const c = carrierOf(g), b = g.ball;
     const runnerOut = c && (P.handed || P.caught || P.scrambling) && P.carrier !== P.qb;
     const qb = g.players[P.qb];
-    if (runnerOut || (P.scrambling && c)) { mv(d, c.x + c.vx * 0.3, c.y + c.vy * 0.3, dt, d.role === 'DL' || d.role === 'LB' ? 0.97 : 1); return; }
+    if (runnerOut || (P.scrambling && c)) { pursue(g, d, c, dt, d.role === 'DL' || d.role === 'LB' ? 0.97 : 1); return; }
+    // reading the run before the handoff: the better the computer, the quicker it sees it (and a run-stop call is already looking for it)
+    if (P.kind === 'run' && !P.handed && P.play !== 'draw' && !P.thrown) {
+      const readT = ({ easy: 0.6, medium: 0.32, hard: 0.16 }[g.level] || 0.32) * (P.defPlay === 'runstop' || P.defPlay === 'goalline' ? 0.5 : 1);
+      if (P.t > readT) { runRead(g, d, P, dt, dir); return; }
+    }
     if (P.thrown && b.state === 'air') {
       // chase the ball down when it is near my area
       const near = Math.hypot(d.x - b.tx, d.y - b.ty);
@@ -519,10 +541,10 @@
     if (d.mode === 'rush') {
       const drawFake = P.play === 'draw' && !P.handed; // the draw looks like a pass, so the rush comes straight in
       if (P.kind === 'run' && !drawFake && !P.handed) { mv(d, g.los - dir * 1.5, qb.y + (d.y - qb.y) * 0.4, dt, 0.9); return; }
-      if (P.kind === 'run' && !drawFake) { const cc = carrierOf(g); if (cc && P.t > 0.75) mv(d, cc.x + cc.vx * 0.3, cc.y + cc.vy * 0.3, dt, 0.97); else mv(d, d.x, d.y, dt, 0); return; }
-      const t = c || qb; mv(d, t.x + t.vx * 0.2, t.y + t.vy * 0.2, dt, d.free ? 1 : 0.9); return;
+      if (P.kind === 'run' && !drawFake) { const cc = carrierOf(g); if (cc) pursue(g, d, cc, dt, 0.97); else mv(d, d.x, d.y, dt, 0); return; }
+      const t = c || qb; pursue(g, d, t, dt, d.free ? 1 : 0.9); return;
     }
-    if (d.mode === 'man' && d.assign >= 0) { const r = g.players[d.assign]; mv(d, r.x + dir * 1.2 + r.vx * 0.15, r.y + r.vy * 0.15, dt, 1); return; }
+    if (d.mode === 'man' && d.assign >= 0) { const r = g.players[d.assign]; mv(d, r.x + dir * 1.2 + r.vx * 0.3, r.y + r.vy * 0.3, dt, 1); return; } // anticipate the break: stay a step ahead of where he is going
     if (d.mode === 'zone' && d.zone) {
       // hold the spot, slide toward the ball side, pick up whoever comes into it
       let tx = d.zone.x, ty = d.zone.y + (b.y - d.zone.y) * 0.18;
@@ -548,6 +570,7 @@
       if (d.mode !== 'rush' && !(d.role === 'LB' && P.kind === 'run')) { d.eng = -1; continue; }
       if (d.eng >= 0) {
         const b = g.players[d.eng]; d.engT -= dt;
+        const cr = carrierOf(g); if (cr && P.kind === 'run' && P.handed && dist(d, cr) < 2.8 && d.engT > 0.25) d.engT = 0.25; // the carrier is right there: shed the block and make the play
         if (d.engT <= 0 || P.thrown && false) { d.eng = -1; d.free = true; if (b) b.eng = -1; }
         else { d.vx *= 0.2; d.vy *= 0.2; if (b) { b.vx = d.vx; b.vy = d.vy; b.x += (d.x - dir * 0.9 - b.x) * Math.min(1, dt * 6); b.y += (d.y - b.y) * Math.min(1, dt * 6); } }
         continue;
@@ -558,7 +581,7 @@
         d.eng = ol.id; ol.eng = d.id;
         // a person on offence has a harder time when the line is beaten: the engage time shrinks with the level
         const lv = { easy: 1.25, medium: 1, hard: 0.8 }[g.level] || 1;
-        d.engT = (P.kind === 'pass' ? 1.9 + g.rng() * 2.6 : 1.3 + g.rng() * 1.9) * (g.human[1 - d.team] ? 1 : 1) * (g.human[d.team] ? 1 : lv);
+        d.engT = (P.kind === 'pass' ? 1.9 + g.rng() * 2.6 : 1.0 + g.rng() * 1.5) * (g.human[1 - d.team] ? 1 : 1) * (g.human[d.team] ? 1 : lv);
       }
     }
   }
