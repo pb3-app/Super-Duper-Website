@@ -286,8 +286,11 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   });
   canvas.addEventListener("pointerdown", (e) => {
     mouse.x = e.clientX; mouse.y = e.clientY;
-    if (e.pointerType === "touch") touchTarget = { x: e.clientX, y: e.clientY }; // touch: the tung walks towards your finger
-    else bonk();
+    if (e.pointerType === "touch") {
+      touchTarget = { x: e.clientX, y: e.clientY }; // touch: the tung walks towards your finger
+      const me = rendered().find((p) => p.id === myId); // ...and tapping your own tung swings the bat
+      if (me && Math.hypot(e.clientX - (me.x - camera.x), e.clientY - (me.y - camera.y)) <= radius * 1.5) bonk();
+    } else bonk(); // mouse: a click anywhere swings (so a click on your tung does too)
   });
   const stopTouch = () => { touchTarget = null; for (const k of ["up", "down", "left", "right"]) input[k] = false; sendInput(); };
   canvas.addEventListener("pointerup", (e) => { if (e.pointerType === "touch") stopTouch(); });
