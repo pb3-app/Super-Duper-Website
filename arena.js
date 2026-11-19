@@ -43,7 +43,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   // ---------- messages from the server ----------
   function onMsg(m) {
     switch (m.t) {
-      case "arena_boink": boinkOn = true; break;
+      case "arena_boink": boinkOn = true; { const h = document.querySelector("#hud h1"); h.classList.remove("tap", "tap2", "flash"); void h.offsetWidth; h.classList.add("flash"); bonkSound(1); } break;
       case "arena_welcome":
         boinkOn = !!m.boink; myId = m.you; arena = m.arena; radius = m.radius; holdSecs = m.hold; logs = m.logs; safe = m.safe; showdown = m.showdown; sdBoard = m.board || sdBoard; wheel = m.wheel ? { ...m.wheel } : null; wheelSpin = null; if (chatLog.childElementCount === 0) for (const c of m.chat || []) addChat(c, false); me$ = { bonks: m.bonks || 0, pct: Math.round(Math.min(1, Math.floor((m.bonks || 0) / 10) / 10) * 100) }; joined = true;
         $("gate").hidden = true; $("scores").hidden = false;
@@ -301,7 +301,14 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   function bonk() { if (joined) T.send({ t: "arena_bonk" }); }
   // a bonk to the top right of your tung, for the one account that has it and anybody who found the logo secret (the server checks too)
   let boinkOn = false;
-  document.querySelector("#hud h1").addEventListener("click", () => { if (!boinkOn && joined) T.send({ t: "arena_logo" }); });
+  const logo = document.querySelector("#hud h1"); let logoFlip = false;
+  logo.setAttribute("role", "button"); logo.tabIndex = 0;
+  const logoClick = () => {
+    logo.classList.remove("tap", "tap2"); void logo.offsetWidth; logo.classList.add((logoFlip = !logoFlip) ? "tap" : "tap2"); // every click gives a little wobble
+    if (!boinkOn && joined) T.send({ t: "arena_logo" });
+  };
+  logo.addEventListener("click", logoClick);
+  logo.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); logoClick(); } });
   let boinkBtn = null;
   setInterval(() => {
     if (joined && boinkOn && !boinkBtn) { // the button only exists once it has been earned
