@@ -27,6 +27,15 @@
     .dg-panel.putting .bag, .dg-panel.putting .ctlrow > label, .dg-panel.putting #aimBtn { opacity: .3; pointer-events: none; }
     .throw { font-size: 1.15rem; font-weight: 900; padding: .6rem 1.6rem; } .flightinfo { font-size: .88rem; opacity: .92; margin-top: .4rem; min-height: 1.2em; }
     table.card { border-collapse: collapse; margin: .8rem auto 0; font-weight: 700; font-size: .85rem; max-width: 100%; } table.card th, table.card td { border: 1px solid rgba(255,255,255,.14); padding: .2rem .45rem; min-width: 2.1rem; text-align: center; } table.card th { background: rgba(0,0,0,.35); } table.card td.cur { background: rgba(255,201,51,.18); } table.card td.under { color: #7df08f; } table.card td.over { color: #ff9a8a; }
+    .dg-score { position: absolute; inset: 0; display: grid; place-items: center; padding: 8px; background: rgba(8, 16, 10, .45); border-radius: 18px; overflow: auto; }
+    .dg-score[hidden], #scoreTab[hidden] { display: none; }
+    .dg-score .box { background: rgba(24, 14, 7, .95); border: 3px solid #5a3517; border-radius: 16px; padding: .7rem .9rem; max-width: 100%; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+    .dg-score h2 { margin: 0; color: var(--accent); font-size: 1.25rem; } .dg-score .sub { font-weight: 700; margin: .2rem 0 .3rem; } .dg-score .sub i { text-transform: capitalize; opacity: .85; font-style: normal; }
+    .dg-score .stand { display: flex; flex-wrap: wrap; gap: .2rem 1rem; justify-content: center; font-weight: 800; font-size: .9rem; }
+    .dg-score table.card { font-size: .74rem; margin: .5rem auto; } .dg-score table.card th, .dg-score table.card td { padding: .12rem .3rem; min-width: 1.5rem; }
+    .dg-score .next { display: flex; flex-wrap: wrap; gap: .5rem 1rem; justify-content: center; align-items: center; font-weight: 700; } .dg-score .btn { font-size: 1rem; padding: .5rem 1.2rem; }
+    #scoreTab { position: absolute; right: 16px; bottom: 16px; }
+    table.card th.who { text-align: left; white-space: nowrap; } table.card tr.me th.who { text-decoration: underline; } table.card tr.gap td { border: 0; padding: .15rem; }
     .oppline { margin-top: .4rem; font-weight: 700; opacity: .9; min-height: 1.3rem; text-align: center; }
     kbd { background: #fff3e0; color: #2b1a0e; border-radius: 5px; padding: 1px 7px; font-weight: 800; font-size: 13px; }
   </style>
@@ -51,12 +60,12 @@
         <h2>Pick a course</h2>
         <div class="courses" id="courses"></div>
         <div class="btn-row"><button class="btn" id="startBtn" style="font-size:1.15rem;padding:.7rem 1.8rem">🥏 Tee off</button></div>
-        <p class="np-hint">18 holes, played in 3D. You throw Triple T ID cards instead of discs: a soft putter card, midranges, drivers, a card that turns over and a card that always hooks. Every card has flight numbers (speed, glide, turn, fade) like a real disc, and you have to time your power and your release. Fewest throws wins. Water and out of bounds cost a throw. Your best total on each course goes on the solo leaderboard (log in to appear on it).</p>
+        <p class="np-hint">18 holes, played in 3D. You throw Triple T ID cards instead of discs: a soft putter card, midranges, drivers, a card that turns over and a card that always hooks. Every card has flight numbers (speed, glide, turn, fade) like a real disc, and you have to time your power and your release. Fewest throws wins. Water and out of bounds cost a throw. Play a friend head to head or open a room for 3 to 4 players: everyone plays each hole at the same time, you see everybody else's cards fly and land (with name tags), and a scorecard shows between the holes. Your best total on each course goes on the solo leaderboard (log in to appear on it).</p>
       </div>
       <div id="mpPanel" hidden></div>
       <div id="play" hidden>
         <div class="hud"><span class="chip" id="chipHole">Hole 1 / 18</span><span class="chip">Par <b id="parEl">3</b></span><span class="chip">Throws <b id="strokeEl">0</b></span><span class="chip" id="chipDist">To basket <b id="distEl">0</b> m</span><span class="chip" id="chipTotal">Total <b id="totEl">0</b></span><button class="btn secondary" id="quitBtn">☰ Menu (Esc)</button></div>
-        <div class="playwrap"><canvas id="view" width="960" height="540"></canvas><button class="btn throw" id="throwFloat">🥏 THROW <kbd>Space</kbd></button><div id="result" class="np-result" hidden></div></div>
+        <div class="playwrap"><canvas id="view" width="960" height="540"></canvas><button class="btn throw" id="throwFloat">🥏 THROW <kbd>Space</kbd></button><div id="score" class="dg-score" hidden></div><button class="btn secondary" id="scoreTab" hidden>📋 Scorecard</button><div id="result" class="np-result" hidden></div></div>
         <div class="dg-panel" id="panel">
           <div class="bag" id="bag"></div>
           <div class="ctlrow">

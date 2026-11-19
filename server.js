@@ -144,7 +144,7 @@ const GAMES = {
     vote: ['level'],
   },
   discgolf: {
-    title: 'Tung Disc Golf', icon: '🥏', progressLabel: 'Throws', judge: 'low', realtime: true,
+    title: 'Tung Disc Golf', icon: '🥏', progressLabel: 'Throws', judge: 'low', realtime: true, groomMax: 4, capMs: 50 * 60 * 1000, // a full 18 holes takes a while
     options: { level: { label: 'Course', values: DG_COURSES, default: 'pines' } },
     vote: ['level'],
   },
@@ -1257,7 +1257,7 @@ function startCountdown(m) {
   m.startTimer = setTimeout(() => {
     if (m.state !== 'countdown') return;
     m.state = 'running';
-    m.capTimer = setTimeout(() => capMatch(m), MATCH_CAP_MS);
+    m.capTimer = setTimeout(() => capMatch(m), GAMES[m.game].capMs || MATCH_CAP_MS);
     if (m.game === 'sprouts') { sendSprouts(m); setTurnTimer(m); }
     if (m.game === 'pool') { sendPool(m); setTurnTimer(m); }
     if (m.tb) { tbSend(m, null, null); setTurnTimer(m); }
@@ -2309,7 +2309,7 @@ const bonkBoost = (bonks) => Math.min(1, Math.floor((bonks || 0) / 10) / 10);
 const AR_COLORS = ['#c8874a', '#a86b35', '#d9a066', '#8b5a2b', '#e0b07a', '#b5793f'];
 const arenaPlayers = new Map(); // key -> player
 let arenaTimer = null, arenaTickNo = 0;
-const ARENA_GROUP = ['bomber', 'sumo', 'lava', 'dizzy', 'pictionary', 'tungup', 'imposter', 'uno', 'phase10']; // games with open rooms for more than 2 players
+const ARENA_GROUP = ['bomber', 'sumo', 'lava', 'dizzy', 'pictionary', 'tungup', 'imposter', 'uno', 'phase10', 'discgolf']; // games with open rooms for more than 2 players
 const arenaRoomMax = (g) => (g === 'uno' || g === 'phase10' ? CR_MAX : g === 'pictionary' ? PIC_MAX : g === 'tungup' ? TU_MAX : g === 'imposter' ? Imposter.MAX_PLAYERS : GAMES[g].groomMax);
 const arenaRoomMin = (g) => (g === 'imposter' ? Imposter.MIN_PLAYERS : 3);
 const arenaGameMeta = (g) => ({ title: GAMES[g].title, icon: GAMES[g].icon });

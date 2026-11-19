@@ -29,7 +29,10 @@
   let courseId = (() => { try { return localStorage.getItem("tungDGCourse") || "pines"; } catch (_) { return "pines"; } })();
   if (!DG.COURSES[courseId]) courseId = "pines";
   let course = DG.course(courseId), np = null, mode = "idle"; // idle | solo | match
-  let holeIdx = 0, hole = null, lie = { x: 0, z: 0 }, prevLie = lie, strokes = 0, results = [], phase = "idle", finished = false, lastSent = 0, oppName = "";
+  let holeIdx = 0, hole = null, lie = { x: 0, z: 0 }, prevLie = lie, strokes = 0, results = [], phase = "idle", finished = false, lastSent = 0;
+  // other players (multiplayer): everyone plays the same hole at the same time, so their cards can be seen on the course
+  const PCOL = ["#4ac0ff", "#ff6b8a", "#7df08f", "#c58bff"], ME = "#ffd23f"; let GRACE = 60000, SHOWMS = 7000;
+  let peers = new Map(), netInfo = null, firstDoneAt = 0, allDoneAt = 0, scoreHidden = false, scoreSig = "", netTimer = 0, toasts = [];
   let cfg = { disc: 2, yaw: 0, power: 0.7, bank: 0, launch: 1, hand: 1 };
   let pred = null, flight = null, banner = null, nextAt = 0, raf = 0, last = 0, tAnim = 0;
   const cam = { x: 0, y: 3, z: -8, yaw: 0, pitch: 0.12 }, camT = { x: 0, y: 3, z: -8, yaw: 0, pitch: 0.12 };
@@ -260,7 +263,7 @@
     ctx.fillStyle = `rgba(0,0,0,${0.12 + 0.26 * up})`; ctx.beginPath(); ctx.ellipse(px, py, 0.38 * k * up, 0.12 * k * up, 0, 0, 7); ctx.fill();
   }
   function drawTrail(f) { // a ribbon in the card's colour that fades behind it, with a few sparkles
-    const n = Math.min(f.i + 1, f.pts.length), start = Math.max(0, n - 70), c = hex2(f.disc.color); let prev = null;
+    const n = Math.min(f.i + 1, f.pts.length), start = Math.max(0, n - 70), c = hex2(f.col || f.disc.color); let prev = null;
     for (let i = start; i < n; i++) {
       const p = f.pts[i], age = (i - start) / Math.max(1, n - start - 1); if (!project(p[0], p[1], p[2], P)) { prev = null; continue; }
       if (prev) { ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},${0.08 + 0.7 * age})`; ctx.lineWidth = 1 + 7 * age * age; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(prev[0], prev[1]); ctx.lineTo(P.x, P.y); ctx.stroke(); ctx.strokeStyle = `rgba(255,255,255,${0.1 + 0.55 * age})`; ctx.lineWidth = 1 + 2 * age; ctx.beginPath(); ctx.moveTo(prev[0], prev[1]); ctx.lineTo(P.x, P.y); ctx.stroke(); }
@@ -286,6 +289,7 @@
     const bp = mp(hole.basket.x, hole.basket.z); ctx.fillStyle = "#ff3b3b"; ctx.beginPath(); ctx.arc(bp[0], bp[1], 4, 0, 7); ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5; ctx.stroke();
     const lp = mp(lie.x, lie.z); ctx.fillStyle = "#ffd23f"; ctx.beginPath(); ctx.arc(lp[0], lp[1], 4, 0, 7); ctx.fill(); ctx.strokeStyle = "#000"; ctx.stroke();
     if (flight) { const q = mp(flight.cur[0], flight.cur[2]); ctx.fillStyle = flight.disc.color; ctx.beginPath(); ctx.arc(q[0], q[1], 3.5, 0, 7); ctx.fill(); }
+    for (const p of peers.values()) { if (p.left || p.h !== holeIdx + 1 || peerDone(p, holeIdx)) continue; const c = p.fl ? [p.fl.cur[0], p.fl.cur[2]] : p.lie, q = mp(c[0], c[1]); ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(q[0], q[1], 3.5, 0, 7); ctx.fill(); ctx.strokeStyle = "#000"; ctx.lineWidth = 1; ctx.stroke(); }
   }
   function drawBanner(now) {
     if (!banner) return; const age = now - banner.t; if (age > banner.ms) { banner = null; return; }
@@ -311,6 +315,7 @@
     const bd = (hole.basket.x - cam.x) * fx + (hole.basket.z - cam.z) * fz; vis.push([bd, null]);
     vis.sort((a, b) => b[0] - a[0]);
     for (const [, t] of vis) { if (t) drawTree(t, th, sky); else drawBasket(hole, sky); }
+    drawPeers(now);
     // the flight path preview (or, if there is none, a straight dotted line showing where you are pointing)
     if ((phase === "aim" || phase === "power" || phase === "acc") && !putting) {
       if (pred) {
@@ -330,7 +335,7 @@
       drawCard3D(lie.x, DG.groundAt(hole, lie.x, lie.z) + 0.05, lie.z, 0.0, Math.sin(cfg.yaw), Math.cos(cfg.yaw), 0, DG.DISCS[cfg.disc], 0.9, true); // the card on the ground at your feet
     }
     if (flight) { const dd = Math.hypot(flight.cur[0] - lie.x, flight.cur[2] - lie.z); ctx.font = "900 22px sans-serif"; ctx.textAlign = "center"; ctx.lineWidth = 5; ctx.strokeStyle = "#101010"; ctx.strokeText(`${dd.toFixed(0)} m`, W / 2, H - 22); ctx.fillStyle = "#fff"; ctx.fillText(`${dd.toFixed(0)} m`, W / 2, H - 22); }
-    drawHUDOverlay(now); drawBanner(now);
+    drawHUDOverlay(now); drawNetHUD(now); drawBanner(now);
     if (putting && phase === "aim") drawPutt(now);
     if (phase === "aim" || phase === "power" || phase === "acc") { if (!putting) drawMeter(now); const d = DG.DISCS[cfg.disc]; ctx.textAlign = "left"; ctx.font = "800 14px sans-serif"; ctx.lineWidth = 4; ctx.strokeStyle = "#101010"; const tx = `${d.name} · ${d.kind}${pred && !putting ? ` · about ${pred.dist.toFixed(0)} m at ${Math.round(previewPower() * 100)}%` : ""}`; ctx.strokeText(tx, 16, H - 18); ctx.fillStyle = d.color; ctx.fillText(tx, 16, H - 18); }
     const tf = $("throwFloat"), want = phase === "aim" ? (putting ? "🥏 PUTT! <kbd>Space</kbd>" : "🥏 THROW <kbd>Space</kbd>") : phase === "power" ? "SET THE POWER <kbd>Space</kbd>" : phase === "acc" ? "RELEASE! <kbd>Space</kbd>" : "";
@@ -348,6 +353,7 @@
   const accAt = (now) => 0.5 + 0.5 * Math.sin(((now - meter.t0) / (1500 - 750 * meter.power)) * 2 * Math.PI - Math.PI / 2);
   function pressThrow() {
     const now = performance.now();
+    if (phase === "between") { nextHole(); return; }
     if (phase === "aim" && putting) { if (now < puttT0) return; const [ex, ey] = puttPos(now); puttNow(ex, ey); }
     else if (phase === "aim") { meter = { stage: "power", t0: now, power: 0 }; phase = "power"; beep(420, 0.06, "triangle", 0.05, 1.3); }
     else if (phase === "power") { meter.power = Math.max(0.05, powerAt(now)); cfg.power = meter.power; meter.stage = "acc"; meter.t0 = now; phase = "acc"; updatePred(); beep(560, 0.06, "triangle", 0.05, 1.3); }
@@ -389,13 +395,14 @@
   const label = (s, par) => (s === 1 ? "ACE!!" : s - par <= -3 ? "ALBATROSS!" : s - par === -2 ? "EAGLE!" : s - par === -1 ? "BIRDIE!" : s === par ? "PAR" : s - par === 1 ? "BOGEY" : s - par === 2 ? "DOUBLE BOGEY" : "+" + (s - par));
   const total = () => results.reduce((a, b) => a + b, 0) + (hole && (phase === "aim" || phase === "flight" || phase === "power" || phase === "acc") ? Math.min(strokes, DG.MAX_STROKES) : 0);
   function startCourse(m) {
-    mode = m; course = DG.course(courseId); holeIdx = 0; results = []; finished = false; lastSent = 0; hideResult(); $("oppLine").textContent = ""; np.setPlaying(true);
+    mode = m; course = DG.course(courseId); holeIdx = 0; results = []; finished = false; lastSent = 0; peers = new Map(); toasts = []; hideResult(); $("oppLine").textContent = ""; np.setPlaying(true);
     newHole(); running(true);
   }
   function newHole() {
     hole = course.holes[holeIdx]; lie = { x: 0, z: 0 }; prevLie = lie; strokes = 0; flight = null; phase = "aim"; banner = null; prepareHole(hole);
     $("chipHole").textContent = `Hole ${holeIdx + 1} / ${DG.HOLES} · ${hole.name}`; $("parEl").textContent = hole.par; $("strokeEl").textContent = 0; $("totEl").textContent = total() || 0;
-    setupLie(true); hud(); card(); sendOpp(); say(`HOLE ${holeIdx + 1}`, `${hole.name} · par ${hole.par} · ${hole.len} m`, "#ffd23f", 2600);
+    firstDoneAt = 0; allDoneAt = 0; scoreHidden = false; for (const p of peers.values()) { p.fl = null; p.sunk = false; if (p.h <= holeIdx) { p.lie = [0, 0]; p.s = 0; } }
+    setupLie(true); hud(); card(); sendState(); refreshScore(); say(`HOLE ${holeIdx + 1}`, `${hole.name} · par ${hole.par} · ${hole.len} m`, "#ffd23f", 2600);
     camSnap();
   }
   function recommend(dist) { return dist <= 22 ? 0 : dist <= 50 ? 1 : dist <= 85 ? 2 : dist <= 118 ? 3 : dist <= 150 ? 4 : 5; }
@@ -423,18 +430,10 @@
     document.querySelectorAll("#bag .card-btn").forEach((b) => b.classList.toggle("on", +b.dataset.i === cfg.disc));
   }
   function hud() { if (!hole) return; $("strokeEl").textContent = strokes; $("distEl").textContent = Math.round(dBasket()); $("totEl").textContent = total(); }
-  function card() {
-    const t = $("card"), rows = [[0, 9], [9, 18]];
-    t.innerHTML = rows.map(([a, b]) => {
-      const hs = course.holes.slice(a, b), r1 = hs.map((h, i) => `<th>${a + i + 1}</th>`).join(""), r2 = hs.map((h) => `<td>${h.par}</td>`).join("");
-      const r3 = hs.map((h, i) => { const s = results[a + i], cls = s == null ? (a + i === holeIdx ? "cur" : "") : s < h.par ? "under" : s > h.par ? "over" : ""; return `<td class="${cls}">${s == null ? (a + i === holeIdx ? strokes || "" : "") : s}</td>`; }).join("");
-      const sub = results.slice(a, b).reduce((x, y) => x + (y || 0), 0), par = hs.reduce((x, h) => x + h.par, 0);
-      return `<tr><th>Hole</th>${r1}<th>${a ? "In" : "Out"}</th></tr><tr><th>Par</th>${r2}<td>${par}</td></tr><tr><th>You</th>${r3}<td>${sub || ""}</td></tr>`;
-    }).join("");
-  }
+  function card() { $("card").innerHTML = cardHtml(); }
   function startFlight(r, p, disc) {
     flight = { r, pts: r.pts, i: 0, t: 0, disc, bank: p.bank, hand: p.hand, spin: 0, cur: r.pts[0], dx: Math.sin(p.yaw), dz: Math.cos(p.yaw), wasTree: false };
-    phase = "flight"; beep(300, 0.22, "sawtooth", 0.03, 2.2); noise(0.25, 1800, 0.12); hud(); card(); sendOpp(); pred = null;
+    phase = "flight"; beep(300, 0.22, "sawtooth", 0.03, 2.2); noise(0.25, 1800, 0.12); hud(); card(); sendState(); sendThrow(r, p, disc); pred = null;
     $("flightInfo").textContent = "";
   }
   function throwNow(power, acc) {
@@ -472,29 +471,164 @@
       say(`${r.dist.toFixed(0)} m`, dB < 1 ? "right next to the basket" : `${dB.toFixed(0)} m to the basket${r.hitTree ? " · off a tree!" : ""}`, "#fff", 2000);
     }
     if (strokes >= DG.MAX_STROKES) { say("PICK UP", `${DG.MAX_STROKES} throws is the most you can take`, "#ff8a7a", 2200); setTimeout(() => holeDone(DG.MAX_STROKES), 1500); phase = "holed"; return; }
-    phase = "aim"; setupLie(); hud(); card(); sendOpp();
+    phase = "aim"; setupLie(); hud(); card(); sendState();
   }
   function holeDone(s) {
-    results[holeIdx] = Math.min(s, DG.MAX_STROKES); phase = "between"; flight = null; nextAt = performance.now() + 2200; hud(); card(); sendOpp();
+    if (!hole || mode === "idle" || results[holeIdx] != null) return;
+    results[holeIdx] = Math.min(s, DG.MAX_STROKES); phase = "between"; flight = null; hud(); card(); sendState();
     if (mode === "match" && total() > lastSent) { lastSent = total(); np.progress(lastSent); }
+    if (mode === "match" && !firstDoneAt) firstDoneAt = performance.now();
+    scoreHidden = false; refreshScore();
   }
   function finishCourse() {
-    finished = true; phase = "done"; const tot = results.reduce((a, b) => a + b, 0), par = course.holes.reduce((a, h) => a + h.par, 0), diff = tot - par;
+    finished = true; phase = "done"; refreshScore(); const tot = sumR(results), par = course.holes.reduce((a, h) => a + h.par, 0), diff = tot - par;
     const txt = diff === 0 ? "Even par" : diff < 0 ? `${-diff} under par` : `${diff} over par`;
     if (mode === "solo") {
       const key = "tungDGBest:" + courseId; let prev = 0; try { prev = Number(localStorage.getItem(key) || 0); } catch (_) {} const pb = !prev || tot < prev; try { if (pb) localStorage.setItem(key, String(tot)); } catch (_) {}
       if (window.TungMP) TungMP.submitSolo({ game: "discgolf", level: courseId, strokes: tot });
       beep(880, 0.6, "triangle", 0.09, 1.5);
       showResult(`🥏 ${tot} throws`, `${txt}. ${pb ? "🏆 New personal best on this course!" : "Your best here: " + prev}`, [["Play again", () => startCourse("solo")], ["Menu", toMenu]]);
-    } else { np.report({ score: tot, ranking: [] }); showResult(`🥏 ${tot} throws`, `${txt}. Waiting for your opponent to finish…`, []); }
+    } else {
+      sendState(); const room = np.kind === "room";
+      // in a room the host names the finishing order: fewest throws, then the better back nine; anyone who left goes last
+      const order = players().sort((a, b) => (a.left ? 1 : 0) - (b.left ? 1 : 0) || vsOf(a) - vsOf(b) || sumR(a.r.slice(9)) - sumR(b.r.slice(9)));
+      np.report({ score: tot, ranking: order.map((p) => (p.me ? netInfo.me.id : p.id)) });
+      showResult(`🥏 ${tot} throws`, `${txt}. ${room ? "Waiting for the final result…" : "Waiting for your opponent to finish…"}`, []);
+    }
   }
   function showResult(title, sub, buttons) {
     const r = $("result"); r.innerHTML = `<h2>${title}</h2><p>${sub}</p><div class="btn-row"></div>`; r.hidden = false;
     for (const [lab, fn] of buttons) { const b = document.createElement("button"); b.className = "btn" + (lab === "Menu" ? " secondary" : ""); b.textContent = lab; b.onclick = fn; r.querySelector(".btn-row").append(b); }
   }
   const hideResult = () => { $("result").hidden = true; };
-  function toMenu() { running(false); mode = "idle"; phase = "idle"; hideResult(); np.setPlaying(false); }
-  function sendOpp() { if (mode === "match") np.send({ k: "h", h: holeIdx + 1, t: total(), d: finished ? 1 : 0 }); }
+  function toMenu() { running(false); mode = "idle"; phase = "idle"; peers = new Map(); hideResult(); refreshScore(); np.setPlaying(false); }
+
+  // ---------------- the other players (multiplayer) ----------------
+  // Everybody plays the same hole at the same time. Each throw is sent as a small list of points and replayed as a ghost on the other screens,
+  // each player's resting card is shown with a name tag, and a hole closes when everybody has finished it (or the time is up).
+  const esc = (s) => NetPlay.esc(String(s));
+  const lab = (s, par) => label(s, par).replace(/!+$/, "").toLowerCase();
+  const sumR = (r) => r.reduce((a, b) => a + (b || 0), 0);
+  const parOf = (r) => r.reduce((a, b, i) => a + (b == null || !course.holes[i] ? 0 : course.holes[i].par), 0);
+  const vsOf = (p) => sumR(p.r) - parOf(p.r);
+  const fmtVs = (d) => (d === 0 ? "E" : d > 0 ? "+" + d : String(d));
+  const players = () => { const a = [{ id: "me", name: "You", color: ME, r: results, s: strokes, me: true, h: holeIdx + 1 }]; for (const p of peers.values()) a.push(p); return a; };
+  const standings = () => players().sort((a, b) => vsOf(a) - vsOf(b));
+  const livePeers = () => [...peers.values()].filter((p) => !p.left);
+  const peerDone = (p, hi) => p.r[hi] != null || p.h > hi + 1;
+  const peerWaiting = () => livePeers().filter((p) => !peerDone(p, holeIdx));
+  const toast = (text, color) => { toasts.push({ text, color, t: performance.now() }); if (toasts.length > 4) toasts.shift(); };
+
+  function sendState() { if (mode !== "match" || !np || !np.kind) return; np.send({ k: "s", h: holeIdx + 1, s: strokes, x: +lie.x.toFixed(1), z: +lie.z.toFixed(1), r: results, f: finished ? 1 : 0, dc: cfg.disc }); }
+  function sendThrow(r, p, disc) { // a throw as about 35 points (the server only takes small messages)
+    if (mode !== "match" || !np || !np.kind) return;
+    const pts = r.pts, n = pts.length, step = Math.max(1, Math.ceil(n / 34)), a = [], add = (q) => a.push(+q[0].toFixed(1), +q[1].toFixed(1), +q[2].toFixed(1), +q[3].toFixed(2));
+    for (let i = 0; i < n; i += step) add(pts[i]); if ((n - 1) % step) add(pts[n - 1]);
+    np.send({ k: "t", h: holeIdx + 1, di: DG.DISCS.indexOf(disc), b: +(p.bank || 0).toFixed(2), hd: p.hand === -1 ? -1 : 1, kd: r.kind === "holed" ? 2 : r.kind === "ob" ? 1 : 0, p: a });
+  }
+  function ghostStep(p, dt) {
+    const f = p.fl; f.t += dt * 1.25; const pts = f.pts;
+    while (f.i < pts.length - 2 && pts[f.i + 1][3] <= f.t) f.i++;
+    const a = pts[f.i], b = pts[Math.min(pts.length - 1, f.i + 1)], u = b[3] > a[3] ? clamp((f.t - a[3]) / (b[3] - a[3]), 0, 1) : 1;
+    f.cur = [lerp(a[0], b[0], u), lerp(a[1], b[1], u), lerp(a[2], b[2], u)];
+    const dx = b[0] - a[0], dz = b[2] - a[2]; if (Math.hypot(dx, dz) > 0.001) { f.dx = lerp(f.dx, dx, 0.2); f.dz = lerp(f.dz, dz, 0.2); }
+    f.spin += dt * 14 * f.hand;
+    if (f.t >= pts[pts.length - 1][3] + 0.05) { p.fl = null; const q = pts[pts.length - 1]; if (f.kd === 2) p.sunk = true; else if (f.kd === 0) p.lie = [q[0], q[2]]; }
+  }
+  function drawTag(p, x, y, z) {
+    if (!project(x, y + 1.8, z, P)) return; const tx = P.x, ty = P.y; if (tx < -60 || tx > W + 60 || ty < -40 || ty > H + 40) return;
+    const by = project(x, y, z, P) ? P.y : ty + 24;
+    ctx.strokeStyle = p.color; ctx.globalAlpha = 0.75; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(tx, ty + 10); ctx.lineTo(tx, by); ctx.stroke(); ctx.globalAlpha = 1;
+    const txt = `${p.name.slice(0, 12)} · ${p.s}`; ctx.font = "800 12px sans-serif"; const w = ctx.measureText(txt).width + 14;
+    ctx.fillStyle = p.color; rrect(ctx, tx - w / 2, ty - 10, w, 20, 9); ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = "rgba(0,0,0,.55)"; ctx.stroke();
+    ctx.fillStyle = "#101010"; ctx.textAlign = "center"; ctx.fillText(txt, tx, ty + 4);
+  }
+  function drawPeers(now) {
+    for (const p of peers.values()) {
+      if (p.left || p.h !== holeIdx + 1 || p.r[holeIdx] != null) continue;
+      const f = p.fl, disc = DG.DISCS[p.disc] || DG.DISCS[2];
+      if (f) {
+        drawTrail(f); const h0 = DG.groundAt(hole, f.cur[0], f.cur[2]); drawShadow(f.cur[0], f.cur[2], hole, f.cur[1] - h0);
+        drawCard3D(f.cur[0], f.cur[1], f.cur[2], f.bank, f.dx, f.dz, f.spin, disc, 1.9); drawTag(p, f.cur[0], f.cur[1], f.cur[2]);
+      } else if (!p.sunk) {
+        let x = p.lie[0], z = p.lie[1]; if (Math.hypot(x - lie.x, z - lie.z) < 0.9) { x += Math.cos(cfg.yaw) * 0.9 * (p.idx + 1); z -= Math.sin(cfg.yaw) * 0.9 * (p.idx + 1); } // do not hide behind your own card on the tee
+        const y = DG.groundAt(hole, x, z) + 0.05; drawShadow(x, z, hole, 0); drawCard3D(x, y, z, 0, hole.basket.x - x, hole.basket.z - z, 0, disc, 0.9, true); drawTag(p, x, y, z);
+      }
+    }
+  }
+  function drawNetHUD(now) { // who is where, what just happened, and the clock once somebody has holed out
+    if (mode !== "match") return;
+    const pl = standings(), x = 12, y = 104, rh = 19, w = 184;
+    ctx.fillStyle = "rgba(0,0,0,.52)"; rrect(ctx, x, y, w, pl.length * rh + 8, 8); ctx.fill(); ctx.font = "800 12px sans-serif";
+    pl.forEach((p, i) => {
+      const yy = y + 4 + i * rh, st = p.me ? (results[holeIdx] != null ? `✓${results[holeIdx]}` : `${strokes}`) : p.left ? "left" : peerDone(p, holeIdx) ? `✓${p.r[holeIdx] == null ? "" : p.r[holeIdx]}` : p.h === holeIdx + 1 ? `${p.s}` : "…";
+      ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(x + 11, yy + 10, 5, 0, 7); ctx.fill();
+      ctx.textAlign = "left"; ctx.fillStyle = p.me ? "#fff" : "rgba(255,255,255,.85)"; ctx.fillText(p.name.slice(0, 10), x + 22, yy + 14);
+      ctx.textAlign = "right"; ctx.fillStyle = "#ffe9a8"; ctx.fillText(p.r.length ? fmtVs(vsOf(p)) : "–", x + w - 44, yy + 14); ctx.fillStyle = st.startsWith("✓") ? "#7df08f" : "#fff"; ctx.fillText(st, x + w - 8, yy + 14);
+    });
+    toasts = toasts.filter((t) => now - t.t < 5000);
+    toasts.forEach((t, i) => { ctx.globalAlpha = clamp((5000 - (now - t.t)) / 600, 0, 1); ctx.font = "800 13px sans-serif"; ctx.textAlign = "left"; ctx.lineWidth = 4; ctx.strokeStyle = "#101010"; const yy = y + pl.length * rh + 28 + i * 18; ctx.strokeText(t.text, x + 4, yy); ctx.fillStyle = t.color; ctx.fillText(t.text, x + 4, yy); ctx.globalAlpha = 1; });
+    if (firstDoneAt && results[holeIdx] == null && phase !== "between") {
+      const left = Math.max(0, Math.ceil((firstDoneAt + GRACE - performance.now()) / 1000)), txt = `⏱ the hole closes in ${left} s`;
+      ctx.font = "900 14px sans-serif"; const tw = ctx.measureText(txt).width + 22; ctx.fillStyle = left < 15 ? "rgba(190,40,30,.85)" : "rgba(0,0,0,.62)"; rrect(ctx, W / 2 - tw / 2, 12, tw, 28, 12); ctx.fill(); ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.fillText(txt, W / 2, 31);
+    }
+  }
+
+  // the scorecard: one row per player (also used under the course and between the holes)
+  function cardHtml() {
+    const pl = players();
+    return [[0, 9], [9, 18]].map(([a, b]) => {
+      const hs = course.holes.slice(a, b), par = hs.reduce((x, h) => x + h.par, 0);
+      const head = `<tr><th>Hole</th>${hs.map((h, i) => `<th>${a + i + 1}</th>`).join("")}<th>${a ? "In" : "Out"}</th></tr><tr><th>Par</th>${hs.map((h) => `<td>${h.par}</td>`).join("")}<td>${par}</td></tr>`;
+      const rows = pl.map((p) => {
+        const cells = hs.map((h, i) => { const k = a + i, s = p.r[k], cur = s == null && k === holeIdx; return `<td class="${s == null ? (cur ? "cur" : "") : s < h.par ? "under" : s > h.par ? "over" : ""}">${s == null ? (cur && p.s && (p.me || p.h === holeIdx + 1) ? p.s : "") : s}</td>`; }).join("");
+        const sub = p.r.slice(a, b).reduce((x, y) => x + (y || 0), 0);
+        return `<tr class="${p.me ? "me" : ""}"><th class="who" style="color:${p.color}">${esc(p.name)}${p.left ? " (left)" : ""}</th>${cells}<td>${sub || ""}</td></tr>`;
+      }).join("");
+      return head + rows;
+    }).join('<tr class="gap"><td colspan="11"></td></tr>');
+  }
+  function scoreHtml() {
+    const hi = holeIdx, par = hole.par, pl = players(), wait = peerWaiting(), last = hi + 1 >= DG.HOLES, solo = mode === "solo", multi = !solo;
+    const per = pl.map((p) => `<span style="color:${p.color}">${esc(p.name)}</span> ${p.r[hi] == null ? "…" : `<b>${p.r[hi]}</b> <i>(${lab(p.r[hi], par)})</i>`}`).join(" &nbsp;·&nbsp; ");
+    const stand = multi ? `<div class="stand">${standings().map((p, i) => `<span style="color:${p.color}">${i + 1}. ${esc(p.name)} ${p.r.length ? `${sumR(p.r)} (${fmtVs(vsOf(p))})` : "–"}</span>`).join("")}</div>` : `<div class="stand"><span>${sumR(results)} throws so far (${fmtVs(vsOf(players()[0]))})</span></div>`;
+    const ctl = solo ? `<button class="btn" data-a="next">${last ? "Finish the round" : "Next hole"} ▶ <kbd>Space</kbd></button>` : (wait.length ? `<button class="btn secondary" data-a="watch">👁 Watch the others throw</button>` : `<button class="btn" data-a="next">${last ? "See the results" : "Next hole"} ▶</button>`) + `<span class="nextTxt" id="scoreNext"></span>`;
+    return `<div class="box"><h2>Hole ${hi + 1} · ${esc(hole.name)}</h2><div class="sub">Par ${par} · ${per}</div>${stand}<table class="card">${cardHtml()}</table><div class="next">${ctl}</div></div>`;
+  }
+  function updateScoreText() {
+    const t = $("scoreNext"); if (!t) return; const now = performance.now(), wait = peerWaiting();
+    t.textContent = wait.length ? `Waiting for ${wait.map((p) => p.name).join(", ")}${firstDoneAt ? ` · the hole closes in ${Math.max(0, Math.ceil((firstDoneAt + GRACE - now) / 1000))} s` : ""}` : allDoneAt ? `Next hole in ${Math.max(0, Math.ceil((allDoneAt + SHOWMS - now) / 1000))} s` : "";
+  }
+  function refreshScore() {
+    const el = $("score"), tab = $("scoreTab");
+    if (!hole || phase !== "between" || finished || mode === "idle") { el.hidden = true; tab.hidden = true; scoreSig = ""; return; }
+    if (mode === "match" && !peerWaiting().length) scoreHidden = false;
+    tab.hidden = !scoreHidden; el.hidden = scoreHidden; if (scoreHidden) return;
+    const html = scoreHtml(); if (html !== scoreSig) { scoreSig = html; el.innerHTML = html; }
+    updateScoreText();
+  }
+  function advance() { scoreHidden = false; if (holeIdx + 1 < DG.HOLES) { holeIdx++; newHole(); } else finishCourse(); }
+  function nextHole() { if (phase !== "between") return; if (mode === "match" && peerWaiting().length) return; advance(); }
+  $("score").addEventListener("click", (e) => { const b = e.target.closest("button[data-a]"); if (!b) return; if (b.dataset.a === "watch") { scoreHidden = true; refreshScore(); } else nextHole(); });
+  $("scoreTab").addEventListener("click", () => { scoreHidden = false; refreshScore(); });
+
+  // keeps the hole in step: closes it for slow players, shows the scorecard and moves everybody on together
+  function netTick() {
+    if (mode !== "match" || !hole || finished || phase === "wait") return;
+    const now = performance.now(), hi = holeIdx, mine = results[hi] != null, lp = livePeers(), nDone = lp.filter((p) => peerDone(p, hi)).length;
+    if ((mine || nDone) && !firstDoneAt) firstDoneAt = now;
+    if (!mine) {
+      if (firstDoneAt && now > firstDoneAt + GRACE && (phase === "aim" || phase === "power" || phase === "acc")) { // the hole closed: pick up
+        cancelMeter(); const dB = dBasket(), s = Math.min(DG.MAX_STROKES, strokes + (dB <= DG.PUTT ? 1 : Math.min(3, 1 + Math.ceil(dB / 60)))); phase = "holed"; // about the throws it would still have taken say("TIME!", `The hole closed: ${s} throws counted`, "#ff8a7a", 2400); setTimeout(() => holeDone(s), 700);
+      }
+    } else if (nDone === lp.length) {
+      if (!allDoneAt) { allDoneAt = now; scoreHidden = false; }
+      if (now > allDoneAt + SHOWMS) advance();
+    } else if (firstDoneAt && now > firstDoneAt + GRACE + 20000) { // somebody's page has stalled: count them out so the others can go on
+      for (const p of lp) if (!peerDone(p, hi)) p.r[hi] = Math.min(DG.MAX_STROKES, Math.max(hole.par, (p.h === hi + 1 ? p.s : 0) + 2));
+    }
+    refreshScore();
+  }
 
   // ---------------- the camera follows the action ----------------
   function camSnap() { aimCam(); Object.assign(cam, camT); }
@@ -509,11 +643,11 @@
     camT.x = lie.x - sy * back; camT.z = lie.z - cy * back; camT.y = Math.max(gy, DG.groundAt(hole, camT.x, camT.z)) + 2.6; camT.yaw = cfg.yaw; camT.pitch = 0.17;
   }
   function updateCam(dt, now) {
-    if (phase === "flight" && flight) {
-      const c = flight.cur, l = Math.hypot(flight.dx, flight.dz) || 1, dx = flight.dx / l, dz = flight.dz / l;
-      camT.x = c[0] - dx * 9; camT.z = c[2] - dz * 9; camT.y = Math.max(c[1] + 2.4, DG.groundAt(hole, camT.x, camT.z) + 2.4);
-      camT.yaw = Math.atan2(dx, dz); const down = (camT.y - c[1]) / 9; camT.pitch = clamp(Math.atan(down), 0.05, 0.5);
-    } else if (phase === "aim" || phase === "power" || phase === "acc") aimCam();
+    const chase = (f) => { const c = f.cur, l = Math.hypot(f.dx, f.dz) || 1, dx = f.dx / l, dz = f.dz / l; camT.x = c[0] - dx * 9; camT.z = c[2] - dz * 9; camT.y = Math.max(c[1] + 2.4, DG.groundAt(hole, camT.x, camT.z) + 2.4); camT.yaw = Math.atan2(dx, dz); const down = (camT.y - c[1]) / 9; camT.pitch = clamp(Math.atan(down), 0.05, 0.5); };
+    const spec = phase === "between" ? [...peers.values()].find((p) => p.fl && p.h === holeIdx + 1) : null; // done with the hole: watch the others throw
+    if (phase === "flight" && flight) chase(flight);
+    else if (spec) chase(spec.fl);
+    else if (phase === "aim" || phase === "power" || phase === "acc") aimCam();
     else if (phase === "between" || phase === "holed") { const b = hole.basket, a = now * 0.0004, d = 9; camT.x = b.x + Math.sin(a) * d; camT.z = b.z + Math.cos(a) * d; camT.y = b.y + 4.5; camT.yaw = Math.atan2(b.x - camT.x, b.z - camT.z); camT.pitch = 0.3; }
     const k = 1 - Math.exp(-(phase === "flight" ? 9 : 5) * dt);
     cam.x = lerp(cam.x, camT.x, k); cam.y = lerp(cam.y, camT.y, k); cam.z = lerp(cam.z, camT.z, k);
@@ -530,7 +664,7 @@
     }
     if (phase === "power" && meter) updatePred();
     if (phase === "flight" && flight) flightStep(dt);
-    if (phase === "between" && performance.now() > nextAt) { if (holeIdx + 1 < DG.HOLES) { holeIdx++; newHole(); } else finishCourse(); }
+    for (const p of peers.values()) if (p.fl) ghostStep(p, dt);
     updateCam(dt, ts); render(ts);
   }
   function running(on) { cancelAnimationFrame(raf); if (on) { last = 0; raf = requestAnimationFrame(frame); } }
@@ -577,14 +711,37 @@
 
   // ---------------- multiplayer ----------------
   np = NetPlay.attach({
-    game: "discgolf", rooms: false, panel: $("mpPanel"), menu: $("menu"), play: $("play"),
+    game: "discgolf", rooms: true, panel: $("mpPanel"), menu: $("menu"), play: $("play"),
     onModeChange() { if (mode === "solo") toMenu(); },
-    onPrepare(c) { oppName = c.players.find((p) => p.id !== c.me.id).name; courseId = c.opts.level in DG.COURSES ? c.opts.level : "pines"; course = DG.course(courseId); mode = "match"; holeIdx = 0; results = []; finished = false; lastSent = 0; hideResult(); $("oppLine").textContent = ""; newHole(); running(true); phase = "wait"; },
-    onStart() { phase = "aim"; setupLie(); },
-    onStop() { },
-    onExit() { running(false); mode = "idle"; hideResult(); },
-    onNet(from, d) { if (d && d.k === "h") $("oppLine").textContent = `${oppName}: hole ${d.h}/${DG.HOLES} · ${d.t} throw${d.t === 1 ? "" : "s"}${d.d ? " · finished" : ""}`; },
+    onPrepare(c) {
+      netInfo = c; peers = new Map(); let ci = 0;
+      for (const pl of c.players) if (pl.id !== c.me.id) { peers.set(pl.id, { id: pl.id, idx: ci, name: pl.name, color: PCOL[ci % PCOL.length], r: [], s: 0, h: 1, lie: [0, 0], disc: 2, fl: null, sunk: false, left: false }); ci++; }
+      courseId = c.opts.level in DG.COURSES ? c.opts.level : "pines"; course = DG.course(courseId); mode = "match"; holeIdx = 0; results = []; finished = false; lastSent = 0; toasts = [];
+      hideResult(); $("oppLine").textContent = "Playing with " + [...peers.values()].map((p) => p.name).join(", "); newHole(); running(true); phase = "wait";
+    },
+    onStart() { phase = "aim"; setupLie(); sendState(); clearInterval(netTimer); netTimer = setInterval(netTick, 250); },
+    onStop() { clearInterval(netTimer); },
+    onExit() { clearInterval(netTimer); running(false); mode = "idle"; peers = new Map(); hideResult(); refreshScore(); },
+    onLeft(id) { const p = peers.get(id); if (p) { p.left = true; p.fl = null; toast(`${p.name} left`, "#ff8a7a"); card(); refreshScore(); } },
+    onRoomEnd(m) {
+      clearInterval(netTimer); running(false); refreshScore(); const mine = netInfo && netInfo.me.id;
+      const rows = m.ranking.map((r) => { const p = r.id === mine ? players()[0] : peers.get(r.id); return `<tr class="${r.place === 1 ? "win" : ""}"><td>${r.place}</td><td>${NetPlay.avatarHtml(r.avatar)} ${NetPlay.esc(r.username)}</td><td>${p && p.r.length === DG.HOLES ? `${sumR(p.r)} throws (${fmtVs(vsOf(p))})` : "did not finish"}</td></tr>`; }).join("");
+      showResult(m.reason === "host_left" ? "Host left" : (m.ranking[0].id === m.you ? "🏆 You win!" : "Round over"), `<table>${rows}</table>`, [["Back to the room", () => { hideResult(); mode = "idle"; np.setPlaying(false); }]]);
+    },
+    onNet(from, d) {
+      const p = peers.get(from); if (!p || !d) return;
+      if (d.k === "s") {
+        const old = p.r.length; if (d.h !== p.h) { p.sunk = false; p.fl = null; }
+        p.h = d.h | 0; p.s = d.s | 0; p.lie = [+d.x || 0, +d.z || 0]; if (d.dc != null) p.disc = clamp(d.dc | 0, 0, DG.DISCS.length - 1); if (Array.isArray(d.r)) p.r = d.r.slice(0, DG.HOLES).map((v) => clamp(+v || 0, 1, DG.MAX_STROKES));
+        if (hole && p.r.length > old && p.r.length - 1 === holeIdx) toast(`${p.name}: ${lab(p.r[holeIdx], hole.par)} (${p.r[holeIdx]})`, p.color);
+        card(); refreshScore();
+      } else if (d.k === "t" && (d.h | 0) === holeIdx + 1 && Array.isArray(d.p) && d.p.length >= 8) {
+        const a = d.p, pts = []; for (let i = 0; i + 3 < a.length && pts.length < 80; i += 4) pts.push([+a[i], +a[i + 1], +a[i + 2], +a[i + 3]]);
+        p.disc = clamp(d.di | 0, 0, DG.DISCS.length - 1);
+        p.fl = { pts, i: 0, t: 0, disc: DG.DISCS[p.disc], col: p.color, bank: +d.b || 0, hand: d.hd === -1 ? -1 : 1, spin: 0, cur: pts[0], dx: pts[1][0] - pts[0][0], dz: pts[1][2] - pts[0][2], kd: d.kd | 0 };
+      }
+    },
   });
   renderBag(); renderCourses(); syncUI();
-  window.__dg = () => ({ DG, cfg, hole, lie, phase, strokes, results, flight, cam, throwNow, pressThrow, puttNow, putting: () => putting, puttSol: () => puttSol, meter: () => meter, holeDone, newHole: () => newHole(), goto: (i) => { holeIdx = i; newHole(); }, setLie: (x, z) => { lie = { x, z }; setupLie(); }, frame: (ts) => frame(ts), render: () => render(performance.now()), start: startCourse });
+  window.__dg = () => ({ DG, tune: (g, sh) => { GRACE = g; SHOWMS = sh; }, peers: () => peers, netTick, sendState, players, cfg, hole, lie, phase, strokes, results, flight, cam, throwNow, pressThrow, puttNow, putting: () => putting, puttSol: () => puttSol, meter: () => meter, holeDone, newHole: () => newHole(), goto: (i) => { holeIdx = i; newHole(); }, setLie: (x, z) => { lie = { x, z }; setupLie(); }, frame: (ts) => frame(ts), render: () => render(performance.now()), start: startCourse });
 })();
