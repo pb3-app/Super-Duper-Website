@@ -2462,7 +2462,7 @@ function doBonk(p, boink, quiet) {
     if (o === p || o.fall > 0 || inSafeZone(o)) continue; // nobody on a log or in the practice corner can be bonked
     if (!!o.z !== !!p.z) continue; // the showdown is its own place: no bonking across its edge, in or out
     const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy);
-    if (d > AR.range + AR.r) continue;
+    if (d > (AR.range + AR.r) * (p.auto ? 2 : 1)) continue; // the Boink switch doubles the reach
     let diff = Math.abs(Math.atan2(dy, dx) - p.facing);
     if (diff > Math.PI) diff = Math.PI * 2 - diff;
     if (diff > Math.PI / 2) continue;
