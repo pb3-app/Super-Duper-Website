@@ -37,25 +37,51 @@
   const keys = {};
 
   // ---------------- the cards ----------------
-  function cardIcon(c, disc) {
-    const g = c.getContext("2d"), w = c.width, h = c.height;
-    g.clearRect(0, 0, w, h);
-    const gr = g.createLinearGradient(0, 0, w, h); gr.addColorStop(0, disc.color); gr.addColorStop(1, "#000"); g.fillStyle = gr; g.globalAlpha = 1;
-    rrect(g, 2, 2, w - 4, h - 4, 7); g.fill(); g.fillStyle = disc.color; rrect(g, 3, 3, w - 6, h - 6, 6); g.globalAlpha = 0.92; g.fill(); g.globalAlpha = 1;
-    g.fillStyle = "rgba(255,255,255,.85)"; rrect(g, 7, 8, h * 0.52, h * 0.52, 4); g.fill(); // the photo
-    g.fillStyle = "#c8874a"; g.fillRect(7 + h * 0.18, 8 + h * 0.12, h * 0.16, h * 0.3); g.fillStyle = "#fff"; g.beginPath(); g.arc(7 + h * 0.22, 8 + h * 0.2, 2.6, 0, 7); g.arc(7 + h * 0.3, 8 + h * 0.2, 2.6, 0, 7); g.fill(); g.fillStyle = "#111"; g.beginPath(); g.arc(7 + h * 0.22, 8 + h * 0.2, 1.1, 0, 7); g.arc(7 + h * 0.3, 8 + h * 0.2, 1.1, 0, 7); g.fill();
-    g.fillStyle = "rgba(0,0,0,.75)"; g.font = "900 12px sans-serif"; g.textAlign = "left"; g.fillText("TTT", h * 0.52 + 12, 20); g.font = "800 8px sans-serif"; g.fillText("ID CARD", h * 0.52 + 12, 30);
-    g.fillStyle = "rgba(0,0,0,.55)"; for (let i = 0; i < 16; i++) g.fillRect(8 + i * 4, h - 13, i % 3 === 0 ? 2.5 : 1.3, 8);
-    g.strokeStyle = "rgba(0,0,0,.5)"; g.lineWidth = 2; rrect(g, 2, 2, w - 4, h - 4, 7); g.stroke();
+  const CW = 192, CH = 120;
+  function drawCardArt(g, w, h, disc) { // a Triple T ID card: photo, name, a holographic stripe, the flight numbers stamped on it, a chip and a barcode
+    const s = w / CW; g.save(); g.scale(s, s); g.clearRect(0, 0, CW, CH);
+    const base = g.createLinearGradient(0, 0, CW, CH); base.addColorStop(0, "#ffffff"); base.addColorStop(0.18, disc.color); base.addColorStop(1, shade(disc.color, 0.55));
+    g.fillStyle = "rgba(0,0,0,.55)"; rrect(g, 1, 3, CW - 2, CH - 2, 14); g.fill(); // edge of the plastic
+    g.fillStyle = base; rrect(g, 0, 0, CW, CH - 3, 14); g.fill();
+    g.save(); rrect(g, 0, 0, CW, CH - 3, 14); g.clip();
+    // holographic stripe
+    const holo = g.createLinearGradient(0, 70, CW, 100); ["#ff6ad5", "#ffd86b", "#7df0ff", "#9d7bff", "#ff6ad5"].forEach((c, i) => holo.addColorStop(i / 4, c));
+    g.globalAlpha = 0.42; g.fillStyle = holo; g.save(); g.transform(1, 0, -0.35, 1, 28, 0); g.fillRect(-20, 74, CW + 60, 17); g.restore(); g.globalAlpha = 1;
+    g.fillStyle = "rgba(255,255,255,.16)"; for (let i = 0; i < 9; i++) { g.beginPath(); g.arc(CW - 20, CH + 10, 24 + i * 11, 0, 7); g.lineWidth = 1.2; g.strokeStyle = "rgba(255,255,255,.12)"; g.stroke(); }
+    g.restore();
+    // the photo window with a tung
+    g.fillStyle = "#fff6e6"; rrect(g, 12, 14, 60, 62, 8); g.fill(); g.strokeStyle = "rgba(0,0,0,.35)"; g.lineWidth = 2; g.stroke();
+    const lg = g.createLinearGradient(0, 22, 0, 70); lg.addColorStop(0, "#e0a965"); lg.addColorStop(1, "#bd8043"); g.fillStyle = lg; rrect(g, 28, 24, 28, 46, 8); g.fill(); g.strokeStyle = "#5e3a18"; g.lineWidth = 2; g.stroke();
+    g.fillStyle = "#f1cf9b"; g.beginPath(); g.ellipse(42, 25, 14, 5, 0, 0, 7); g.fill(); g.stroke();
+    g.fillStyle = "#fff"; g.beginPath(); g.arc(36, 42, 5.5, 0, 7); g.arc(49, 42, 5.5, 0, 7); g.fill(); g.fillStyle = "#111"; g.beginPath(); g.arc(37, 43, 2.4, 0, 7); g.arc(50, 43, 2.4, 0, 7); g.fill();
+    g.strokeStyle = "#3d2412"; g.lineWidth = 2; g.beginPath(); g.arc(42.5, 52, 6, 0.2, Math.PI - 0.2); g.stroke();
+    // the printing
+    g.fillStyle = "rgba(10,10,10,.85)"; g.textAlign = "left"; g.font = "900 22px sans-serif"; g.fillText("TRIPLE T", 82, 36); g.font = "800 11px sans-serif"; g.fillStyle = "rgba(10,10,10,.7)"; g.fillText("ID CARD · " + disc.kind.toUpperCase(), 82, 50);
+    g.font = "900 13px sans-serif"; g.fillStyle = "rgba(10,10,10,.9)"; g.fillText(disc.name, 82, 68);
+    g.fillStyle = "rgba(10,10,10,.8)"; g.font = "800 14px sans-serif"; g.fillText(`${disc.speed}   ${disc.glide}   ${disc.turn}   ${disc.fade}`, 14, 106);
+    g.fillStyle = "#e8c65a"; rrect(g, 108, 79, 20, 15, 3); g.fill(); g.strokeStyle = "rgba(90,60,0,.6)"; g.lineWidth = 1; g.stroke();
+    g.fillStyle = "rgba(10,10,10,.65)"; for (let i = 0; i < 26; i++) g.fillRect(104 + i * 3.1, 98, i % 3 === 0 ? 2 : 1, 12);
+    g.strokeStyle = "rgba(255,255,255,.55)"; g.lineWidth = 2; rrect(g, 1, 1, CW - 2, CH - 5, 13); g.stroke();
+    g.restore();
   }
+  function shade(hex, k) { const c = [1, 3, 5].map((i) => Math.round(parseInt(hex.slice(i, i + 2), 16) * k)); return `rgb(${c[0]},${c[1]},${c[2]})`; }
+  const artCache = {};
+  function artFor(disc, back) {
+    const key = disc.id + (back ? "b" : ""); if (artCache[key]) return artCache[key];
+    const c = document.createElement("canvas"); c.width = CW; c.height = CH; const g = c.getContext("2d");
+    if (!back) drawCardArt(g, CW, CH, disc);
+    else { const gr = g.createLinearGradient(0, 0, CW, CH); gr.addColorStop(0, shade(disc.color, 0.8)); gr.addColorStop(1, shade(disc.color, 0.4)); g.fillStyle = "rgba(0,0,0,.55)"; rrect(g, 1, 3, CW - 2, CH - 2, 14); g.fill(); g.fillStyle = gr; rrect(g, 0, 0, CW, CH - 3, 14); g.fill(); g.fillStyle = "rgba(255,255,255,.2)"; g.font = "900 64px sans-serif"; g.textAlign = "center"; g.fillText("TTT", CW / 2, 74); g.strokeStyle = "rgba(255,255,255,.4)"; g.lineWidth = 2; rrect(g, 1, 1, CW - 2, CH - 5, 13); g.stroke(); }
+    artCache[key] = c; return c;
+  }
+  function cardIcon(c, disc) { c.getContext("2d").clearRect(0, 0, c.width, c.height); drawCardArt(c.getContext("2d"), c.width, c.height, disc); }
   function rrect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
   function renderBag() {
     const box = $("bag"); box.replaceChildren();
     DG.DISCS.forEach((d, i) => {
       const b = document.createElement("button"); b.className = "card-btn" + (i === cfg.disc ? " on" : ""); b.dataset.i = i; b.title = d.blurb;
-      const c = document.createElement("canvas"); c.width = 156; c.height = 100; cardIcon(c, d);
-      b.append(c); b.insertAdjacentHTML("beforeend", `<b><kbd>${i + 1}</kbd>${d.name}</b><small>${d.kind}</small><small>${d.speed} / ${d.glide} / ${d.turn} / ${d.fade}</small>`);
-      b.onclick = () => { cfg.disc = i; syncUI(); refreshPred(); beep(520, 0.05, "triangle", 0.05, 1.2); };
+      const c = document.createElement("canvas"); c.width = 192; c.height = 120; cardIcon(c, d);
+      b.append(c); b.insertAdjacentHTML("beforeend", `<b><kbd>${i + 1}</kbd>${d.name}</b><small>${d.kind}</small><small>${d.speed} / ${d.glide} / ${d.turn} / ${d.fade}</small><small>about ${Math.round(DG.maxCarry(d.id))} m flat out</small>`);
+      b.onclick = () => { cfg.disc = i; syncUI(); refreshInfo(); beep(520, 0.05, "triangle", 0.05, 1.2); };
       box.append(b);
     });
   }
@@ -187,6 +213,10 @@
     ctx.strokeStyle = "#6c757d"; ctx.beginPath(); ctx.ellipse(bx, px(0.6), 0.3 * k, 0.05 * k, 0, 0, 7); ctx.stroke();
     ctx.fillStyle = "#ffb703"; ctx.beginPath(); ctx.ellipse(bx, px(0.58), 0.34 * k, 0.06 * k, 0, 0, 7); ctx.fill();
   }
+  function drawGimmeRing(h) { // the 3 metre gimme circle round the basket
+    const b = h.basket, pts = []; for (let i = 0; i <= 28; i++) { const a = i / 28 * Math.PI * 2, x = b.x + Math.cos(a) * DG.GIMME, z = b.z + Math.sin(a) * DG.GIMME; pts.push([x, DG.groundAt(h, x, z) + 0.12, z]); }
+    drawLine(pts, "rgba(255,255,255,.7)", true, 2, 0);
+  }
   function drawTee(h) { // a sign at the tee
     if (!project(2.8, DG.groundAt(h, 2.8, 0), 0.5, P)) return; const k = FOC / P.z, x = P.x, y = P.y;
     ctx.fillStyle = "#5e3a18"; ctx.fillRect(x - 0.05 * k, y - 1.5 * k, 0.1 * k, 1.5 * k); ctx.fillStyle = "#ffd23f"; ctx.fillRect(x - 0.42 * k, y - 1.9 * k, 0.84 * k, 0.5 * k);
@@ -198,23 +228,45 @@
     for (const p of pts) { if (project(p[0], p[1] + (lift || 0), p[2], P)) { started ? ctx.lineTo(P.x, P.y) : ctx.moveTo(P.x, P.y); started = true; } }
     ctx.stroke(); ctx.setLineDash([]);
   }
-  function drawCard3D(x, y, z, bank, dirx, dirz, spin, disc, big) {
-    // a card (a flat rectangle) at (x, y, z), tilted by the bank, spinning
+  function drawCard3D(x, y, z, bank, dirx, dirz, spin, disc, big, hold) {
+    // a real-looking card: its art is pasted onto the projected rectangle, with an edge, a moving shine and a back side
     const l = Math.hypot(dirx, dirz) || 1, f = [dirx / l, 0, dirz / l], r = [f[2], 0, -f[0]];
-    const tilt = bank * 0.55, e1 = [r[0] * Math.cos(tilt), Math.sin(tilt), r[2] * Math.cos(tilt)], e2 = f;
-    const c = Math.cos(spin), s = Math.sin(spin), a = [e1[0] * c + e2[0] * s, e1[1] * c + e2[1] * s, e1[2] * c + e2[2] * s], b = [-e1[0] * s + e2[0] * c, -e1[1] * s + e2[1] * c, -e1[2] * s + e2[2] * c];
-    const sz = big || 0.42, hw = sz * 0.5, hh = sz * 0.32, quad = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]], o = [];
-    for (const [u, v] of quad) { if (!project(x + a[0] * u + b[0] * v, y + a[1] * u + b[1] * v, z + a[2] * u + b[2] * v, P)) return; o.push([P.x, P.y]); }
-    ctx.fillStyle = "#101010"; ctx.beginPath(); ctx.moveTo(...o[0]); for (let i = 1; i < 4; i++) ctx.lineTo(...o[i]); ctx.closePath(); ctx.fill();
-    const m = (p, q, t) => [lerp(p[0], q[0], t), lerp(p[1], q[1], t)], inner = [m(m(o[0], o[2], 0.1), o[0], 0), 0]; void inner;
-    const ctr = [(o[0][0] + o[2][0]) / 2, (o[0][1] + o[2][1]) / 2], sh = o.map((q) => [lerp(q[0], ctr[0], 0.1), lerp(q[1], ctr[1], 0.1)]);
-    ctx.fillStyle = disc.color; ctx.beginPath(); ctx.moveTo(...sh[0]); for (let i = 1; i < 4; i++) ctx.lineTo(...sh[i]); ctx.closePath(); ctx.fill();
+    const tilt = bank * 0.55 + (hold ? 0 : 0.1 * Math.sin(spin * 0.7)), e1 = [r[0] * Math.cos(tilt), Math.sin(tilt), r[2] * Math.cos(tilt)], e2 = f;
+    const c = Math.cos(spin), sn = Math.sin(spin), a = [e1[0] * c + e2[0] * sn, e1[1] * c + e2[1] * sn, e1[2] * c + e2[2] * sn], b = [-e1[0] * sn + e2[0] * c, -e1[1] * sn + e2[1] * c, -e1[2] * sn + e2[2] * c];
+    { // tip the card up a little towards the camera so you can see its face in the air
+      const nrm = [b[1] * a[2] - b[2] * a[1], b[2] * a[0] - b[0] * a[2], b[0] * a[1] - b[1] * a[0]], vt = hold ? 0.55 : 0.5, cv2 = Math.cos(vt), sv = Math.sin(vt);
+      let n2 = [nrm[0] * cv2 - f[0] * sv, nrm[1] * cv2 - f[1] * sv, nrm[2] * cv2 - f[2] * sv]; const nl = Math.hypot(n2[0], n2[1], n2[2]) || 1; n2 = n2.map((v) => v / nl);
+      const da = a[0] * n2[0] + a[1] * n2[1] + a[2] * n2[2]; let a2 = [a[0] - n2[0] * da, a[1] - n2[1] * da, a[2] - n2[2] * da]; const al = Math.hypot(a2[0], a2[1], a2[2]) || 1; a2 = a2.map((v) => v / al);
+      const b2 = [a2[1] * n2[2] - a2[2] * n2[1], a2[2] * n2[0] - a2[0] * n2[2], a2[0] * n2[1] - a2[1] * n2[0]];
+      a[0] = a2[0]; a[1] = a2[1]; a[2] = a2[2]; b[0] = b2[0]; b[1] = b2[1]; b[2] = b2[2];
+    }
+    const sz = big || 0.5, hw = sz * 0.5, hh = sz * 0.5 * (CH / CW), quad = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]], o = [];
+    for (const [u, v] of quad) { if (!project(x + a[0] * u + b[0] * v, y + a[1] * u + b[1] * v, z + a[2] * u + b[2] * v, P)) return 0; o.push([P.x, P.y]); }
     const w = Math.hypot(o[1][0] - o[0][0], o[1][1] - o[0][1]);
-    if (w > 26) { ctx.save(); ctx.translate(ctr[0], ctr[1]); ctx.rotate(Math.atan2(o[1][1] - o[0][1], o[1][0] - o[0][0])); ctx.fillStyle = "rgba(255,255,255,.85)"; ctx.fillRect(-w * 0.4, -w * 0.12, w * 0.3, w * 0.3); ctx.fillStyle = "rgba(0,0,0,.75)"; ctx.font = `900 ${Math.max(6, w * 0.22) | 0}px sans-serif`; ctx.textAlign = "left"; ctx.fillText("TTT", -w * 0.04, w * 0.02); ctx.restore(); }
+    const ux = (o[1][0] - o[0][0]) / CW, uy = (o[1][1] - o[0][1]) / CW, vx = (o[3][0] - o[0][0]) / CH, vy = (o[3][1] - o[0][1]) / CH, det = ux * vy - uy * vx, back = det < 0;
+    const edge = Math.max(1.2, w * 0.045);
+    ctx.fillStyle = "rgba(0,0,0,.45)"; ctx.beginPath(); ctx.moveTo(o[0][0], o[0][1] + edge); for (let i = 1; i < 4; i++) ctx.lineTo(o[i][0], o[i][1] + edge); ctx.closePath(); ctx.fill();
+    ctx.save();
+    if (back) ctx.setTransform(-ux, -uy, vx, vy, o[1][0], o[1][1]); else ctx.setTransform(ux, uy, vx, vy, o[0][0], o[0][1]);
+    ctx.drawImage(artFor(disc, back), 0, 0);
+    if (w > 18) { // a shine that slides across as it spins
+      ctx.save(); rrect(ctx, 0, 0, CW, CH - 3, 14); ctx.clip(); const gx = (((spin * 0.45) % 2) + 2) % 2 * (CW + 120) - 80, sh = ctx.createLinearGradient(gx, 0, gx + 70, CH); sh.addColorStop(0, "rgba(255,255,255,0)"); sh.addColorStop(0.5, "rgba(255,255,255,.5)"); sh.addColorStop(1, "rgba(255,255,255,0)"); ctx.fillStyle = sh; ctx.fillRect(0, 0, CW, CH); ctx.restore();
+    }
+    ctx.restore(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+    return w;
   }
-  function drawShadow(x, z, h) {
-    const gy = DG.groundAt(h, x, z); if (gy < -40) return; if (!project(x, gy + 0.03, z, P)) return; const k = FOC / P.z, px = P.x, py = P.y;
-    ctx.fillStyle = "rgba(0,0,0,.3)"; ctx.beginPath(); ctx.ellipse(px, py, 0.34 * k, 0.1 * k, 0, 0, 7); ctx.fill();
+  function drawShadow(x, z, h, height) {
+    const gy = DG.groundAt(h, x, z); if (gy < -40) return; if (!project(x, gy + 0.03, z, P)) return; const k = FOC / P.z, px = P.x, py = P.y, up = clamp(1 - (height || 0) * 0.045, 0.35, 1);
+    ctx.fillStyle = `rgba(0,0,0,${0.12 + 0.26 * up})`; ctx.beginPath(); ctx.ellipse(px, py, 0.38 * k * up, 0.12 * k * up, 0, 0, 7); ctx.fill();
+  }
+  function drawTrail(f) { // a ribbon in the card's colour that fades behind it, with a few sparkles
+    const n = Math.min(f.i + 1, f.pts.length), start = Math.max(0, n - 70), c = hex2(f.disc.color); let prev = null;
+    for (let i = start; i < n; i++) {
+      const p = f.pts[i], age = (i - start) / Math.max(1, n - start - 1); if (!project(p[0], p[1], p[2], P)) { prev = null; continue; }
+      if (prev) { ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},${0.08 + 0.7 * age})`; ctx.lineWidth = 1 + 7 * age * age; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(prev[0], prev[1]); ctx.lineTo(P.x, P.y); ctx.stroke(); ctx.strokeStyle = `rgba(255,255,255,${0.1 + 0.55 * age})`; ctx.lineWidth = 1 + 2 * age; ctx.beginPath(); ctx.moveTo(prev[0], prev[1]); ctx.lineTo(P.x, P.y); ctx.stroke(); }
+      if (i % 5 === 0 && age > 0.35) { ctx.fillStyle = `rgba(255,255,255,${age * 0.8})`; const j = Math.sin(i * 12.9898 + tAnim * 6) * 7; ctx.beginPath(); ctx.arc(P.x + j, P.y + Math.cos(i * 7.7) * 7, 1 + age * 1.8, 0, 7); ctx.fill(); }
+      prev = [P.x, P.y];
+    }
   }
 
   function drawHUDOverlay(now) {
@@ -229,7 +281,7 @@
     const rd = R, mx = W - rd.mw - 12, my = 12;
     ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.fillRect(mx - 4, my - 4, rd.mw + 8, rd.mh + 8); ctx.drawImage(rd.mm, mx, my);
     const mp = (x, z) => { const q = rd.toM(x, z); return [mx + q[0], my + q[1]]; };
-    if (pred && phase === "aim") { ctx.strokeStyle = "#ffe066"; ctx.lineWidth = 2; ctx.beginPath(); pred.pts.forEach((p, i) => { const q = mp(p[0], p[2]); i ? ctx.lineTo(...q) : ctx.moveTo(...q); }); ctx.stroke(); }
+    if (phase === "aim" || phase === "power" || phase === "acc") { ctx.strokeStyle = "#ffe066"; ctx.lineWidth = 2; ctx.setLineDash([4, 4]); const q0 = mp(lie.x, lie.z), q1 = mp(lie.x + Math.sin(cfg.yaw) * 70, lie.z + Math.cos(cfg.yaw) * 70); ctx.beginPath(); ctx.moveTo(...q0); ctx.lineTo(...q1); ctx.stroke(); ctx.setLineDash([]); }
     const t0 = mp(0, 0); ctx.fillStyle = "#cfd8dc"; ctx.fillRect(t0[0] - 3, t0[1] - 2, 6, 4);
     const bp = mp(hole.basket.x, hole.basket.z); ctx.fillStyle = "#ff3b3b"; ctx.beginPath(); ctx.arc(bp[0], bp[1], 4, 0, 7); ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5; ctx.stroke();
     const lp = mp(lie.x, lie.z); ctx.fillStyle = "#ffd23f"; ctx.beginPath(); ctx.arc(lp[0], lp[1], 4, 0, 7); ctx.fill(); ctx.strokeStyle = "#000"; ctx.stroke();
@@ -252,40 +304,85 @@
     // the ground below the horizon
     ctx.fillStyle = rgb(fogMix(hex2("#5a8a50"), 400, sky)); ctx.fillRect(0, H / 2 - Math.tan(cam.pitch) * FOC + 8, W, H);
     drawTerrain(hole, R);
-    drawTee(hole);
+    drawTee(hole); drawGimmeRing(hole);
     // trees and the basket, far to near
     const vis = [];
     for (const t of hole.trees) { const dx = t.x - cam.x, dz = t.z - cam.z, fw = dx * fx + dz * fz; if (fw < 0.5 || fw > 330) continue; if (Math.abs(dx * rx + dz * rz) > fw * 1.1 + 8) continue; vis.push([fw, t]); }
     const bd = (hole.basket.x - cam.x) * fx + (hole.basket.z - cam.z) * fz; vis.push([bd, null]);
     vis.sort((a, b) => b[0] - a[0]);
     for (const [, t] of vis) { if (t) drawTree(t, th, sky); else drawBasket(hole, sky); }
-    // the aim line, and the card
-    if (phase === "aim" && pred) {
-      const pts = pred.pts.filter((_, i) => i % 3 === 0); drawLine(pts, "rgba(255,230,90,.95)", true, 4, 0.0);
-      const e = pred.end; if (project(e.x, DG.groundAt(hole, e.x, e.z) + 0.05, e.z, P)) { const k = FOC / P.z; ctx.strokeStyle = pred.kind === "ob" ? "#ff5a4a" : pred.kind === "holed" ? "#7df08f" : "#ffe066"; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(P.x, P.y, Math.max(6, 0.7 * k), Math.max(3, 0.25 * k), 0, 0, 7); ctx.stroke(); }
+    // where you are pointing: a straight dotted line on the ground (it does not show how the card will curve!)
+    if ((phase === "aim" || phase === "power" || phase === "acc") && !putting) {
+      const pts = []; for (let d = 4; d <= 90; d += 3) { const x = lie.x + Math.sin(cfg.yaw) * d, z = lie.z + Math.cos(cfg.yaw) * d; pts.push([x, DG.groundAt(hole, x, z) + 0.15, z]); }
+      drawLine(pts, "rgba(255,230,90,.85)", true, 3, 0);
     }
     if (flight) {
-      const trail = flight.pts.slice(0, flight.i + 1).filter((_, i, a) => i % 2 === 0 || i === a.length - 1); drawLine(trail, "rgba(255,255,255,.7)", false, 2.5, 0);
-      drawShadow(flight.cur[0], flight.cur[2], hole);
-      drawCard3D(flight.cur[0], flight.cur[1], flight.cur[2], flight.bank, flight.dx, flight.dz, flight.spin, flight.disc, 1.35);
+      drawTrail(flight);
+      const h0 = DG.groundAt(hole, flight.cur[0], flight.cur[2]); drawShadow(flight.cur[0], flight.cur[2], hole, flight.cur[1] - h0);
+      for (let g = 2; g >= 1; g--) { const gi = Math.max(0, flight.i - g * 3), q = flight.pts[gi]; if (q && Math.hypot(q[0] - flight.cur[0], q[2] - flight.cur[2]) < 25) { ctx.globalAlpha = 0.16 * (3 - g); drawCard3D(q[0], q[1], q[2], flight.bank, flight.dx, flight.dz, flight.spin - g * 0.7 * flight.hand, flight.disc, 1.9); ctx.globalAlpha = 1; } }
+      drawCard3D(flight.cur[0], flight.cur[1], flight.cur[2], flight.bank, flight.dx, flight.dz, flight.spin, flight.disc, 1.9);
     } else if (phase !== "between" && phase !== "holed") {
-      drawCard3D(lie.x, DG.groundAt(hole, lie.x, lie.z) + 0.05, lie.z, 0.0, Math.sin(cfg.yaw), Math.cos(cfg.yaw), 0, DG.DISCS[cfg.disc], 0.8); // the card on the ground at your feet
+      drawCard3D(lie.x, DG.groundAt(hole, lie.x, lie.z) + 0.05, lie.z, 0.0, Math.sin(cfg.yaw), Math.cos(cfg.yaw), 0, DG.DISCS[cfg.disc], 0.9, true); // the card on the ground at your feet
     }
     if (flight) { const dd = Math.hypot(flight.cur[0] - lie.x, flight.cur[2] - lie.z); ctx.font = "900 22px sans-serif"; ctx.textAlign = "center"; ctx.lineWidth = 5; ctx.strokeStyle = "#101010"; ctx.strokeText(`${dd.toFixed(0)} m`, W / 2, H - 22); ctx.fillStyle = "#fff"; ctx.fillText(`${dd.toFixed(0)} m`, W / 2, H - 22); }
     drawHUDOverlay(now); drawBanner(now);
-    if (phase === "aim") { // the power gauge and the card you hold
-      const x = 22, y = 118, hh = 240, pw = cfg.power; ctx.fillStyle = "rgba(0,0,0,.5)"; rrect(ctx, x - 6, y - 8, 32, hh + 40, 10); ctx.fill();
-      ctx.fillStyle = "rgba(255,255,255,.18)"; ctx.fillRect(x, y, 20, hh); const col = `hsl(${120 - pw * 120},85%,55%)`; ctx.fillStyle = col; ctx.fillRect(x, y + hh * (1 - pw), 20, hh * pw);
-      ctx.fillStyle = "#fff"; ctx.font = "800 11px sans-serif"; ctx.textAlign = "center"; ctx.fillText(Math.round(pw * 100) + "%", x + 10, y + hh + 18);
-      const d = DG.DISCS[cfg.disc]; ctx.textAlign = "left"; ctx.font = "800 14px sans-serif"; ctx.lineWidth = 4; ctx.strokeStyle = "#101010"; const tx = `${d.name} · ${pred ? pred.dist.toFixed(0) : "?"} m`; ctx.strokeText(tx, 70, H - 18); ctx.fillStyle = d.color; ctx.fillText(tx, 70, H - 18);
+    if (putting && phase === "aim") drawPutt(now);
+    if (phase === "aim" || phase === "power" || phase === "acc") { if (!putting) drawMeter(now); const d = DG.DISCS[cfg.disc]; ctx.textAlign = "left"; ctx.font = "800 14px sans-serif"; ctx.lineWidth = 4; ctx.strokeStyle = "#101010"; const tx = `${d.name} · ${d.kind}`; ctx.strokeText(tx, 16, H - 18); ctx.fillStyle = d.color; ctx.fillText(tx, 16, H - 18); }
+    const tf = $("throwFloat"), want = phase === "aim" ? (putting ? "🥏 PUTT! <kbd>Space</kbd>" : "🥏 THROW <kbd>Space</kbd>") : phase === "power" ? "SET THE POWER <kbd>Space</kbd>" : phase === "acc" ? "RELEASE! <kbd>Space</kbd>" : "";
+    tf.hidden = !want; const wk = phase + (putting ? "p" : ""); if (want && tf.dataset.w !== wk) { tf.innerHTML = want; tf.dataset.w = wk; }
+  }
+
+  // ---------------- the throw: pick power on the first press, then the release on the second ----------------
+  let meter = null;
+  // Putting: inside 10 m there is no power meter. The putter is solved for you and you line up a drifting ring with the basket and press Space once.
+  let putting = false, puttSol = null, puttT0 = 0, puttMo = null, puttTrail = [];
+  const puttAmp = (d) => clamp(0.8 + 0.4 * d, 1.2, 4.2);
+  const puttPos = (now) => { const t = Math.max(0, (now - puttT0) / 1000), A = puttAmp(puttSol.dist); return [A * Math.sin(2.3 * t + puttMo[0]), 0.55 * A * Math.sin(1.31 * t + puttMo[1])]; };
+  const tri = (x) => { const m = ((x % 2) + 2) % 2; return m < 1 ? m : 2 - m; };
+  const powerAt = (now) => tri((now - meter.t0) / 1150);
+  const accAt = (now) => 0.5 + 0.5 * Math.sin(((now - meter.t0) / (1500 - 750 * meter.power)) * 2 * Math.PI - Math.PI / 2);
+  function pressThrow() {
+    const now = performance.now();
+    if (phase === "aim" && putting) { if (now < puttT0) return; const [ex, ey] = puttPos(now); puttNow(ex, ey); }
+    else if (phase === "aim") { meter = { stage: "power", t0: now, power: 0 }; phase = "power"; beep(420, 0.06, "triangle", 0.05, 1.3); }
+    else if (phase === "power") { meter.power = Math.max(0.05, powerAt(now)); cfg.power = meter.power; meter.stage = "acc"; meter.t0 = now; phase = "acc"; beep(560, 0.06, "triangle", 0.05, 1.3); }
+    else if (phase === "acc") { const a = (accAt(now) - 0.5) * 2, pw = meter.power; meter = null; throwNow(pw, a); }
+  }
+  function cancelMeter() { if (phase === "power" || phase === "acc") { meter = null; phase = "aim"; } }
+  function drawPutt(now) {
+    const b = hole.basket; if (!project(b.x, b.y + 0.9, b.z, P)) return;
+    const u = 0.35 * FOC / P.z, cx = P.x, cy = P.y, ready = now >= puttT0, [ex, ey] = ready ? puttPos(now) : [0, 0], rx = cx + ex * u, ry = cy - ey * u, near = Math.hypot(ex, ey) < 1.2;
+    // the sweet spot on the basket
+    ctx.fillStyle = near ? "rgba(120,255,160,.28)" : "rgba(255,255,255,.12)"; ctx.beginPath(); ctx.arc(cx, cy, 1.2 * u, 0, 7); ctx.fill();
+    ctx.lineWidth = 4; ctx.strokeStyle = near ? "rgba(120,255,160,1)" : "rgba(255,255,255,.9)"; ctx.setLineDash([7, 5]); ctx.beginPath(); ctx.arc(cx, cy, 1.2 * u, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = "rgba(255,255,255,.8)"; ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, 7); ctx.fill();
+    if (ready) { puttTrail.push([rx, ry]); if (puttTrail.length > 14) puttTrail.shift(); }
+    puttTrail.forEach((q, i) => { ctx.fillStyle = `rgba(255,230,90,${(i / puttTrail.length) * 0.35})`; ctx.beginPath(); ctx.arc(q[0], q[1], 9 * (i / puttTrail.length), 0, 7); ctx.fill(); });
+    ctx.globalAlpha = ready ? 1 : 0.4; ctx.strokeStyle = near ? "#7df08f" : "#ffe066"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(rx, ry, 17, 0, 7); ctx.stroke();
+    ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(rx - 26, ry); ctx.lineTo(rx - 8, ry); ctx.moveTo(rx + 8, ry); ctx.lineTo(rx + 26, ry); ctx.moveTo(rx, ry - 26); ctx.lineTo(rx, ry - 8); ctx.moveTo(rx, ry + 8); ctx.lineTo(rx, ry + 26); ctx.stroke(); ctx.globalAlpha = 1;
+    ctx.fillStyle = "rgba(0,0,0,.6)"; rrect(ctx, W / 2 - 230, H - 60, 460, 44, 12); ctx.fill(); ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.font = "800 14px sans-serif";
+    ctx.fillText(ready ? `PUTTING · ${puttSol.dist.toFixed(1)} m: press Space when the ring is on the basket` : "PUTTING: get ready…", W / 2, H - 33);
+  }
+  function drawMeter(now) {
+    const w = 380, h = 24, x = (W - w) / 2, y = H - 64;
+    ctx.fillStyle = "rgba(0,0,0,.6)"; rrect(ctx, x - 10, y - 30, w + 20, h + 46, 14); ctx.fill();
+    ctx.textAlign = "center"; ctx.font = "800 12px sans-serif"; ctx.fillStyle = "#fff";
+    if (phase === "aim") { ctx.fillText("Aim, pick your card, then press THROW (Space) to start the power meter", W / 2, y + 12); return; }
+    ctx.fillText(phase === "power" ? "POWER: press Space when it is as high as you want" : "RELEASE: press Space with the marker in the green", W / 2, y - 12);
+    ctx.fillStyle = "rgba(255,255,255,.14)"; ctx.fillRect(x, y, w, h);
+    if (phase === "power") { const p = powerAt(now); ctx.fillStyle = `hsl(${120 - p * 120},85%,55%)`; ctx.fillRect(x, y, w * p, h); for (const t of [0.25, 0.5, 0.75]) { ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.fillRect(x + w * t - 1, y, 2, h); } ctx.fillStyle = "#fff"; ctx.fillText(Math.round(p * 100) + "%", x + w / 2, y + 17); }
+    else {
+      ctx.fillStyle = "#b3392e"; ctx.fillRect(x, y, w, h); ctx.fillStyle = "#e0b43a"; ctx.fillRect(x + w * 0.3, y, w * 0.4, h); ctx.fillStyle = "#3be86b"; ctx.fillRect(x + w * 0.45, y, w * 0.1, h);
+      ctx.fillStyle = "rgba(255,255,255,.7)"; ctx.fillRect(x + w * 0.5 - 1, y - 4, 2, h + 8);
+      const m = accAt(now); ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.moveTo(x + w * m, y - 6); ctx.lineTo(x + w * m - 8, y - 18); ctx.lineTo(x + w * m + 8, y - 18); ctx.closePath(); ctx.fill(); ctx.fillRect(x + w * m - 2, y, 4, h);
+      ctx.fillStyle = "#fff"; ctx.fillText(`power ${Math.round(meter.power * 100)}%`, x + w / 2, y + 17);
     }
-    $("throwFloat").hidden = phase !== "aim";
   }
 
   // ---------------- the round ----------------
   const dBasket = () => Math.hypot(hole.basket.x - lie.x, hole.basket.z - lie.z);
   const label = (s, par) => (s === 1 ? "ACE!!" : s - par <= -3 ? "ALBATROSS!" : s - par === -2 ? "EAGLE!" : s - par === -1 ? "BIRDIE!" : s === par ? "PAR" : s - par === 1 ? "BOGEY" : s - par === 2 ? "DOUBLE BOGEY" : "+" + (s - par));
-  const total = () => results.reduce((a, b) => a + b, 0) + (hole && (phase === "aim" || phase === "flight") ? Math.min(strokes, DG.MAX_STROKES) : 0);
+  const total = () => results.reduce((a, b) => a + b, 0) + (hole && (phase === "aim" || phase === "flight" || phase === "power" || phase === "acc") ? Math.min(strokes, DG.MAX_STROKES) : 0);
   function startCourse(m) {
     mode = m; course = DG.course(courseId); holeIdx = 0; results = []; finished = false; lastSent = 0; hideResult(); $("oppLine").textContent = ""; np.setPlaying(true);
     newHole(); running(true);
@@ -297,15 +394,16 @@
     camSnap();
   }
   function recommend(dist) { return dist <= 22 ? 0 : dist <= 50 ? 1 : dist <= 85 ? 2 : dist <= 118 ? 3 : dist <= 150 ? 4 : 5; }
-  function setupLie(first) { // a sensible aim, card and power for where you are
-    const gp = DG.guidePoint(hole, lie), dB = dBasket(); cfg.yaw = Math.atan2(gp.x - lie.x, gp.z - lie.z); cfg.disc = recommend(dB); cfg.bank = 0; cfg.launch = 1; cfg.hand = 1;
-    const c = DG.caddie(hole, lie, { fast: true, discs: [DG.DISCS[cfg.disc]] }); if (c) { cfg.yaw = c.p.yaw; cfg.power = c.p.power; cfg.bank = c.p.bank; cfg.launch = c.p.launch; }
-    syncUI(); refreshPred(); void first;
+  function setupLie() { // point down the fairway (or at the basket) with a sensible card for the distance. The rest is up to you.
+    const gp = DG.guidePoint(hole, lie), dB = dBasket(); cfg.yaw = Math.atan2(gp.x - lie.x, gp.z - lie.z); cfg.disc = recommend(dB); cfg.bank = 0; cfg.launch = 1; cfg.hand = 1; cfg.power = 0.7;
+    putting = dB <= DG.PUTT && dB > DG.GIMME;
+    if (putting) { cfg.disc = 0; puttSol = DG.puttSolve(hole, lie); cfg.yaw = puttSol.yaw; puttMo = [Math.random() * 6.28, Math.random() * 6.28]; puttT0 = performance.now() + 900; puttTrail = []; }
+    $("panel").classList.toggle("putting", putting);
+    syncUI(); refreshInfo();
   }
   const params = (p) => Object.assign({ disc: DG.DISCS[cfg.disc].id, yaw: cfg.yaw, power: cfg.power, bank: cfg.bank, launch: cfg.launch, hand: cfg.hand }, p || {});
-  function refreshPred() { if (!hole) return; pred = DG.predict(hole, lie, params()); const dd = pred.dist; $("flightInfo").textContent = `${DG.DISCS[cfg.disc].name}: about ${dd.toFixed(0)} m${pred.kind === "ob" ? " (that goes out of bounds!)" : pred.kind === "holed" ? " (in the basket!)" : ""} · basket ${dBasket().toFixed(0)} m away`; hud(); }
+  function refreshInfo() { if (!hole) return; const d = DG.DISCS[cfg.disc]; if (putting) { $("flightInfo").textContent = `PUTTING from ${dBasket().toFixed(1)} m: line the ring up with the basket and press Space once. The farther out you are, the more the ring wanders. Wind still pushes it.`; hud(); return; } $("flightInfo").textContent = `${d.name} (${d.kind}): about ${Math.round(DG.maxCarry(d.id))} m flat out · the basket is ${dBasket().toFixed(0)} m away · wind ${(hole.wind.speed * DG.K.windK).toFixed(1)} m/s`; hud(); }
   function syncUI() {
-    $("power").value = Math.round(cfg.power * 100); $("powEl").textContent = Math.round(cfg.power * 100) + "%";
     $("bank").value = Math.round(cfg.bank * 100); $("bankEl").textContent = cfg.bank === 0 ? "Flat" : cfg.bank > 0 ? `Hyzer ${Math.round(cfg.bank * 100)}%` : `Anhyzer ${Math.round(-cfg.bank * 100)}%`;
     document.querySelectorAll("#launchSeg button").forEach((b) => b.classList.toggle("on", +b.dataset.v === cfg.launch));
     document.querySelectorAll("#handSeg button").forEach((b) => b.classList.toggle("on", +b.dataset.v === cfg.hand));
@@ -321,12 +419,18 @@
       return `<tr><th>Hole</th>${r1}<th>${a ? "In" : "Out"}</th></tr><tr><th>Par</th>${r2}<td>${par}</td></tr><tr><th>You</th>${r3}<td>${sub || ""}</td></tr>`;
     }).join("");
   }
-  function throwNow() {
-    if (phase !== "aim" || !hole) return;
-    strokes++; const p = params(), r = DG.throwCard(hole, lie, p), disc = DG.DISCS[cfg.disc];
+  function startFlight(r, p, disc) {
     flight = { r, pts: r.pts, i: 0, t: 0, disc, bank: p.bank, hand: p.hand, spin: 0, cur: r.pts[0], dx: Math.sin(p.yaw), dz: Math.cos(p.yaw), wasTree: false };
     phase = "flight"; beep(300, 0.22, "sawtooth", 0.03, 2.2); noise(0.25, 1800, 0.12); hud(); card(); sendOpp(); pred = null;
     $("flightInfo").textContent = "";
+  }
+  function throwNow(power, acc) {
+    if (!hole || (phase !== "aim" && phase !== "acc" && phase !== "power")) return;
+    strokes++; const p = params({ power: power == null ? cfg.power : power, acc: acc || 0 }), r = DG.throwCard(hole, lie, p); startFlight(r, p, DG.DISCS[cfg.disc]);
+  }
+  function puttNow(ex, ey) {
+    if (!hole || phase !== "aim" || !putting || !puttSol) return;
+    strokes++; const o = DG.puttThrow(hole, lie, puttSol, ex, ey); beep(520, 0.08, "triangle", 0.05, 1.4); startFlight(o.r, Object.assign({ bank: 0, hand: 1 }, o.p), DG.DISCS[0]);
   }
   function flightStep(dt) {
     const f = flight; f.t += dt * 1.25; const pts = f.pts;
@@ -348,6 +452,10 @@
       say(r.why === "water" ? "SPLASH!" : "OUT OF BOUNDS", "+1 throw: throw again from where you were", "#ff8a7a", 2600);
     } else {
       lie = { x: r.end.x, z: r.end.z }; prevLie = lie; const dB = dBasket();
+      if (dB <= DG.GIMME) { // within 3 metres: it is a gimme, the tap-in is given and counts as one more throw
+        strokes++; const sc = Math.min(strokes, DG.MAX_STROKES); phase = "holed"; hud(); beep(700, 0.15, "triangle", 0.07, 1.3); setTimeout(() => beep(1000, 0.25, "triangle", 0.06, 1.2), 120);
+        say("GIMME!", `${dB.toFixed(1)} m out: it counts · ${label(sc, hole.par)} · ${sc} throw${sc === 1 ? "" : "s"}`, sc <= hole.par ? "#7df08f" : "#ffd23f", 2600); setTimeout(() => holeDone(sc), 1900); return;
+      }
       say(`${r.dist.toFixed(0)} m`, dB < 1 ? "right next to the basket" : `${dB.toFixed(0)} m to the basket${r.hitTree ? " · off a tree!" : ""}`, "#fff", 2000);
     }
     if (strokes >= DG.MAX_STROKES) { say("PICK UP", `${DG.MAX_STROKES} throws is the most you can take`, "#ff8a7a", 2200); setTimeout(() => holeDone(DG.MAX_STROKES), 1500); phase = "holed"; return; }
@@ -378,7 +486,13 @@
   // ---------------- the camera follows the action ----------------
   function camSnap() { aimCam(); Object.assign(cam, camT); }
   function aimCam() {
-    const gy = DG.groundAt(hole, lie.x, lie.z), back = 7.5, sy = Math.sin(cfg.yaw), cy = Math.cos(cfg.yaw);
+    const gy = DG.groundAt(hole, lie.x, lie.z);
+    if (putting && puttSol) { // low and close, looking at the basket
+      const b = hole.basket, d = puttSol.dist, back = clamp(d * 0.55 + 1.5, 3, 6), sy = Math.sin(puttSol.yaw), cy = Math.cos(puttSol.yaw);
+      camT.x = lie.x - sy * back; camT.z = lie.z - cy * back; camT.y = Math.max(gy, DG.groundAt(hole, camT.x, camT.z)) + 1.45; camT.yaw = puttSol.yaw;
+      camT.pitch = clamp(Math.atan2(camT.y - (b.y + 0.9), d + back), -0.05, 0.4); return;
+    }
+    const back = 7.5, sy = Math.sin(cfg.yaw), cy = Math.cos(cfg.yaw);
     camT.x = lie.x - sy * back; camT.z = lie.z - cy * back; camT.y = Math.max(gy, DG.groundAt(hole, camT.x, camT.z)) + 2.6; camT.yaw = cfg.yaw; camT.pitch = 0.17;
   }
   function updateCam(dt, now) {
@@ -386,7 +500,7 @@
       const c = flight.cur, l = Math.hypot(flight.dx, flight.dz) || 1, dx = flight.dx / l, dz = flight.dz / l;
       camT.x = c[0] - dx * 9; camT.z = c[2] - dz * 9; camT.y = Math.max(c[1] + 2.4, DG.groundAt(hole, camT.x, camT.z) + 2.4);
       camT.yaw = Math.atan2(dx, dz); const down = (camT.y - c[1]) / 9; camT.pitch = clamp(Math.atan(down), 0.05, 0.5);
-    } else if (phase === "aim") aimCam();
+    } else if (phase === "aim" || phase === "power" || phase === "acc") aimCam();
     else if (phase === "between" || phase === "holed") { const b = hole.basket, a = now * 0.0004, d = 9; camT.x = b.x + Math.sin(a) * d; camT.z = b.z + Math.cos(a) * d; camT.y = b.y + 4.5; camT.yaw = Math.atan2(b.x - camT.x, b.z - camT.z); camT.pitch = 0.3; }
     const k = 1 - Math.exp(-(phase === "flight" ? 9 : 5) * dt);
     cam.x = lerp(cam.x, camT.x, k); cam.y = lerp(cam.y, camT.y, k); cam.z = lerp(cam.z, camT.z, k);
@@ -399,8 +513,7 @@
     const dt = Math.min(0.05, last ? (ts - last) / 1000 : 0.016); last = ts; tAnim += dt;
     if (!hole) return;
     if (phase === "aim") { // held keys
-      let d = 0; if (keys.left) d -= 1; if (keys.right) d += 1; if (d) { cfg.yaw += d * dt * (keys.shift ? 0.25 : 0.9); refreshPred(); }
-      let p = 0; if (keys.up) p += 1; if (keys.down) p -= 1; if (p) { cfg.power = clamp(cfg.power + p * dt * 0.4, 0.05, 1); syncUI(); refreshPred(); }
+      let d = 0; if (keys.left) d -= 1; if (keys.right) d += 1; if (d && !putting) { cfg.yaw += d * dt * (keys.shift ? 0.25 : 0.9); refreshInfo(); }
     }
     if (phase === "flight" && flight) flightStep(dt);
     if (phase === "between" && performance.now() > nextAt) { if (holeIdx + 1 < DG.HOLES) { holeIdx++; newHole(); } else finishCourse(); }
@@ -413,30 +526,26 @@
   addEventListener("keydown", (e) => {
     if (mode === "idle" || /input|select|textarea/i.test(e.target.tagName)) return;
     if (KEYMAP[e.code]) { keys[KEYMAP[e.code]] = true; e.preventDefault(); return; }
-    if (e.code === "Space") { e.preventDefault(); if (!e.repeat) throwNow(); return; }
+    if (e.code === "Space") { e.preventDefault(); if (!e.repeat) pressThrow(); return; }
+    if (e.code === "Escape" && (phase === "power" || phase === "acc")) { cancelMeter(); return; }
+    if (e.code === "Escape" && mode === "solo" && phase === "aim") { $("quitBtn").click(); return; }
     if (phase !== "aim") return;
-    if (/^Digit[1-8]$/.test(e.code)) { cfg.disc = +e.code.slice(5) - 1; syncUI(); refreshPred(); return; }
-    if (e.code === "KeyQ") { cfg.bank = clamp(cfg.bank - 0.25, -1, 1); syncUI(); refreshPred(); } else if (e.code === "KeyE") { cfg.bank = clamp(cfg.bank + 0.25, -1, 1); syncUI(); refreshPred(); }
-    else if (e.code === "KeyC") caddie(); else if (e.code === "KeyF") { cfg.hand = -cfg.hand; syncUI(); refreshPred(); }
-    else if (e.code === "Escape" && mode === "solo") $("quitBtn").click();
+    if (putting) return; // the putter is locked in
+    if (/^Digit[1-8]$/.test(e.code)) { cfg.disc = +e.code.slice(5) - 1; syncUI(); refreshInfo(); return; }
+    if (e.code === "KeyQ") { cfg.bank = clamp(cfg.bank - 0.25, -1, 1); syncUI(); refreshInfo(); } else if (e.code === "KeyE") { cfg.bank = clamp(cfg.bank + 0.25, -1, 1); syncUI(); refreshInfo(); }
+    else if (e.code === "KeyF") { cfg.hand = -cfg.hand; syncUI(); refreshInfo(); }
   });
   addEventListener("blur", () => { for (const k of Object.keys(keys)) keys[k] = false; });
   addEventListener("keyup", (e) => { if (KEYMAP[e.code]) keys[KEYMAP[e.code]] = false; });
   let dragX = null;
   cv.addEventListener("pointerdown", (e) => { dragX = e.clientX; cv.setPointerCapture(e.pointerId); });
-  cv.addEventListener("pointermove", (e) => { if (dragX == null || phase !== "aim") return; cfg.yaw += (e.clientX - dragX) * 0.0035; dragX = e.clientX; refreshPred(); });
+  cv.addEventListener("pointermove", (e) => { if (dragX == null || phase !== "aim" || putting) return; cfg.yaw += (e.clientX - dragX) * 0.0035; dragX = e.clientX; refreshInfo(); });
   cv.addEventListener("pointerup", () => { dragX = null; });
-  $("power").addEventListener("input", (e) => { cfg.power = e.target.value / 100; syncUI(); refreshPred(); });
-  $("bank").addEventListener("input", (e) => { cfg.bank = e.target.value / 100; syncUI(); refreshPred(); });
-  $("launchSeg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { cfg.launch = +b.dataset.v; syncUI(); refreshPred(); } });
-  $("handSeg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { cfg.hand = +b.dataset.v; syncUI(); refreshPred(); } });
-  $("throwBtn").addEventListener("click", throwNow); $("throwFloat").addEventListener("click", throwNow);
-  $("aimBtn").addEventListener("click", () => { if (phase !== "aim") return; cfg.yaw = Math.atan2(hole.basket.x - lie.x, hole.basket.z - lie.z); refreshPred(); });
-  function caddie() {
-    if (phase !== "aim") return; $("flightInfo").textContent = "Caddie is thinking…";
-    setTimeout(() => { const c = DG.caddie(hole, lie, { fast: false }); if (c) { cfg.disc = DG.discOf(c.p.disc).n; cfg.yaw = c.p.yaw; cfg.power = c.p.power; cfg.bank = c.p.bank; cfg.launch = c.p.launch; cfg.hand = c.p.hand; syncUI(); refreshPred(); beep(660, 0.1, "triangle", 0.05, 1.3); } }, 20);
-  }
-  $("caddieBtn").addEventListener("click", caddie);
+  $("bank").addEventListener("input", (e) => { cfg.bank = e.target.value / 100; syncUI(); refreshInfo(); });
+  $("launchSeg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { cfg.launch = +b.dataset.v; syncUI(); refreshInfo(); } });
+  $("handSeg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { cfg.hand = +b.dataset.v; syncUI(); refreshInfo(); } });
+  $("throwBtn").addEventListener("click", pressThrow); $("throwFloat").addEventListener("click", pressThrow);
+  $("aimBtn").addEventListener("click", () => { if (phase !== "aim" || putting) return; cfg.yaw = Math.atan2(hole.basket.x - lie.x, hole.basket.z - lie.z); refreshInfo(); });
   $("quitBtn").addEventListener("click", () => { if (np.kind) np.leave(); else toMenu(); });
   $("startBtn").addEventListener("click", () => startCourse("solo"));
 
@@ -463,5 +572,5 @@
     onNet(from, d) { if (d && d.k === "h") $("oppLine").textContent = `${oppName}: hole ${d.h}/${DG.HOLES} · ${d.t} throw${d.t === 1 ? "" : "s"}${d.d ? " · finished" : ""}`; },
   });
   renderBag(); renderCourses(); syncUI();
-  window.__dg = () => ({ DG, cfg, hole, lie, phase, strokes, results, flight, pred, cam, throwNow, caddie, holeDone, newHole: () => newHole(), goto: (i) => { holeIdx = i; newHole(); }, setLie: (x, z) => { lie = { x, z }; setupLie(); }, frame: (ts) => frame(ts), render: () => render(performance.now()), start: startCourse });
+  window.__dg = () => ({ DG, cfg, hole, lie, phase, strokes, results, flight, cam, throwNow, pressThrow, puttNow, putting: () => putting, puttSol: () => puttSol, meter: () => meter, holeDone, newHole: () => newHole(), goto: (i) => { holeIdx = i; newHole(); }, setLie: (x, z) => { lie = { x, z }; setupLie(); }, frame: (ts) => frame(ts), render: () => render(performance.now()), start: startCourse });
 })();

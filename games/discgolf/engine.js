@@ -11,7 +11,7 @@
   if (typeof module === 'object' && module.exports) module.exports = factory(); else root.DiscGolf = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
-  const HOLES = 18, MAX_STROKES = 9, G = 9.81, DT = 1 / 90;
+  const HOLES = 18, MAX_STROKES = 9, GIMME = 3, G = 9.81, DT = 1 / 90; // GIMME: land within this many metres of the basket and the next throw is given
   const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
   const lerp = (a, b, t) => a + (b - a) * t;
   const smooth = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
@@ -38,7 +38,7 @@
   const DISC_BY_ID = {}; DISCS.forEach((d, i) => { d.n = i; DISC_BY_ID[d.id] = d; });
 
   // physics constants (calibrated against real-ish distances: a putter about 40 m, a distance driver about 125 m)
-  const K = { drag: 0.013594, dragSpeed: 0.0000021, lift: 0.222469, a0: 0.021122, turn: 0.662855, fade: 0.791712, bank: 0.003946, bankLift: 0.345631, pcomp: 0.888204, pcompL: 0.478748, windK: 0.8, v0: 18.094425, v0Speed: 2.061057 };
+  const K = { drag: 0.013594, dragSpeed: 0.0000021, lift: 0.222469, a0: 0.021122, turn: 0.662855, fade: 0.791712, bank: 0.003946, bankLift: 0.345631, pcomp: 0.888204, pcompL: 0.478748, windK: 1.0, v0: 18.094425, v0Speed: 2.061057 };
   const LAUNCH = [0.035, 0.115, 0.2]; // low, normal, high (radians above flat)
 
   // ---------- the courses ----------
@@ -195,7 +195,7 @@
       if (y - by < 0.35 || y - by > 1.6) return 0;
       if (d < 0.1) return 2; // the pole: deflects
       if (d > 0.52) return 0;
-      const pc = clamp(0.97 - 0.038 * Math.max(0, sp - 6), 0.1, 0.97) * (1 - 0.4 * (d / 0.52) * (d / 0.52));
+      const pc = clamp(0.985 - 0.024 * Math.max(0, sp - 7), 0.12, 0.985) * (1 - 0.3 * (d / 0.52) * (d / 0.52));
       return rng() < pc ? 1 : 3;
     };
     while (steps < 3000 && !result) {
@@ -262,13 +262,44 @@
     pts.push([st.x, st.y, st.z, st.t]);
     return { pts, end: { x: st.x, y: st.y, z: st.z }, kind: result.kind, why: result.why, hitTree, carry: firstImpact ? firstImpact.d : 0, dist: Math.hypot(st.x - lie.x, st.z - lie.z), time: st.t, surf: surfAt(h, st.x, st.z) };
   }
-  // what actually leaves your hand: a little shaky, more so the harder you throw
+  // what actually leaves your hand. p.acc (-1..1) is how far off the release was on the accuracy meter: the harder you throw, the more
+  // a late or early release costs you (a hook or a slice), and there is always a little shake on top.
   function execute(p, rng) {
-    rng = rng || Math.random; const pw = clamp(p.power, 0, 1), putt = discOf(p.disc).speed <= 3 && pw < 0.55;
-    return Object.assign({}, p, { yaw: p.yaw + gauss(rng) * ((putt ? 0.4 : 0.8) + 3.8 * pw * pw * pw) * Math.PI / 180, power: clamp(pw * (1 + gauss(rng) * 0.025), 0, 1), bank: clamp((p.bank || 0) + gauss(rng) * 0.035 * (0.4 + pw), -1, 1) });
+    rng = rng || Math.random; const pw = clamp(p.power, 0, 1), putt = discOf(p.disc).speed <= 3 && pw < 0.55, acc = clamp(p.acc || 0, -1, 1);
+    const baseDeg = (putt ? 0.5 : 0.9) + 2.2 * pw * pw * pw + Math.abs(acc) * (2 + 10 * pw * pw);
+    return Object.assign({}, p, { yaw: p.yaw + (gauss(rng) * 0.55 + Math.sign(acc) * Math.abs(acc)) * baseDeg * Math.PI / 180, power: clamp(pw * (1 + gauss(rng) * 0.02), 0, 1), bank: clamp((p.bank || 0) + acc * 0.4 * (0.4 + pw) + gauss(rng) * 0.04, -1, 1) });
   }
   const throwCard = (h, lie, p, rng) => simulate(h, lie, execute(p, rng), { rng });
   const predict = (h, lie, p) => simulate(h, lie, p, { rng: () => 0.01 }); // no luck, no wobble
+
+  // ---------- putting (inside PUTT metres the throw is done by lining up a reticle, not with the power meter) ----------
+  const PUTT = 10;
+  // the putter throw that would drop into the basket from here with no wind and no wobble (the player has to deliver it)
+  function puttSolve(h, lie) {
+    const b = h.basket, dx = b.x - lie.x, dz = b.z - lie.z, dist = Math.hypot(dx, dz), yaw0 = Math.atan2(dx, dz); let best = null;
+    for (const launch of [1, 0]) {
+      const good = []; let near = null;
+      for (let p = 0.06; p <= 0.8; p += 0.01) {
+        const r = simulate(h, lie, { disc: 'lite', yaw: yaw0, power: p, bank: 0, launch, hand: 1 }, { noWind: true, rng: () => 0.01 });
+        if (r.kind === 'holed') good.push(p); const d = Math.hypot(r.end.x - b.x, r.end.z - b.z); if (!near || d < near.d) near = { d, p };
+      }
+      const cand = good.length ? { power: good[(good.length - 1) >> 1], ok: true, launch } : { power: near.p, ok: false, launch };
+      if (!best || (cand.ok && !best.ok)) best = cand; if (best.ok) break;
+    }
+    return { yaw: yaw0, power: best.power, launch: best.launch, dist, ok: best.ok };
+  }
+  // ex / ey: where the reticle was when you pressed (in 0.35 m steps at the basket: sideways, and long (+) or short (-))
+  function puttThrow(h, lie, sol, ex, ey, rng) {
+    rng = rng || Math.random; const d = Math.max(1.5, sol.dist);
+    const p = { disc: 'lite', yaw: sol.yaw + (ex * 0.35) / d + gauss(rng) * 0.0035, power: clamp(sol.power * (1 + (ey * 0.35) / (1.25 * d)) * (1 + gauss(rng) * 0.01), 0.04, 1), bank: 0, launch: sol.launch, hand: 1 };
+    return { r: simulate(h, lie, p, { rng }), p };
+  }
+
+  let flatField = null;
+  function maxCarry(disc) { // how far the card goes at full power on level ground with no wind
+    if (!flatField) { const nx = 240, nz = 240; flatField = { grid: { x0: -300, z0: -100, nx, nz, cell: 2.5, h: new Float32Array((nx + 1) * (nz + 1)) }, surf: new Uint8Array(nx * nz), treeGrid: {}, basket: { x: 0, z: 5000, y: 0 }, wind: { x: 0, z: 0 } }; }
+    return simulate(flatField, { x: 0, z: 0 }, { disc, yaw: 0, power: 1, bank: 0, launch: 1, hand: 1 }, { noWind: true, rng: () => 0.5 }).dist;
+  }
 
   // ---------- helping the player (and testing the course) ----------
   function remaining(h, x, z) { const inf = pathInfo(h, x, z); return Math.max(0, h.pathLen - inf.along) + inf.dist * 0.35; }
@@ -308,9 +339,10 @@
       if (r.kind === 'holed') return { strokes };
       if (r.kind === 'ob') { strokes++; continue; }
       lie = { x: r.end.x, z: r.end.z };
+      if (Math.hypot(lie.x - h.basket.x, lie.z - h.basket.z) <= GIMME) return { strokes: strokes + 1 };
     }
     return { strokes: MAX_STROKES };
   }
 
-  return { HOLES, MAX_STROKES, DISCS, DISC_BY_ID, COURSES, IDS, CELL, K, LAUNCH, course, groundAt, surfAt, pathInfo, pointAlong, treesNear, simulate, execute, throwCard, predict, caddie, guidePoint, autoHole, rngFrom, gauss, discOf, FRICTION };
+  return { HOLES, MAX_STROKES, GIMME, PUTT, puttSolve, puttThrow, DISCS, DISC_BY_ID, COURSES, IDS, CELL, K, LAUNCH, course, groundAt, surfAt, pathInfo, pointAlong, treesNear, simulate, execute, throwCard, predict, caddie, guidePoint, autoHole, maxCarry, rngFrom, gauss, discOf, FRICTION };
 });

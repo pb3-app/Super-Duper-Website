@@ -24,6 +24,7 @@
     .ctlrow label { display: grid; gap: 2px; font-size: .78rem; font-weight: 700; opacity: .95; } .ctlrow input[type=range] { width: 170px; }
     .seg { display: inline-flex; border-radius: 10px; overflow: hidden; border: 2px solid #7a4a1f; } .seg button { font: inherit; font-size: .85rem; font-weight: 700; color: inherit; background: rgba(90, 53, 23, .7); border: 0; padding: .3rem .65rem; cursor: pointer; } .seg button.on { background: var(--accent); color: #2b1a0e; }
     #throwFloat { position: absolute; right: 16px; bottom: 16px; } #throwFloat[hidden] { display: none; }
+    .dg-panel.putting .bag, .dg-panel.putting .ctlrow > label, .dg-panel.putting #aimBtn { opacity: .3; pointer-events: none; }
     .throw { font-size: 1.15rem; font-weight: 900; padding: .6rem 1.6rem; } .flightinfo { font-size: .88rem; opacity: .92; margin-top: .4rem; min-height: 1.2em; }
     table.card { border-collapse: collapse; margin: .8rem auto 0; font-weight: 700; font-size: .85rem; max-width: 100%; } table.card th, table.card td { border: 1px solid rgba(255,255,255,.14); padding: .2rem .45rem; min-width: 2.1rem; text-align: center; } table.card th { background: rgba(0,0,0,.35); } table.card td.cur { background: rgba(255,201,51,.18); } table.card td.under { color: #7df08f; } table.card td.over { color: #ff9a8a; }
     .oppline { margin-top: .4rem; font-weight: 700; opacity: .9; min-height: 1.3rem; text-align: center; }
@@ -50,7 +51,7 @@
         <h2>Pick a course</h2>
         <div class="courses" id="courses"></div>
         <div class="btn-row"><button class="btn" id="startBtn" style="font-size:1.15rem;padding:.7rem 1.8rem">🥏 Tee off</button></div>
-        <p class="np-hint">18 holes, played in 3D. You throw Triple T ID cards instead of discs: a soft putter card, midranges, drivers, a card that turns over and a card that always hooks. Every card has flight numbers (speed, glide, turn, fade) like a real disc. Fewest throws wins. Water and out of bounds cost a throw. Your best total on each course goes on the solo leaderboard (log in to appear on it).</p>
+        <p class="np-hint">18 holes, played in 3D. You throw Triple T ID cards instead of discs: a soft putter card, midranges, drivers, a card that turns over and a card that always hooks. Every card has flight numbers (speed, glide, turn, fade) like a real disc, and you have to time your power and your release. Fewest throws wins. Water and out of bounds cost a throw. Your best total on each course goes on the solo leaderboard (log in to appear on it).</p>
       </div>
       <div id="mpPanel" hidden></div>
       <div id="play" hidden>
@@ -59,11 +60,10 @@
         <div class="dg-panel" id="panel">
           <div class="bag" id="bag"></div>
           <div class="ctlrow">
-            <label>Power <b id="powEl">70%</b><input type="range" id="power" min="5" max="100" value="70"></label>
             <label>Curve <b id="bankEl">Flat</b><input type="range" id="bank" min="-100" max="100" step="25" value="0"></label>
             <label>Launch<span class="seg" id="launchSeg"><button data-v="0">Low</button><button data-v="1" class="on">Normal</button><button data-v="2">High</button></span></label>
             <label>Throw<span class="seg" id="handSeg"><button data-v="1" class="on">Backhand</button><button data-v="-1">Forehand</button></span></label>
-            <button class="btn secondary" id="caddieBtn">🧠 Caddie</button><button class="btn secondary" id="aimBtn">🎯 Aim at the basket</button>
+            <button class="btn secondary" id="aimBtn">🎯 Aim at the basket</button>
             <button class="btn throw" id="throwBtn">🥏 THROW <kbd>Space</kbd></button>
           </div>
           <div class="flightinfo" id="flightInfo"></div>
@@ -71,14 +71,14 @@
         <section class="controls" aria-label="Controls">
           <h2>🎮 Controls</h2>
           <div class="ctl-grid">
-            <div class="ctl"><span class="keys"><kbd>←</kbd><kbd>→</kbd> or drag the view</span><span class="act">Turn to aim. The dotted line shows where the card will fly.</span></div>
-            <div class="ctl"><span class="keys"><kbd>↑</kbd><kbd>↓</kbd></span><span class="act">More or less power. Short throws go with the putter, long ones with drivers.</span></div>
+            <div class="ctl"><span class="keys"><kbd>←</kbd><kbd>→</kbd> or drag the view</span><span class="act">Turn to aim. The dotted line only shows where you are pointing, not how the card will curve: you have to work that out from its flight numbers.</span></div>
             <div class="ctl"><span class="keys"><kbd>1</kbd> - <kbd>8</kbd></span><span class="act">Pick a card from your bag (the numbers are speed / glide / turn / fade).</span></div>
             <div class="ctl"><span class="keys"><kbd>Q</kbd><kbd>E</kbd></span><span class="act">Curve the throw: anhyzer (turns right) or hyzer (hooks left).</span></div>
-            <div class="ctl"><span class="keys"><kbd>Space</kbd></span><span class="act">Throw. Wind pushes the card, and the harder you throw the less accurate you are.</span></div>
-            <div class="ctl"><span class="keys"><kbd>C</kbd></span><span class="act">Caddie: suggests a card, a curve and a power.</span></div>
+            <div class="ctl"><span class="keys"><kbd>Space</kbd> ×2</span><span class="act"><b>Press once to start the power meter and again to set the power.</b> Then the release marker swings across the bar: press a third time with it in the green. A bad release sends the card off line, and the harder you throw the worse it is. <kbd>Esc</kbd> cancels.</span></div>
+            <div class="ctl"><span class="keys"><kbd>Space</kbd></span><span class="act"><b>Putting (inside 10 m):</b> you use the putter automatically. A ring wanders around the basket, and you press Space once when it is on the target. Farther putts wander more.</span></div>
+            <div class="ctl"><span class="keys"><kbd>F</kbd></span><span class="act">Switch between a backhand and a forehand throw (they curve opposite ways).</span></div>
           </div>
-          <p class="ctl-extra">📱 <b>Touch:</b> drag the view to aim, use the sliders and the Throw button. <b>Goal:</b> get the card into the chains of the basket in as few throws as you can. Trees knock it down, water and out of bounds cost a throw (and you throw again from where you were).</p>
+          <p class="ctl-extra">📱 <b>Touch:</b> drag the view to aim, use the sliders and tap the Throw button for each step of the meter. <b>Goal:</b> get the card into the chains of the basket in as few throws as you can. Trees knock it down, water and out of bounds cost a throw (and you throw again from where you were). <b>Within 10 metres you putt:</b> the power meter is replaced by a ring that drifts over the basket, and you press Space once when it lines up (it wanders more the farther out you are). <b>Land within 3 metres of the basket and it is a gimme:</b> the putt is given and counts as one more throw.</p>
         </section>
         <div class="oppline" id="oppLine"></div>
         <table class="card" id="card"></table>
