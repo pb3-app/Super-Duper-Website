@@ -15,12 +15,8 @@ canvas { display: block; width: 100vw; height: 100vh; }
 
 #side { position: absolute; top: 64px; right: 16px; display: grid; gap: 10px; width: 230px; justify-items: stretch; }
 #scores { background: rgba(26, 15, 7, 0.75); border-radius: 10px; padding: 10px 14px; font-size: 15px; }
-#hud h1 { user-select: none; -webkit-user-select: none; cursor: pointer; display: inline-block; transition: transform 0.08s, color 0.15s; transform-origin: 30% 60%; }
-#hud h1:hover { color: #ffa24d; } #hud h1:active { transform: translateY(2px) scale(0.96); text-shadow: 1px 1px 0 #1a0f07; }
-#hud h1:focus-visible { outline: 2px solid #ffcf99; outline-offset: 4px; border-radius: 6px; }
-#hud h1.tap { animation: logoTap 0.22s ease-out; } #hud h1.tap2 { animation: logoTap2 0.22s ease-out; } #hud h1.flash { animation: logoFlash 0.9s ease-out; }
-@keyframes logoTap { 50% { transform: scale(1.08) rotate(-2deg); } } @keyframes logoTap2 { 50% { transform: scale(1.08) rotate(2deg); } }
-@keyframes logoFlash { 0% { transform: scale(1); } 20% { transform: scale(1.25) rotate(-4deg); color: #fff; text-shadow: 0 0 18px #ffcf99, 3px 3px 0 #1a0f07; } 50% { transform: scale(0.95) rotate(3deg); } 100% { transform: scale(1); } }
+.shop__tabs button.flash { animation: tabFlash 0.9s ease-out; }
+@keyframes tabFlash { 0% { transform: scale(1); } 20% { transform: scale(1.2) rotate(-3deg); background: #ffcf99; } 50% { transform: scale(0.95) rotate(2deg); } 100% { transform: scale(1); } }
 #boinkBtn { font-family: "Bungee", sans-serif; font-size: 14px; padding: 8px 10px; border: none; border-radius: 10px; background: #ff8c2a; color: #2b1a0e; cursor: pointer; box-shadow: 0 3px 0 #a8551a; }
 #boinkBtn:active { transform: translateY(3px); box-shadow: 0 0 0 #a8551a; } #boinkBtn[hidden] { display: none; }
 #scores b { font-family: "Bungee", sans-serif; color: #ff8c2a; display: block; margin-bottom: 4px; }

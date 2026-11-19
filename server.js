@@ -2260,7 +2260,7 @@ wss.on('connection', (ws) => {
         if (c && c.from === ws.key) closeChallenge(c, 'cancelled');
         return;
       }
-      case 'arena_join': case 'arena_leave': case 'arena_input': case 'arena_bonk': case 'arena_chat': case 'arena_logo': return onArena(ws, msg);
+      case 'arena_join': case 'arena_leave': case 'arena_input': case 'arena_bonk': case 'arena_chat': case 'arena_wd': return onArena(ws, msg);
       case 'sp_move': return onSpMove(ws, msg);
       case 'pool_shot': return onPoolShot(ws, msg);
       case 'tb_move': return onTbMove(ws, msg);
@@ -2303,7 +2303,7 @@ setInterval(() => {
 // Players are the logged-in accounts on the arena page. The server runs the world and the clients send inputs. A game is
 // started by standing on its log: 2 tungs on the same log for 10 seconds start the 1v1 match, and 1 tung alone on a
 // practice-corner log for 10 seconds goes to that game's solo mode.
-const BOINK_USER = 'jackthetungman'; // has the Boink button (under the bonks board) from the start; everybody else finds it by clicking the arena logo 3 times within 10 seconds
+const BOINK_USER = 'jackthetungman'; // has the Boink button (under the bonks board) from the start; everybody else finds it by clicking My wardrobe 3 times in a row within 10 seconds
 const hasBoink = (key) => key === BOINK_USER || !!(db.users[key] && db.users[key].boink);
 const AR = { w: 4600, h: 3200, r: 28, tick: 30, speed: 320, range: 85, cooldown: 0.6, knock: 900, friction: 6, hold: 10, max: 40 };
 // Every 10 bonks you have ever landed, anywhere in the arena, make you 10% faster, up to double speed at 100 bonks.
@@ -2459,8 +2459,9 @@ function onArena(ws, msg) {
       if (Number.isFinite(msg.i.aim)) p.input.aim = msg.i.aim;
       return;
     }
-    case 'arena_logo': { // the secret: three clicks on the logo within ten seconds
+    case 'arena_wd': { // the secret: three clicks in a row on the My wardrobe tab within ten seconds
       if (hasBoink(ws.key)) return;
+      if (msg.reset) { ws.logoClicks = []; return; }
       const now = Date.now(); ws.logoClicks = (ws.logoClicks || []).filter((t) => now - t < 10000); ws.logoClicks.push(now);
       if (ws.logoClicks.length >= 3 && db.users[ws.key]) { db.users[ws.key].boink = true; saveDb(); ws.logoClicks = []; wsSend(ws, { t: 'arena_boink' }); }
       return;
