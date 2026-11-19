@@ -2260,7 +2260,7 @@ wss.on('connection', (ws) => {
         if (c && c.from === ws.key) closeChallenge(c, 'cancelled');
         return;
       }
-      case 'arena_join': case 'arena_leave': case 'arena_input': case 'arena_bonk': case 'arena_chat': case 'arena_wd': return onArena(ws, msg);
+      case 'arena_join': case 'arena_leave': case 'arena_input': case 'arena_bonk': case 'arena_chat': case 'arena_wd': case 'arena_auto': return onArena(ws, msg);
       case 'sp_move': return onSpMove(ws, msg);
       case 'pool_shot': return onPoolShot(ws, msg);
       case 'tb_move': return onTbMove(ws, msg);
@@ -2447,6 +2447,42 @@ function arenaChat(ws, msg) {
 }
 function arenaBroadcast(msg) { const out = JSON.stringify(msg); for (const p of arenaPlayers.values()) if (p.ws.readyState === 1) p.ws.send(out); }
 
+// one swing of the bat. boink = the Boink bonk to the top right; quiet = no 'safe zone' message (the auto switch swings again and again)
+function doBonk(p, boink, quiet) {
+  if (p.cooldown > 0 || p.stunned > 0 || p.fall > 0) return;
+  if (inSafeZone(p)) { // no bonking from a log or from the practice corner
+    if (!quiet && (!p.safeAt || Date.now() - p.safeAt > 1500)) { p.safeAt = Date.now(); wsSend(p.ws, { t: 'arena_event', type: 'safe' }); }
+    return;
+  }
+  p.cooldown = AR.cooldown; p.swing = 0.2;
+  if (boink && hasBoink(p.key)) { p.boink = 0.3; p.facing = -Math.PI / 4; } // the Boink button: a bonk to the top right, whichever way he is aiming
+  let landed = 0;
+  for (const o of arenaPlayers.values()) {
+    if (o === p || o.fall > 0 || inSafeZone(o)) continue; // nobody on a log or in the practice corner can be bonked
+    if (!!o.z !== !!p.z) continue; // the showdown is its own place: no bonking across its edge, in or out
+    const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy);
+    if (d > AR.range + AR.r) continue;
+    let diff = Math.abs(Math.atan2(dy, dx) - p.facing);
+    if (diff > Math.PI) diff = Math.PI * 2 - diff;
+    if (diff > Math.PI / 2) continue;
+    o.vx += (dx / (d || 1)) * AR.knock; o.vy += (dy / (d || 1)) * AR.knock; o.stunned = 0.35; p.score++; landed++; o.lastHit = { key: p.key, at: Date.now() };
+    let dmg = 0, ko = false;
+    if (p.z && o.z) { // in the Showdown a bonk hurts, and the same for every bat; at zero health you go down the pit and the hitter gets the knock-off
+      dmg = SD_DAMAGE; o.hp = Math.max(0, (o.hp == null ? SD_HP : o.hp) - dmg);
+      if (o.hp <= 0) { ko = true; sdFall(o); }
+    }
+    arenaBroadcast({ t: 'arena_event', type: 'bonk', from: p.name, to: o.name, x: Math.round(o.x), y: Math.round(o.y), dmg, hp: o.z ? Math.round(o.hp) : -1, ko });
+  }
+  if (landed) { // every landed bonk counts towards your lifetime total, which sets your speed
+    const u = db.users[p.key];
+    if (u) {
+      u.bonks = (u.bonks || 0) + landed; saveDb();
+      const boost = bonkBoost(u.bonks), up = boost > p.boost; p.boost = boost;
+      wsSend(p.ws, { t: 'arena_me', bonks: u.bonks, pct: Math.round(boost * 100), up });
+    }
+  }
+}
+
 function onArena(ws, msg) {
   switch (msg.t) {
     case 'arena_join': return arenaJoin(ws);
@@ -2468,38 +2504,15 @@ function onArena(ws, msg) {
     }
     case 'arena_bonk': {
       const p = arenaPlayers.get(ws.key);
-      if (!p || p.ws !== ws || p.cooldown > 0 || p.stunned > 0 || p.fall > 0) return;
-      if (inSafeZone(p)) { // no bonking from a log or from the practice corner
-        if (!p.safeAt || Date.now() - p.safeAt > 1500) { p.safeAt = Date.now(); wsSend(ws, { t: 'arena_event', type: 'safe' }); }
-        return;
-      }
-      p.cooldown = AR.cooldown; p.swing = 0.2;
-      if (msg.boink === true && hasBoink(p.key)) { p.boink = 0.3; p.facing = -Math.PI / 4; } // the Boink button: a bonk to the top right, whichever way he is aiming
-      let landed = 0;
-      for (const o of arenaPlayers.values()) {
-        if (o === p || o.fall > 0 || inSafeZone(o)) continue; // nobody on a log or in the practice corner can be bonked
-        if (!!o.z !== !!p.z) continue; // the showdown is its own place: no bonking across its edge, in or out
-        const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy);
-        if (d > AR.range + AR.r) continue;
-        let diff = Math.abs(Math.atan2(dy, dx) - p.facing);
-        if (diff > Math.PI) diff = Math.PI * 2 - diff;
-        if (diff > Math.PI / 2) continue;
-        o.vx += (dx / (d || 1)) * AR.knock; o.vy += (dy / (d || 1)) * AR.knock; o.stunned = 0.35; p.score++; landed++; o.lastHit = { key: p.key, at: Date.now() };
-        let dmg = 0, ko = false;
-        if (p.z && o.z) { // in the Showdown a bonk hurts, and the same for every bat; at zero health you go down the pit and the hitter gets the knock-off
-          dmg = SD_DAMAGE; o.hp = Math.max(0, (o.hp == null ? SD_HP : o.hp) - dmg);
-          if (o.hp <= 0) { ko = true; sdFall(o); }
-        }
-        arenaBroadcast({ t: 'arena_event', type: 'bonk', from: p.name, to: o.name, x: Math.round(o.x), y: Math.round(o.y), dmg, hp: o.z ? Math.round(o.hp) : -1, ko });
-      }
-      if (landed) { // every landed bonk counts towards your lifetime total, which sets your speed
-        const u = db.users[p.key];
-        if (u) {
-          u.bonks = (u.bonks || 0) + landed; saveDb();
-          const boost = bonkBoost(u.bonks), up = boost > p.boost; p.boost = boost;
-          wsSend(p.ws, { t: 'arena_me', bonks: u.bonks, pct: Math.round(boost * 100), up });
-        }
-      }
+      if (!p || p.ws !== ws) return;
+      doBonk(p, msg.boink === true, false);
+      return;
+    }
+    case 'arena_auto': { // the Boink switch: swing again and again at the normal cooldown until it is switched off
+      const p = arenaPlayers.get(ws.key);
+      if (!p || p.ws !== ws) return;
+      p.auto = msg.on === true && hasBoink(p.key);
+      return;
     }
   }
 }
@@ -2515,6 +2528,7 @@ function arenaStep() {
     }
     p.boink = Math.max(0, (p.boink || 0) - dt);
     p.facing = p.boink > 0 ? -Math.PI / 4 : p.input.aim;
+    if (p.auto && p.cooldown <= 0 && p.stunned <= 0 && hasBoink(p.key)) doBonk(p, true, true);
     let mx = 0, my = 0;
     if (p.stunned <= 0) {
       if (p.input.up) my--; if (p.input.down) my++; if (p.input.left) mx--; if (p.input.right) mx++;

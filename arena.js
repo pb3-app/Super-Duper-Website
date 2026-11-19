@@ -45,7 +45,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     switch (m.t) {
       case "arena_boink": boinkOn = true; { const b = document.querySelector("#shopTabs [data-tab=ward]"); if (b) { b.classList.remove("flash"); void b.offsetWidth; b.classList.add("flash"); } bonkSound(1); } break;
       case "arena_welcome":
-        boinkOn = !!m.boink; myId = m.you; arena = m.arena; radius = m.radius; holdSecs = m.hold; logs = m.logs; safe = m.safe; showdown = m.showdown; sdBoard = m.board || sdBoard; wheel = m.wheel ? { ...m.wheel } : null; wheelSpin = null; if (chatLog.childElementCount === 0) for (const c of m.chat || []) addChat(c, false); me$ = { bonks: m.bonks || 0, pct: Math.round(Math.min(1, Math.floor((m.bonks || 0) / 10) / 10) * 100) }; joined = true;
+        boinkOn = !!m.boink; boinkAuto = false; boinkLabel(); myId = m.you; arena = m.arena; radius = m.radius; holdSecs = m.hold; logs = m.logs; safe = m.safe; showdown = m.showdown; sdBoard = m.board || sdBoard; wheel = m.wheel ? { ...m.wheel } : null; wheelSpin = null; if (chatLog.childElementCount === 0) for (const c of m.chat || []) addChat(c, false); me$ = { bonks: m.bonks || 0, pct: Math.round(Math.min(1, Math.floor((m.bonks || 0) / 10) / 10) * 100) }; joined = true;
         $("gate").hidden = true; $("scores").hidden = false;
         loadShop(); loadBoard();
         break;
@@ -301,12 +301,14 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   function bonk() { if (joined) T.send({ t: "arena_bonk" }); }
   // a bonk to the top right of your tung, for the one account that has it and anybody who found the secret (the server checks too)
   let boinkOn = false;
-  let boinkBtn = null;
+  let boinkBtn = null, boinkAuto = false;
+  const boinkLabel = () => { if (!boinkBtn) return; boinkBtn.textContent = boinkAuto ? "🏏 Boink: ON" : "🏏 Boink: OFF"; boinkBtn.classList.toggle("on", boinkAuto); boinkBtn.setAttribute("aria-pressed", String(boinkAuto)); };
   setInterval(() => {
     if (joined && boinkOn && !boinkBtn) { // the button only exists once it has been earned
       boinkBtn = document.createElement("button"); boinkBtn.id = "boinkBtn"; boinkBtn.type = "button"; boinkBtn.textContent = "🏏 Boink";
-      boinkBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); if (joined) T.send({ t: "arena_bonk", boink: true }); });
-      $("scores").after(boinkBtn);
+      boinkBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); });
+      boinkBtn.addEventListener("click", () => { if (!joined) return; boinkAuto = !boinkAuto; boinkLabel(); T.send({ t: "arena_auto", on: boinkAuto }); }); // a switch: the server swings for you at the normal rate until it is off
+      $("scores").after(boinkBtn); boinkLabel();
     }
     if (boinkBtn) boinkBtn.hidden = !(joined && boinkOn);
   }, 500);

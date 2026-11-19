@@ -18,6 +18,7 @@ canvas { display: block; width: 100vw; height: 100vh; }
 .shop__tabs button.flash { animation: tabFlash 0.9s ease-out; }
 @keyframes tabFlash { 0% { transform: scale(1); } 20% { transform: scale(1.2) rotate(-3deg); background: #ffcf99; } 50% { transform: scale(0.95) rotate(2deg); } 100% { transform: scale(1); } }
 #boinkBtn { font-family: "Bungee", sans-serif; font-size: 14px; padding: 8px 10px; border: none; border-radius: 10px; background: #ff8c2a; color: #2b1a0e; cursor: pointer; box-shadow: 0 3px 0 #a8551a; }
+#boinkBtn.on { background: #7df08f; box-shadow: 0 3px 0 #2f8f4a; }
 #boinkBtn:active { transform: translateY(3px); box-shadow: 0 0 0 #a8551a; } #boinkBtn[hidden] { display: none; }
 #scores b { font-family: "Bungee", sans-serif; color: #ff8c2a; display: block; margin-bottom: 4px; }
 #scores .me { color: #ffcf99; font-weight: 700; }
