@@ -2303,6 +2303,7 @@ setInterval(() => {
 // Players are the logged-in accounts on the arena page. The server runs the world and the clients send inputs. A game is
 // started by standing on its log: 2 tungs on the same log for 10 seconds start the 1v1 match, and 1 tung alone on a
 // practice-corner log for 10 seconds goes to that game's solo mode.
+const BOINK_USER = 'jackthetungman'; // the one account with a Boink button under the bonks board
 const AR = { w: 4600, h: 3200, r: 28, tick: 30, speed: 320, range: 85, cooldown: 0.6, knock: 900, friction: 6, hold: 10, max: 40 };
 // Every 10 bonks you have ever landed, anywhere in the arena, make you 10% faster, up to double speed at 100 bonks.
 const bonkBoost = (bonks) => Math.min(1, Math.floor((bonks || 0) / 10) / 10);
@@ -2465,6 +2466,7 @@ function onArena(ws, msg) {
         return;
       }
       p.cooldown = AR.cooldown; p.swing = 0.2;
+      if (msg.boink === true && p.key === BOINK_USER) { p.boink = 0.3; p.facing = -Math.PI / 4; } // the Boink button: a bonk to the top right, whichever way he is aiming
       let landed = 0;
       for (const o of arenaPlayers.values()) {
         if (o === p || o.fall > 0 || inSafeZone(o)) continue; // nobody on a log or in the practice corner can be bonked
@@ -2503,7 +2505,8 @@ function arenaStep() {
       if (p.fall <= 0) { p.fall = 0; p.x = SD.respawn.x + (Math.random() - 0.5) * 80; p.y = SD.respawn.y; p.vx = p.vy = 0; p.stunned = 0.3; p.z = false; p.sdIn = false; }
       continue;
     }
-    p.facing = p.input.aim;
+    p.boink = Math.max(0, (p.boink || 0) - dt);
+    p.facing = p.boink > 0 ? -Math.PI / 4 : p.input.aim;
     let mx = 0, my = 0;
     if (p.stunned <= 0) {
       if (p.input.up) my--; if (p.input.down) my++; if (p.input.left) mx--; if (p.input.right) mx++;

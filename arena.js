@@ -298,6 +298,9 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   $("bonkBtn").addEventListener("pointerdown", (e) => { e.preventDefault(); bonk(); });
   $("wheelBtn").addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); useWheel(); });
   function bonk() { if (joined) T.send({ t: "arena_bonk" }); }
+  // JacktheTungMan only (the server checks too): a bonk to the top right of his tung
+  $("boinkBtn").addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); if (joined) T.send({ t: "arena_bonk", boink: true }); });
+  setInterval(() => { $("boinkBtn").hidden = !(joined && T && T.user && String(T.user.username).toLowerCase() === "jackthetungman"); }, 500);
 
   let lastSent = "";
   function sendInput() {

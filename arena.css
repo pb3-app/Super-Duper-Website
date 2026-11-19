@@ -15,6 +15,8 @@ canvas { display: block; width: 100vw; height: 100vh; }
 
 #side { position: absolute; top: 64px; right: 16px; display: grid; gap: 10px; width: 230px; justify-items: stretch; }
 #scores { background: rgba(26, 15, 7, 0.75); border-radius: 10px; padding: 10px 14px; font-size: 15px; }
+#boinkBtn { font-family: "Bungee", sans-serif; font-size: 14px; padding: 8px 10px; border: none; border-radius: 10px; background: #ff8c2a; color: #2b1a0e; cursor: pointer; box-shadow: 0 3px 0 #a8551a; }
+#boinkBtn:active { transform: translateY(3px); box-shadow: 0 0 0 #a8551a; } #boinkBtn[hidden] { display: none; }
 #scores b { font-family: "Bungee", sans-serif; color: #ff8c2a; display: block; margin-bottom: 4px; }
 #scores .me { color: #ffcf99; font-weight: 700; }
 #feed { position: absolute; bottom: 64px; left: 16px; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
