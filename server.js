@@ -2303,8 +2303,8 @@ setInterval(() => {
 // Players are the logged-in accounts on the arena page. The server runs the world and the clients send inputs. A game is
 // started by standing on its log: 2 tungs on the same log for 10 seconds start the 1v1 match, and 1 tung alone on a
 // practice-corner log for 10 seconds goes to that game's solo mode.
-const BOINK_USER = 'jackthetungman'; // has the Boink button (under the bonks board) from the start; everybody else finds it by clicking My wardrobe 3 times in a row within 10 seconds
-const hasBoink = (key) => key === BOINK_USER || !!(db.users[key] && db.users[key].boink);
+const BOINK_USER = 'jackthetungman'; // has the Boink button (under the bonks board) from the start; everybody else finds it (for the current visit only) by clicking My wardrobe 3 times in a row within 10 seconds
+const hasBoink = (key) => key === BOINK_USER || !!(arenaPlayers.get(key) || {}).unlocked; // found in this visit to the arena only: leave and it is gone
 const AR = { w: 4600, h: 3200, r: 28, tick: 30, speed: 320, range: 85, cooldown: 0.6, knock: 900, friction: 6, hold: 10, max: 40 };
 // Every 10 bonks you have ever landed, anywhere in the arena, make you 10% faster, up to double speed at 100 bonks.
 const bonkBoost = (bonks) => Math.min(1, Math.floor((bonks || 0) / 10) / 10);
@@ -2418,6 +2418,7 @@ function arenaJoin(ws) {
     arenaPlayers.set(ws.key, p);
     arenaBroadcast({ t: 'arena_event', type: 'join', name: p.name });
   }
+  if (p.ws !== ws) { p.unlocked = false; p.auto = false; } // a new visit starts without the secret
   p.ws = ws;
   wsSend(ws, { t: 'arena_welcome', boink: hasBoink(ws.key), chat: arenaChatLog.slice(-12), you: ws.key, bonks: (db.users[ws.key] && db.users[ws.key].bonks) || 0, ...arenaInfo() });
   if (!arenaTimer) arenaTimer = setInterval(arenaStep, 1000 / AR.tick);
@@ -2496,10 +2497,11 @@ function onArena(ws, msg) {
       return;
     }
     case 'arena_wd': { // the secret: three clicks in a row on the My wardrobe tab within ten seconds
-      if (hasBoink(ws.key)) return;
+      const ap = arenaPlayers.get(ws.key);
+      if (!ap || ap.ws !== ws || hasBoink(ws.key)) return;
       if (msg.reset) { ws.logoClicks = []; return; }
       const now = Date.now(); ws.logoClicks = (ws.logoClicks || []).filter((t) => now - t < 10000); ws.logoClicks.push(now);
-      if (ws.logoClicks.length >= 3 && db.users[ws.key]) { db.users[ws.key].boink = true; saveDb(); ws.logoClicks = []; wsSend(ws, { t: 'arena_boink' }); }
+      if (ws.logoClicks.length >= 3) { ap.unlocked = true; ws.logoClicks = []; wsSend(ws, { t: 'arena_boink' }); }
       return;
     }
     case 'arena_bonk': {
