@@ -43,8 +43,9 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   // ---------- messages from the server ----------
   function onMsg(m) {
     switch (m.t) {
+      case "arena_boink": boinkOn = true; break;
       case "arena_welcome":
-        myId = m.you; arena = m.arena; radius = m.radius; holdSecs = m.hold; logs = m.logs; safe = m.safe; showdown = m.showdown; sdBoard = m.board || sdBoard; wheel = m.wheel ? { ...m.wheel } : null; wheelSpin = null; if (chatLog.childElementCount === 0) for (const c of m.chat || []) addChat(c, false); me$ = { bonks: m.bonks || 0, pct: Math.round(Math.min(1, Math.floor((m.bonks || 0) / 10) / 10) * 100) }; joined = true;
+        boinkOn = !!m.boink; myId = m.you; arena = m.arena; radius = m.radius; holdSecs = m.hold; logs = m.logs; safe = m.safe; showdown = m.showdown; sdBoard = m.board || sdBoard; wheel = m.wheel ? { ...m.wheel } : null; wheelSpin = null; if (chatLog.childElementCount === 0) for (const c of m.chat || []) addChat(c, false); me$ = { bonks: m.bonks || 0, pct: Math.round(Math.min(1, Math.floor((m.bonks || 0) / 10) / 10) * 100) }; joined = true;
         $("gate").hidden = true; $("scores").hidden = false;
         loadShop(); loadBoard();
         break;
@@ -102,7 +103,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     }
   }
   if (T) {
-    for (const t of ["arena_welcome", "arena_chat", "arena_state", "arena_event", "arena_solo", "arena_room", "arena_full", "arena_busy", "arena_sd", "arena_me"]) T.on("msg:" + t, onMsg);
+    for (const t of ["arena_welcome", "arena_chat", "arena_state", "arena_event", "arena_solo", "arena_room", "arena_full", "arena_busy", "arena_sd", "arena_me", "arena_boink"]) T.on("msg:" + t, onMsg);
     T.on("ready", () => { refreshGate(); join(); });
     T.on("logout", () => { joined = false; chatBox.hidden = true;  myId = null; snapshots.length = 0; refreshGate(); });
     T.booted.then(() => { refreshGate(); join(); });
@@ -298,9 +299,18 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   $("bonkBtn").addEventListener("pointerdown", (e) => { e.preventDefault(); bonk(); });
   $("wheelBtn").addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); useWheel(); });
   function bonk() { if (joined) T.send({ t: "arena_bonk" }); }
-  // JacktheTungMan only (the server checks too): a bonk to the top right of his tung
-  $("boinkBtn").addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); if (joined) T.send({ t: "arena_bonk", boink: true }); });
-  setInterval(() => { $("boinkBtn").hidden = !(joined && T && T.user && String(T.user.username).toLowerCase() === "jackthetungman"); }, 500);
+  // a bonk to the top right of your tung, for the one account that has it and anybody who found the logo secret (the server checks too)
+  let boinkOn = false;
+  document.querySelector("#hud h1").addEventListener("click", () => { if (!boinkOn && joined) T.send({ t: "arena_logo" }); });
+  let boinkBtn = null;
+  setInterval(() => {
+    if (joined && boinkOn && !boinkBtn) { // the button only exists once it has been earned
+      boinkBtn = document.createElement("button"); boinkBtn.id = "boinkBtn"; boinkBtn.type = "button"; boinkBtn.textContent = "🏏 Boink";
+      boinkBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); if (joined) T.send({ t: "arena_bonk", boink: true }); });
+      $("scores").after(boinkBtn);
+    }
+    if (boinkBtn) boinkBtn.hidden = !(joined && boinkOn);
+  }, 500);
 
   let lastSent = "";
   function sendInput() {
