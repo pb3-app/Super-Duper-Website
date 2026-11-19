@@ -281,7 +281,7 @@
     const rd = R, mx = W - rd.mw - 12, my = 12;
     ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.fillRect(mx - 4, my - 4, rd.mw + 8, rd.mh + 8); ctx.drawImage(rd.mm, mx, my);
     const mp = (x, z) => { const q = rd.toM(x, z); return [mx + q[0], my + q[1]]; };
-    if (phase === "aim" || phase === "power" || phase === "acc") { ctx.strokeStyle = "#ffe066"; ctx.lineWidth = 2; ctx.setLineDash([4, 4]); const q0 = mp(lie.x, lie.z), q1 = mp(lie.x + Math.sin(cfg.yaw) * 70, lie.z + Math.cos(cfg.yaw) * 70); ctx.beginPath(); ctx.moveTo(...q0); ctx.lineTo(...q1); ctx.stroke(); ctx.setLineDash([]); }
+    if (phase === "aim" || phase === "power" || phase === "acc") { ctx.strokeStyle = "#ffe066"; ctx.lineWidth = 2; ctx.setLineDash([4, 4]); ctx.beginPath(); if (pred) pred.pts.forEach((p, i) => { const q = mp(p[0], p[2]); i ? ctx.lineTo(...q) : ctx.moveTo(...q); }); else { const q0 = mp(lie.x, lie.z), q1 = mp(lie.x + Math.sin(cfg.yaw) * 70, lie.z + Math.cos(cfg.yaw) * 70); ctx.moveTo(...q0); ctx.lineTo(...q1); } ctx.stroke(); ctx.setLineDash([]); }
     const t0 = mp(0, 0); ctx.fillStyle = "#cfd8dc"; ctx.fillRect(t0[0] - 3, t0[1] - 2, 6, 4);
     const bp = mp(hole.basket.x, hole.basket.z); ctx.fillStyle = "#ff3b3b"; ctx.beginPath(); ctx.arc(bp[0], bp[1], 4, 0, 7); ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5; ctx.stroke();
     const lp = mp(lie.x, lie.z); ctx.fillStyle = "#ffd23f"; ctx.beginPath(); ctx.arc(lp[0], lp[1], 4, 0, 7); ctx.fill(); ctx.strokeStyle = "#000"; ctx.stroke();
@@ -311,10 +311,15 @@
     const bd = (hole.basket.x - cam.x) * fx + (hole.basket.z - cam.z) * fz; vis.push([bd, null]);
     vis.sort((a, b) => b[0] - a[0]);
     for (const [, t] of vis) { if (t) drawTree(t, th, sky); else drawBasket(hole, sky); }
-    // where you are pointing: a straight dotted line on the ground (it does not show how the card will curve!)
+    // the flight path preview (or, if there is none, a straight dotted line showing where you are pointing)
     if ((phase === "aim" || phase === "power" || phase === "acc") && !putting) {
-      const pts = []; for (let d = 4; d <= 90; d += 3) { const x = lie.x + Math.sin(cfg.yaw) * d, z = lie.z + Math.cos(cfg.yaw) * d; pts.push([x, DG.groundAt(hole, x, z) + 0.15, z]); }
-      drawLine(pts, "rgba(255,230,90,.85)", true, 3, 0);
+      if (pred) {
+        drawLine(pred.pts.filter((_, i) => i % 3 === 0), "rgba(255,230,90,.95)", true, 4, 0);
+        const e = pred.end; if (project(e.x, DG.groundAt(hole, e.x, e.z) + 0.05, e.z, P)) { const k = FOC / P.z; ctx.strokeStyle = pred.kind === "ob" ? "#ff5a4a" : pred.kind === "holed" ? "#7df08f" : "#ffe066"; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(P.x, P.y, Math.max(6, 0.7 * k), Math.max(3, 0.25 * k), 0, 0, 7); ctx.stroke(); }
+      } else {
+        const pts = []; for (let d = 4; d <= 90; d += 3) { const x = lie.x + Math.sin(cfg.yaw) * d, z = lie.z + Math.cos(cfg.yaw) * d; pts.push([x, DG.groundAt(hole, x, z) + 0.15, z]); }
+        drawLine(pts, "rgba(255,230,90,.85)", true, 3, 0);
+      }
     }
     if (flight) {
       drawTrail(flight);
@@ -327,7 +332,7 @@
     if (flight) { const dd = Math.hypot(flight.cur[0] - lie.x, flight.cur[2] - lie.z); ctx.font = "900 22px sans-serif"; ctx.textAlign = "center"; ctx.lineWidth = 5; ctx.strokeStyle = "#101010"; ctx.strokeText(`${dd.toFixed(0)} m`, W / 2, H - 22); ctx.fillStyle = "#fff"; ctx.fillText(`${dd.toFixed(0)} m`, W / 2, H - 22); }
     drawHUDOverlay(now); drawBanner(now);
     if (putting && phase === "aim") drawPutt(now);
-    if (phase === "aim" || phase === "power" || phase === "acc") { if (!putting) drawMeter(now); const d = DG.DISCS[cfg.disc]; ctx.textAlign = "left"; ctx.font = "800 14px sans-serif"; ctx.lineWidth = 4; ctx.strokeStyle = "#101010"; const tx = `${d.name} · ${d.kind}`; ctx.strokeText(tx, 16, H - 18); ctx.fillStyle = d.color; ctx.fillText(tx, 16, H - 18); }
+    if (phase === "aim" || phase === "power" || phase === "acc") { if (!putting) drawMeter(now); const d = DG.DISCS[cfg.disc]; ctx.textAlign = "left"; ctx.font = "800 14px sans-serif"; ctx.lineWidth = 4; ctx.strokeStyle = "#101010"; const tx = `${d.name} · ${d.kind}${pred && !putting ? ` · about ${pred.dist.toFixed(0)} m at ${Math.round(previewPower() * 100)}%` : ""}`; ctx.strokeText(tx, 16, H - 18); ctx.fillStyle = d.color; ctx.fillText(tx, 16, H - 18); }
     const tf = $("throwFloat"), want = phase === "aim" ? (putting ? "🥏 PUTT! <kbd>Space</kbd>" : "🥏 THROW <kbd>Space</kbd>") : phase === "power" ? "SET THE POWER <kbd>Space</kbd>" : phase === "acc" ? "RELEASE! <kbd>Space</kbd>" : "";
     tf.hidden = !want; const wk = phase + (putting ? "p" : ""); if (want && tf.dataset.w !== wk) { tf.innerHTML = want; tf.dataset.w = wk; }
   }
@@ -345,7 +350,7 @@
     const now = performance.now();
     if (phase === "aim" && putting) { if (now < puttT0) return; const [ex, ey] = puttPos(now); puttNow(ex, ey); }
     else if (phase === "aim") { meter = { stage: "power", t0: now, power: 0 }; phase = "power"; beep(420, 0.06, "triangle", 0.05, 1.3); }
-    else if (phase === "power") { meter.power = Math.max(0.05, powerAt(now)); cfg.power = meter.power; meter.stage = "acc"; meter.t0 = now; phase = "acc"; beep(560, 0.06, "triangle", 0.05, 1.3); }
+    else if (phase === "power") { meter.power = Math.max(0.05, powerAt(now)); cfg.power = meter.power; meter.stage = "acc"; meter.t0 = now; phase = "acc"; updatePred(); beep(560, 0.06, "triangle", 0.05, 1.3); }
     else if (phase === "acc") { const a = (accAt(now) - 0.5) * 2, pw = meter.power; meter = null; throwNow(pw, a); }
   }
   function cancelMeter() { if (phase === "power" || phase === "acc") { meter = null; phase = "aim"; } }
@@ -395,14 +400,22 @@
   }
   function recommend(dist) { return dist <= 22 ? 0 : dist <= 50 ? 1 : dist <= 85 ? 2 : dist <= 118 ? 3 : dist <= 150 ? 4 : 5; }
   function setupLie() { // point down the fairway (or at the basket) with a sensible card for the distance. The rest is up to you.
-    const gp = DG.guidePoint(hole, lie), dB = dBasket(); cfg.yaw = Math.atan2(gp.x - lie.x, gp.z - lie.z); cfg.disc = recommend(dB); cfg.bank = 0; cfg.launch = 1; cfg.hand = 1; cfg.power = 0.7;
+    const gp = DG.guidePoint(hole, lie), dB = dBasket(); cfg.yaw = Math.atan2(gp.x - lie.x, gp.z - lie.z); cfg.disc = recommend(dB); cfg.bank = 0; cfg.launch = 1; cfg.hand = 1; cfg.power = clamp(Math.hypot(gp.x - lie.x, gp.z - lie.z) / DG.maxCarry(DG.DISCS[cfg.disc].id), 0.3, 1);
     putting = dB <= DG.PUTT && dB > DG.GIMME;
     if (putting) { cfg.disc = 0; puttSol = DG.puttSolve(hole, lie); cfg.yaw = puttSol.yaw; puttMo = [Math.random() * 6.28, Math.random() * 6.28]; puttT0 = performance.now() + 900; puttTrail = []; }
     $("panel").classList.toggle("putting", putting);
     syncUI(); refreshInfo();
   }
   const params = (p) => Object.assign({ disc: DG.DISCS[cfg.disc].id, yaw: cfg.yaw, power: cfg.power, bank: cfg.bank, launch: cfg.launch, hand: cfg.hand }, p || {});
-  function refreshInfo() { if (!hole) return; const d = DG.DISCS[cfg.disc]; if (putting) { $("flightInfo").textContent = `PUTTING from ${dBasket().toFixed(1)} m: line the ring up with the basket and press Space once. The farther out you are, the more the ring wanders. Wind still pushes it.`; hud(); return; } $("flightInfo").textContent = `${d.name} (${d.kind}): about ${Math.round(DG.maxCarry(d.id))} m flat out · the basket is ${dBasket().toFixed(0)} m away · wind ${(hole.wind.speed * DG.K.windK).toFixed(1)} m/s`; hud(); }
+  // the flight path preview: where the card would go at the power on the meter (live while the meter moves), with the wind but without any shaky release
+  const previewPower = () => (phase === "power" && meter ? powerAt(performance.now()) : cfg.power);
+  function updatePred() { pred = !hole || putting || (phase !== "aim" && phase !== "power" && phase !== "acc") ? null : DG.predict(hole, lie, params({ power: clamp(previewPower(), 0.05, 1) })); }
+  function refreshInfo() {
+    if (!hole) return; const d = DG.DISCS[cfg.disc];
+    if (putting) { pred = null; $("flightInfo").textContent = `PUTTING from ${dBasket().toFixed(1)} m: line the ring up with the basket and press Space once. The farther out you are, the more the ring wanders. Wind still pushes it.`; hud(); return; }
+    updatePred();
+    $("flightInfo").textContent = `${d.name} (${d.kind}) at ${Math.round(cfg.power * 100)}% power: about ${pred ? pred.dist.toFixed(0) : "?"} m${pred && pred.kind === "ob" ? " (out of bounds!)" : pred && pred.kind === "holed" ? " (in the basket!)" : ""} · the basket is ${dBasket().toFixed(0)} m away · wind ${(hole.wind.speed * DG.K.windK).toFixed(1)} m/s`; hud();
+  }
   function syncUI() {
     $("bank").value = Math.round(cfg.bank * 100); $("bankEl").textContent = cfg.bank === 0 ? "Flat" : cfg.bank > 0 ? `Hyzer ${Math.round(cfg.bank * 100)}%` : `Anhyzer ${Math.round(-cfg.bank * 100)}%`;
     document.querySelectorAll("#launchSeg button").forEach((b) => b.classList.toggle("on", +b.dataset.v === cfg.launch));
@@ -515,6 +528,7 @@
     if (phase === "aim") { // held keys
       let d = 0; if (keys.left) d -= 1; if (keys.right) d += 1; if (d && !putting) { cfg.yaw += d * dt * (keys.shift ? 0.25 : 0.9); refreshInfo(); }
     }
+    if (phase === "power" && meter) updatePred();
     if (phase === "flight" && flight) flightStep(dt);
     if (phase === "between" && performance.now() > nextAt) { if (holeIdx + 1 < DG.HOLES) { holeIdx++; newHole(); } else finishCourse(); }
     updateCam(dt, ts); render(ts);
