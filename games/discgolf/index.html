@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Tung Disc Golf</title>
+  <link rel="stylesheet" href="../game.css" />
+  <link rel="stylesheet" href="../../mp.css" />
+  <style>
+    body .game-page { max-width: 1040px; }
+    #view { width: 100%; max-width: 960px; aspect-ratio: 16 / 9; display: block; margin: 0 auto; border-radius: 18px; background: #87c4f0; box-shadow: 0 10px 0 #0a1a0e, 0 20px 40px rgba(0,0,0,.55); touch-action: none; cursor: ew-resize; }
+    .playwrap { position: relative; max-width: 960px; margin: 0 auto; }
+    .menu-card { max-width: 780px; margin: 1rem auto; text-align: left; } .menu-card h2 { margin: 0 0 .6rem; color: var(--accent); }
+    .courses { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: .7rem; }
+    .course { text-align: left; font: inherit; color: var(--text); border: 3px solid var(--wood-dark); border-radius: 14px; padding: .7rem .9rem; cursor: pointer; background: rgba(0,0,0,.28); }
+    .course.sel { border-color: var(--accent); box-shadow: 0 0 14px rgba(255,201,51,.35); }
+    .course h3 { margin: 0 0 .2rem; } .course p { margin: 0; font-size: .85rem; opacity: .85; } .course .swatch { height: 46px; border-radius: 10px; margin-bottom: .5rem; }
+    .dg-panel { max-width: 960px; margin: .7rem auto 0; background: rgba(30, 16, 8, .86); border: 3px solid #5a3517; border-radius: 16px; padding: .7rem .9rem; text-align: left; }
+    .bag { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: .4rem; }
+    .card-btn { font: inherit; color: inherit; cursor: pointer; border: 3px solid #5a3517; background: rgba(60, 34, 16, .85); border-radius: 12px; padding: .3rem; display: grid; justify-items: center; gap: 2px; line-height: 1.15; }
+    .card-btn:hover { border-color: #a1631f; } .card-btn.on { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(255,201,51,.3), 0 0 14px rgba(255,201,51,.3); background: rgba(110, 66, 24, .9); }
+    .card-btn canvas { width: 78px; height: 50px; border-radius: 6px; } .card-btn b { font-size: .8rem; } .card-btn small { font-size: .72rem; opacity: .85; font-variant-numeric: tabular-nums; } .card-btn kbd { background: #fff3e0; color: #2b1a0e; border-radius: 4px; padding: 0 4px; font-size: .66rem; font-weight: 800; margin-right: 3px; }
+    .ctlrow { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; margin-top: .6rem; }
+    .ctlrow label { display: grid; gap: 2px; font-size: .78rem; font-weight: 700; opacity: .95; } .ctlrow input[type=range] { width: 170px; }
+    .seg { display: inline-flex; border-radius: 10px; overflow: hidden; border: 2px solid #7a4a1f; } .seg button { font: inherit; font-size: .85rem; font-weight: 700; color: inherit; background: rgba(90, 53, 23, .7); border: 0; padding: .3rem .65rem; cursor: pointer; } .seg button.on { background: var(--accent); color: #2b1a0e; }
+    #throwFloat { position: absolute; right: 16px; bottom: 16px; } #throwFloat[hidden] { display: none; }
+    .throw { font-size: 1.15rem; font-weight: 900; padding: .6rem 1.6rem; } .flightinfo { font-size: .88rem; opacity: .92; margin-top: .4rem; min-height: 1.2em; }
+    table.card { border-collapse: collapse; margin: .8rem auto 0; font-weight: 700; font-size: .85rem; max-width: 100%; } table.card th, table.card td { border: 1px solid rgba(255,255,255,.14); padding: .2rem .45rem; min-width: 2.1rem; text-align: center; } table.card th { background: rgba(0,0,0,.35); } table.card td.cur { background: rgba(255,201,51,.18); } table.card td.under { color: #7df08f; } table.card td.over { color: #ff9a8a; }
+    .oppline { margin-top: .4rem; font-weight: 700; opacity: .9; min-height: 1.3rem; text-align: center; }
+    kbd { background: #fff3e0; color: #2b1a0e; border-radius: 5px; padding: 1px 7px; font-weight: 800; font-size: 13px; }
+  </style>
+</head>
+<body data-game="discgolf" data-custom="1">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="game-page">
+    <div class="game-top">
+      <a class="back" href="../../index.html#games">← Games</a>
+      <h1>🥏 Tung Disc Golf</h1>
+      <div id="mpSlot"></div>
+    </div>
+    <div class="mode-switch" id="modeSwitch">
+      <button class="btn secondary active" data-mode="single">🎮 Single Player</button>
+      <button class="btn secondary" data-mode="multi">👥 Multiplayer</button>
+    </div>
+    <div class="mp-lobby" id="mpLobby" hidden></div>
+    <div class="mp-matchbar" id="mpMatchBar" hidden></div>
+
+    <div id="gameArea">
+      <div id="menu" class="np-sec menu-card">
+        <h2>Pick a course</h2>
+        <div class="courses" id="courses"></div>
+        <div class="btn-row"><button class="btn" id="startBtn" style="font-size:1.15rem;padding:.7rem 1.8rem">🥏 Tee off</button></div>
+        <p class="np-hint">18 holes, played in 3D. You throw Triple T ID cards instead of discs: a soft putter card, midranges, drivers, a card that turns over and a card that always hooks. Every card has flight numbers (speed, glide, turn, fade) like a real disc. Fewest throws wins. Water and out of bounds cost a throw. Your best total on each course goes on the solo leaderboard (log in to appear on it).</p>
+      </div>
+      <div id="mpPanel" hidden></div>
+      <div id="play" hidden>
+        <div class="hud"><span class="chip" id="chipHole">Hole 1 / 18</span><span class="chip">Par <b id="parEl">3</b></span><span class="chip">Throws <b id="strokeEl">0</b></span><span class="chip" id="chipDist">To basket <b id="distEl">0</b> m</span><span class="chip" id="chipTotal">Total <b id="totEl">0</b></span><button class="btn secondary" id="quitBtn">☰ Menu (Esc)</button></div>
+        <div class="playwrap"><canvas id="view" width="960" height="540"></canvas><button class="btn throw" id="throwFloat">🥏 THROW <kbd>Space</kbd></button><div id="result" class="np-result" hidden></div></div>
+        <div class="dg-panel" id="panel">
+          <div class="bag" id="bag"></div>
+          <div class="ctlrow">
+            <label>Power <b id="powEl">70%</b><input type="range" id="power" min="5" max="100" value="70"></label>
+            <label>Curve <b id="bankEl">Flat</b><input type="range" id="bank" min="-100" max="100" step="25" value="0"></label>
+            <label>Launch<span class="seg" id="launchSeg"><button data-v="0">Low</button><button data-v="1" class="on">Normal</button><button data-v="2">High</button></span></label>
+            <label>Throw<span class="seg" id="handSeg"><button data-v="1" class="on">Backhand</button><button data-v="-1">Forehand</button></span></label>
+            <button class="btn secondary" id="caddieBtn">🧠 Caddie</button><button class="btn secondary" id="aimBtn">🎯 Aim at the basket</button>
+            <button class="btn throw" id="throwBtn">🥏 THROW <kbd>Space</kbd></button>
+          </div>
+          <div class="flightinfo" id="flightInfo"></div>
+        </div>
+        <section class="controls" aria-label="Controls">
+          <h2>🎮 Controls</h2>
+          <div class="ctl-grid">
+            <div class="ctl"><span class="keys"><kbd>←</kbd><kbd>→</kbd> or drag the view</span><span class="act">Turn to aim. The dotted line shows where the card will fly.</span></div>
+            <div class="ctl"><span class="keys"><kbd>↑</kbd><kbd>↓</kbd></span><span class="act">More or less power. Short throws go with the putter, long ones with drivers.</span></div>
+            <div class="ctl"><span class="keys"><kbd>1</kbd> - <kbd>8</kbd></span><span class="act">Pick a card from your bag (the numbers are speed / glide / turn / fade).</span></div>
+            <div class="ctl"><span class="keys"><kbd>Q</kbd><kbd>E</kbd></span><span class="act">Curve the throw: anhyzer (turns right) or hyzer (hooks left).</span></div>
+            <div class="ctl"><span class="keys"><kbd>Space</kbd></span><span class="act">Throw. Wind pushes the card, and the harder you throw the less accurate you are.</span></div>
+            <div class="ctl"><span class="keys"><kbd>C</kbd></span><span class="act">Caddie: suggests a card, a curve and a power.</span></div>
+          </div>
+          <p class="ctl-extra">📱 <b>Touch:</b> drag the view to aim, use the sliders and the Throw button. <b>Goal:</b> get the card into the chains of the basket in as few throws as you can. Trees knock it down, water and out of bounds cost a throw (and you throw again from where you were).</p>
+        </section>
+        <div class="oppline" id="oppLine"></div>
+        <table class="card" id="card"></table>
+      </div>
+    </div>
+    <div id="gameLeaderboard"></div>
+  </div>
+  <script src="../../mp.js"></script>
+  <script src="../../assets/tung.js"></script>
+  <script src="../netplay.js"></script>
+  <script src="engine.js"></script>
+  <script src="discgolf.js"></script>
+</body>
+</html>

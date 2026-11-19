@@ -33,6 +33,7 @@ const CardGames = { uno: require('./games/uno/engine.js'), phase10: require('./g
 const Shop = require('./assets/shop-items.js'); // the tung shop: the items, and which six are for sale today
 const GOLF_COURSES = ['meadow', 'neon', 'frost', 'desert', 'candy'];
 const GOLF_HOLES = 6, GOLF_MAXSTROKES = 8;
+const DG_COURSES = ['pines', 'lakeside'], DG_HOLES = 18, DG_MAXSTROKES = 9;
 
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'data');
@@ -140,6 +141,11 @@ const GAMES = {
   golf: {
     title: 'Tung Tung Mini Golf', icon: '⛳', progressLabel: 'Strokes', judge: 'low', realtime: true,
     options: { level: { label: 'Course', values: GOLF_COURSES, default: 'meadow' } },
+    vote: ['level'],
+  },
+  discgolf: {
+    title: 'Tung Disc Golf', icon: '🥏', progressLabel: 'Throws', judge: 'low', realtime: true,
+    options: { level: { label: 'Course', values: DG_COURSES, default: 'pines' } },
     vote: ['level'],
   },
   archery: {
@@ -661,6 +667,14 @@ async function handleApi(req, res, url) {
         if (!(cur <= strokes)) { u.solo.golf[b.level] = strokes; saveDb(); }
         return json(res, 200, { ok: true, best: u.solo.golf[b.level] });
       }
+      if (b.game === 'discgolf') {
+        const strokes = Math.floor(Number(b.strokes));
+        if (!DG_COURSES.includes(b.level) || !Number.isFinite(strokes) || strokes < DG_HOLES || strokes > DG_HOLES * DG_MAXSTROKES) throw httpErr(400, 'Bad score');
+        u.solo.discgolf = u.solo.discgolf || {};
+        const cur = u.solo.discgolf[b.level];
+        if (!(cur <= strokes)) { u.solo.discgolf[b.level] = strokes; saveDb(); }
+        return json(res, 200, { ok: true, best: u.solo.discgolf[b.level] });
+      }
       if (b.game === 'minesweeper' || b.game === 'f1' || b.game === 'tungup') {
         const time = Math.floor(Number(b.time));
         const okLevel = b.game === 'f1' ? F1_TRACKS.includes(b.level) : b.game === 'tungup' ? TU_MAPS.includes(b.level) : !!LEVELS[b.level];
@@ -692,6 +706,7 @@ async function handleApi(req, res, url) {
       if (game === 'f1' && !F1_TRACKS.includes(level)) throw httpErr(400, 'Unknown track');
       if (game === 'tungup' && !TU_MAPS.includes(level)) throw httpErr(400, 'Unknown map');
       if (game === 'golf' && !GOLF_COURSES.includes(level)) throw httpErr(400, 'Unknown course');
+      if (game === 'discgolf' && !DG_COURSES.includes(level)) throw httpErr(400, 'Unknown course');
       const rows = [];
       if (GAMES[game].soloWL) {
         for (const u of liveUsers()) {
@@ -704,12 +719,12 @@ async function handleApi(req, res, url) {
       for (const u of liveUsers()) {
         let v;
         if (game === 'clicker') v = u.clicker && Math.floor(u.clicker.total);
-        else if (game === 'minesweeper' || game === 'f1' || game === 'tungup' || game === 'golf') v = u.solo && u.solo[game] && u.solo[game][level];
+        else if (game === 'minesweeper' || game === 'f1' || game === 'tungup' || game === 'golf' || game === 'discgolf') v = u.solo && u.solo[game] && u.solo[game][level];
         else v = u.solo && u.solo[game];
         if (v > 0) rows.push({ ...publicUser(u), value: v });
       }
       // Scores and totals: higher is better. Minesweeper: lower time is better.
-      rows.sort((a, b) => (game === 'minesweeper' || game === 'f1' || game === 'tungup' || game === 'golf' ? a.value - b.value : b.value - a.value) || a.username.localeCompare(b.username));
+      rows.sort((a, b) => (game === 'minesweeper' || game === 'f1' || game === 'tungup' || game === 'golf' || game === 'discgolf' ? a.value - b.value : b.value - a.value) || a.username.localeCompare(b.username));
       return json(res, 200, { game, level, rows });
     }
 
@@ -1172,7 +1187,7 @@ function createMatch(c) {
     sp: g === 'sprouts' ? Sprouts.newGame(c.options.dots, c.options.mode === 'misere') : null,
     pool: g === 'pool' ? Pool.newGame() : null, turn: c.from, turnTimer: null,
     tb: GAMES[g].turnBased ? TB[g].newGame(c.options) : null,
-    total: g === 'golf' ? GOLF_HOLES * GOLF_MAXSTROKES : g === 'tungup' ? 100 : g === 'f1' ? c.options.laps * F1_CHECKPOINTS : g === 'minesweeper' ? LEVELS[c.options.level].rows * LEVELS[c.options.level].cols - LEVELS[c.options.level].mines : null,
+    total: g === 'golf' ? GOLF_HOLES * GOLF_MAXSTROKES : g === 'discgolf' ? DG_HOLES * DG_MAXSTROKES : g === 'tungup' ? 100 : g === 'f1' ? c.options.laps * F1_CHECKPOINTS : g === 'minesweeper' ? LEVELS[c.options.level].rows * LEVELS[c.options.level].cols - LEVELS[c.options.level].mines : null,
   };
   for (const k of m.keys) {
     m.players[k] = { key: k, joined: false, started: false, socks: new Set(), progress: 0, status: 'playing', time: null, forfeitTimer: null };

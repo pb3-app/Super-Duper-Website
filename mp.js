@@ -803,17 +803,17 @@
       const tabBar = tabs.length > 1 ? h('div', { class: 'mp-tabs' }, tabs.map((t) =>
         h('button', { class: 'mp-btn small' + (t.id === current ? '' : ' ghost'), onclick: () => { current = t.id; render(); } }, t.label))) : null;
       if (solo) {
-        const isTime = solo[1] === 'minesweeper' || solo[1] === 'f1' || solo[1] === 'tungup' || solo[1] === 'golf';
+        const isTime = solo[1] === 'minesweeper' || solo[1] === 'f1' || solo[1] === 'tungup' || solo[1] === 'golf' || solo[1] === 'discgolf';
         const isWL = !!(S.cfg.games[solo[1]] && S.cfg.games[solo[1]].soloWL);
         const isCount = solo[1] === 'clicker';
-        const cols = isWL ? ['#', 'Player', 'Wins', 'Losses'] : ['#', 'Player', solo[1] === 'golf' ? 'Fewest strokes' : isTime ? 'Best time' : isCount ? 'Total tungs' : solo[1] === 'slope' ? 'Best distance' : solo[1] === 'flappy' ? 'Most pipes' : solo[1] === 'paper' ? 'Biggest land' : 'Best score'];
+        const cols = isWL ? ['#', 'Player', 'Wins', 'Losses'] : ['#', 'Player', solo[1] === 'golf' || solo[1] === 'discgolf' ? 'Fewest strokes' : isTime ? 'Best time' : isCount ? 'Total tungs' : solo[1] === 'slope' ? 'Best distance' : solo[1] === 'flappy' ? 'Most pipes' : solo[1] === 'paper' ? 'Biggest land' : 'Best score'];
         const table = h('table', null,
           h('thead', null, h('tr', null, cols.map((x) => h('th', null, x)))),
           h('tbody', null, data.rows.length ? data.rows.map((r, i) =>
             h('tr', { class: S.user && S.user.id === r.id ? 'me' : '' },
               h('td', null, i + 1),
               h('td', { class: 'who' }, h('div', null, avatarNode(r.avatar, 30), r.username)),
-              h('td', { class: 'win' }, solo[1] === 'golf' ? r.value + ' strokes' : solo[1] === 'f1' || solo[1] === 'tungup' ? fmtTime(r.value) : isTime ? r.value + 's' : isCount ? r.value.toLocaleString() : solo[1] === 'slope' ? r.value + ' m' : solo[1] === 'paper' ? (r.value / 10).toFixed(1) + '%' : r.value),
+              h('td', { class: 'win' }, solo[1] === 'golf' || solo[1] === 'discgolf' ? r.value + ' strokes' : solo[1] === 'f1' || solo[1] === 'tungup' ? fmtTime(r.value) : isTime ? r.value + 's' : isCount ? r.value.toLocaleString() : solo[1] === 'slope' ? r.value + ' m' : solo[1] === 'paper' ? (r.value / 10).toFixed(1) + '%' : r.value),
               isWL ? h('td', { class: 'loss' }, r.losses) : null))
             : h('tr', null, h('td', { colspan: String(cols.length), class: 'mp-empty' }, 'No solo scores yet. Log in and play single player to get on the board!'))));
         wrap.replaceChildren(...[h('h2', null, title), tabBar, h('p', { class: 'mp-hint', style: 'text-align:center;margin-bottom:.5rem' }, (isWL ? 'Your results against the computer. ' : isCount ? 'Everything you have ever clicked and earned. ' : 'Single player scores. ') + 'These never affect win/loss records.'), table].filter(Boolean));
