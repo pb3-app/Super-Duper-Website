@@ -14,6 +14,7 @@
   const ROLES_DEF = ['DL', 'DL', 'DL', 'DL', 'LB', 'LB', 'LB', 'CB', 'CB', 'S', 'S'];
   const RECEIVERS = [7, 8, 9, 10, 1]; // keys 1 to 5 throw to these offensive slots
   const STIFF_CD = 5; // the stiff arm (juke) can only be used once every 5 seconds
+  const BACK_MIN = 2.5, BACK_MAX = L - 2.5; // the deepest a pass can land: inside the back line of the end zone
   const MAX_DOWNFIELD = 40; // nobody goes (and no pass is thrown) more than 40 yards past the line of scrimmage
   const BALL_SPEED = 27, CLOCK_RATE = 2.5; // the game clock runs 2.5 times faster than real time, so a quarter is about 35 seconds of live play
   const OFF_PLAYS = {
@@ -129,7 +130,7 @@
     const rnd = { r: g.rng, side: flipS() };
     if (kind === 'pass') for (const slot of RECEIVERS) {
       const p = O[slot], inn = (CY - p.y > 0 ? 1 : -1) * (oc !== 'flood' && oc !== 'screen' && g.rng() < 0.28 ? -1 : 1);
-      p.route = routeFor(oc, slot, inn, rnd).map(([f, l]) => { const wx = p.x + dir * f, lim = los + dir * MAX_DOWNFIELD; return [(wx - lim) * dir > 0 ? lim : wx, clamp(p.y + l, 2.5, W - 2.5)]; }); p.mode = 'route';
+      p.route = routeFor(oc, slot, inn, rnd).map(([f, l]) => { const wx = p.x + dir * f, lim = los + dir * MAX_DOWNFIELD; return [clamp((wx - lim) * dir > 0 ? lim : wx, 2, L - 2), clamp(p.y + l, 2.5, W - 2.5)]; }); p.mode = 'route';
     }
     O.forEach((p) => { if (p.role === 'OL') p.mode = 'oline'; });
     if (kind === 'pass') { O[1].mode = oc === 'deep' ? 'block' : 'route'; if (oc === 'deep') O[1].route = []; } else { O[1].mode = 'runner'; O[7].mode = 'block'; O[8].mode = 'block'; O[9].mode = 'block'; O[10].mode = 'block'; }
@@ -144,7 +145,7 @@
     const zone = (p, fwd, y) => { p.mode = 'zone'; p.zone = { x: los + dir * (fwd + J(1.6)), y: clamp(y + J(1.5), 3, W - 3) }; };
     const mark = (p, slotIdx) => { p.mode = 'man'; p.assign = O[slotIdx].id; };
     if (dc === 'cover2') { zone(D[4], 8, CY - 8); zone(D[5], 8, CY); zone(D[6], 8, CY + 8); zone(D[7], 6, 6); zone(D[8], 6, W - 6); zone(D[9], 20, CY - 11); zone(D[10], 20, CY + 11); }
-    else if (man) { const sw = g.rng() < 0.4; mark(D[7], sw ? 8 : 7); mark(D[8], sw ? 7 : 8); mark(D[9], 9); zone(D[10], 20, CY); mark(D[4], 1); mark(D[5], 10); zone(D[6], 9, CY); }
+    else if (man) { const sw = g.rng() < 0.4; place(D[7], 2, O[sw ? 8 : 7].y); place(D[8], 2, O[sw ? 7 : 8].y); mark(D[7], sw ? 8 : 7); mark(D[8], sw ? 7 : 8); mark(D[9], 9); zone(D[10], 20, CY); mark(D[4], 1); mark(D[5], 10); zone(D[6], 9, CY); }
     else if (blitz) { mark(D[7], 7); mark(D[8], 8); mark(D[9], 9); mark(D[10], 10); D[4].mode = D[5].mode = D[6].mode = 'rush'; if (g.rng() < 0.4) { const x = g.rng() < 0.5 ? 9 : 10; D[x].mode = 'rush'; } }
     else if (dc === 'cover3') { zone(D[7], 22, 9); zone(D[8], 22, W - 9); zone(D[9], 24, CY); zone(D[10], 12, CY + (g.rng() < 0.5 ? -12 : 12)); zone(D[4], 8, CY - 10); zone(D[5], 8, CY); zone(D[6], 8, CY + 10); }
     else if (dc === 'zblitz') {
@@ -152,7 +153,7 @@
       zone(D[0], 5, CY - 7); zone(D[3], 5, CY + 7); zone(D[7], 6, 6); zone(D[8], 6, W - 6); zone(D[9], 20, CY - 10); zone(D[10], 20, CY + 10); zone(D[4], 8, CY - 8); zone(D[5], 8, CY); zone(D[6], 8, CY + 8);
       for (const k of rush) D[k].mode = 'rush';
     }
-    else if (dc === 'cblitz') { D[7].mode = 'rush'; D[4].mode = 'rush'; mark(D[8], 8); mark(D[9], 9); zone(D[10], 22, CY); mark(D[5], 10); zone(D[6], 8, CY); }
+    else if (dc === 'cblitz') { D[7].mode = 'rush'; D[4].mode = 'rush'; mark(D[8], 8); mark(D[9], 9); place(D[10], 6, clamp(O[7].y + 4, 2, W - 2)); mark(D[10], 7); mark(D[5], 10); zone(D[6], 10, CY); } // the safety takes the blitzing corner's man
     else if (dc === 'spy') { D[5].mode = 'spy'; zone(D[4], 8, CY - 9); zone(D[6], 8, CY + 9); zone(D[7], 6, 6); zone(D[8], 6, W - 6); zone(D[9], 20, CY - 10); zone(D[10], 20, CY + 10); }
     else if (dc === 'goalline') {
       [-6, 0, 6].forEach((o, i) => { place(D[4 + i], 2.2, CY + o); D[4 + i].mode = 'rush'; });
@@ -225,7 +226,7 @@
   function live(g, dt, ins) {
     const P = g.P, dir = dirOf(g), offT = g.off, defT = 1 - g.off, O = g.players.slice(offT * 11, offT * 11 + 11), D = g.players.slice(defT * 11, defT * 11 + 11);
     P.t += dt;
-    { const om = offBurst(P.t, P), dm = defRamp(P.t, P); for (const q of O) q.pm = om; for (const q of D) q.pm = dm; }
+    { const om = offBurst(P.t, P), dm = defRamp(P.t, P) * (P.caught && P.carrier !== P.qb && !P.intercepted && (P.catchT || 0) < 2.2 ? 1.2 : 1); /* everybody on the defence reacts the moment the ball is caught */ for (const q of O) q.pm = om; for (const q of D) q.pm = P.kind === 'pass' && (q.mode === 'man' || q.mode === 'zone') ? Math.max(dm, om * 0.94) : dm; } // (the men in coverage stay with the receivers off the line)
     if (P.caught && P.carrier >= 0) P.catchT = (P.catchT || 0) + dt; g.clock = Math.max(0, g.clock - dt * CLOCK_RATE); if (g.clock === 0) g.endAfter = true;
     const inO = ins[offT] || {}, inD = ins[defT] || {}, lastO = g.lastIn[offT] || {}, lastD = g.lastIn[defT] || {};
     const press = (inp, last, key) => (inp[key] || 0) !== (last[key] || 0);
@@ -288,6 +289,7 @@
     if (g.ball.state === 'air') ballFlight(g, dt, O, D, { pressO: humanO && press(inO, lastO, 'actN'), pressD: humanD && press(inD, lastD, 'actN'), sel });
     // ---- move everybody ----
     for (const p of g.players) {
+      if (p.shed > 0) p.shed -= dt; else if (p.blk > 0) p.blk = Math.max(0, p.blk - dt * 0.6);
       p.x += p.vx * dt; p.y += p.vy * dt;
       if (p.team === offT && p.id !== P.carrier) { const lim = g.los + dir * MAX_DOWNFIELD; if ((p.x - lim) * dir > 0) { p.x = lim; p.vx = 0; } } // a receiver stops once he is 40 yards downfield
       if (p.y < -1.5) { p.y = -1.5; p.vy = 0; } if (p.y > W + 1.5) { p.y = W + 1.5; p.vy = 0; }
@@ -350,12 +352,14 @@
     if (p.mode === 'block') { chaseBlock(g, p, dt, D, dir); return; }
     mv(p, p.x, p.y, dt, 0);
   }
+  // a block holds a defender for about three quarters of a second; then he gets off it and is free of blocks for a moment (so the play is not over just because the receivers block)
+  function blockHit(foe, dt) { if (foe.shed > 0) return; foe.blk = (foe.blk || 0) + dt; if (foe.blk > 0.75) { foe.blk = 0; foe.shed = 0.9; } else foe.stun = Math.max(foe.stun, 0.12); }
   // blockers and teammates of the ball carrier: get in front of the nearest tackler
   function chaseBlock(g, p, dt, D, dir) {
     const c = carrierOf(g);
     if (!c) return mv(p, p.x, p.y, dt, 0);
     const foe = D.filter((d) => d.eng < 0 || d.eng === p.id).sort((a, b) => dist(a, p) - dist(b, p))[0];
-    if (foe && dist(foe, p) < 9 && dist(foe, c) < 14) { const tx = foe.x - dir * 0.2, ty = foe.y; mv(p, tx, ty, dt, 0.85); if (dist(p, foe) < 1.1) foe.stun = Math.max(foe.stun, 0.12); }
+    if (foe && dist(foe, p) < 9 && dist(foe, c) < 14) { const tx = foe.x - dir * 0.2, ty = foe.y; mv(p, tx, ty, dt, 0.85); if (dist(p, foe) < 1.1) blockHit(foe, dt); }
     else mv(p, c.x + dir * 2, c.y + (p.y > c.y ? 2 : -2), dt, 0.9);
   }
   function carrierAI(g, p, dt, D, dir) {
@@ -390,15 +394,17 @@
     let best = null, bs = -99;
     for (const slot of RECEIVERS) {
       const r = O[slot]; if (r.id === qb.id) continue;
-      const dm = Math.min(...D.map((d) => dist(d, r))), ahead = (r.x - qb.x) * dirOf(g);
-      if (ahead < 1) continue;
-      const s = Math.min(dm, 6) * 1.0 + Math.min(ahead, 25) * 0.07 + g.rng() * 0.4;
+      // how open is he where the ball will come down? (how far the nearest defender is from that spot, less how far he can run in the time the ball takes)
+      const ahead = (r.x - qb.x) * dirOf(g); if (ahead < 1) continue;
+      const T = Math.max(0.3, dist(qb, r) / BALL_SPEED), tx = clamp(r.x + r.vx * T * 0.95, BACK_MIN, BACK_MAX), ty = r.y + r.vy * T * 0.95;
+      let dm = 99; for (const d of D) { const m = Math.hypot(d.x - tx, d.y - ty) - SPD[d.role] * d.sp * T * 0.9 * (d.stun > 0 ? 0.5 : 1); if (m < dm) dm = m; }
+      const s = clamp(dm, -3, 7) * 1.0 + Math.min(ahead, 25) * 0.07 + g.rng() * 0.4;
       if (s > bs) { bs = s; best = { r, dm }; }
     }
     const skill = { easy: 0.85, medium: 1, hard: 1.2 }[g.level] || 1;
     const patience = 2.3 + g.rng() * 1.2;
-    if (best && (best.dm >= 2.6 / skill || pressured || P.t > patience)) {
-      if (pressured || P.t > patience + 0.9) { if (!best || best.dm < 1.3) { P.scrambling = true; return; } }
+    if (best && (best.dm >= 1.4 / skill || pressured || P.t > patience)) {
+      if (pressured || P.t > patience + 0.9) { if (!best || best.dm < -0.5) { P.scrambling = true; return; } }
       throwTo(g, qb, best.r, D);
     } else if (P.t > patience + 1.2) P.scrambling = true;
   }
@@ -409,10 +415,12 @@
     let T = Math.max(0.3, dist(qb, r) / BALL_SPEED), tx = r.x + r.vx * T * 0.95, ty = r.y + r.vy * T * 0.95;
     T = Math.max(0.3, Math.hypot(tx - qb.x, ty - qb.y) / BALL_SPEED); tx = r.x + r.vx * T * 0.95; ty = r.y + r.vy * T * 0.95;
     { const lim = g.los + dirOf(g) * MAX_DOWNFIELD; if ((tx - lim) * dirOf(g) > 0) tx = lim; } // the ball can not be thrown more than 40 yards downfield
+    tx = clamp(tx, BACK_MIN, BACK_MAX); ty = clamp(ty, 1.5, W - 1.5); // ...nor past the back of the end zone or out of bounds
     const rush = D.some((d) => d.mode === 'rush' && d.free && dist(d, qb) < 3.2);
     const err = 0.3 + (rush ? 0.9 : 0) + Math.hypot(tx - qb.x, ty - qb.y) * 0.012 + (qb.jukeT > 0 ? 0.3 : 0);
     tx += (g.rng() - 0.5) * 2 * err; ty += (g.rng() - 0.5) * 2 * err;
     { const lim = g.los + dirOf(g) * MAX_DOWNFIELD; if ((tx - lim) * dirOf(g) > 0) tx = lim; }
+    tx = clamp(tx, BACK_MIN, BACK_MAX); ty = clamp(ty, 1, W - 1); // a throw that is off target still lands inside the end zone, never behind it
     Object.assign(b, { state: 'air', sx: qb.x, sy: qb.y, tx, ty, T, u: 0, hgt: 1.4 + Math.hypot(tx - qb.x, ty - qb.y) * 0.07, carrier: null, x: qb.x, y: qb.y, z: 0 });
   }
   // the ball in the air. A person has to be inside the ring (CATCH_R yards) when the ball comes down and go for it at the right moment:
@@ -437,7 +445,8 @@
     let eO = Infinity, eD = Infinity, dWho = null;
     if (P.clk.o) eO = P.clk.o.raw; else if (!humanOff && z.off.some((p) => p.id === R.id)) eO = aiError(g, skill[1]);
     if (P.clk.d) { eD = P.clk.d.raw; dWho = g.players[P.clk.d.id]; }
-    if (!humanDef) for (const d of z.def) { const e = aiError(g, skill[0]); if (e < eD) { eD = e; dWho = d; } } // the computer's defenders in the zone go for it (when a person defends, only HE can pick it off)
+    if (!humanDef) for (const d of z.def) { const e = aiError(g, skill[0] * (1 + 0.3 * (nD - 1))); // (defenders crowding the same ball get in each other's way)
+      if (e < eD) { eD = e; dWho = d; } } // the computer's defenders in the zone go for it (when a person defends, only HE can pick it off)
     // the dispersion removed
     const extraO = Math.max(0, nO - nD), extraD = Math.max(0, nD - nO);
     const mulO = 1 - Math.min(0.7, OFF_EDGE + EXTRA_EDGE * extraO), mulD = 1 - Math.min(0.6, EXTRA_EDGE * extraD);
@@ -447,7 +456,7 @@
     P.contest = { nO, nD, aO: Number.isFinite(aO) ? Math.round(aO * 1000) / 1000 : null, aD: Number.isFinite(aD) ? Math.round(aD * 1000) / 1000 : null };
     if (!okO && !okD) { const why = (P.whyO && humanOff ? P.whyO : P.whyD && humanDef ? P.whyD : ''); flash(why ? why + ' INCOMPLETE' : 'INCOMPLETE', 1.4); b.state = 'dead'; b.carrier = null; endPlay(g, 'incomplete', g.los); return; }
     if (okO && (!okD || aO <= aD)) { flash(eO <= PERFECT ? 'PERFECT CATCH!' : 'CAUGHT IT!', 1); return caught(g, R); }
-    if (g.rng() < PICK_CHANCE && dWho) { P.intercepted = true; interception(g, dWho); return; }
+    if (g.rng() < (humanDef ? PICK_CHANCE : PICK_CHANCE * 0.65) && dWho) { P.intercepted = true; interception(g, dWho); return; }
     flash('BROKEN UP!', 1.2); b.state = 'dead'; b.carrier = null; endPlay(g, 'incomplete', g.los);
   }
   // the ball in the air. A person has to be inside the ring (CATCH_R yards) when the ball comes down and click at the right moment: too early or out of range and
@@ -500,6 +509,9 @@
   // Chase somebody the smart way: not at where he is, but at where he will be when we get there (a few passes of the estimate),
   // so a defender coming from the side takes the angle and cuts him off instead of trailing him.
   function pursue(g, d, c, dt, mul) {
+    // a computer defender who is almost on the carrier dives at him (the same lunge a person gets: a longer reach and a burst of speed)
+    if (d.dive > 0) { d.dive -= dt; mul = (mul == null ? 1 : mul) * 1.45; }
+    else if (d.dcd <= 0 && g.P && g.P.kind !== 'kick') { const dd = dist(d, c); if (dd < 2.6 && dd > 0.7 && d.stun <= 0 && g.rng() < dt * 5) { d.dive = 0.3; d.dcd = 1.3; } }
     const sp = Math.max(1, SPD[d.role] * d.sp * (mul == null ? 1 : mul) * (d.pm || 1));
     let tx = c.x, ty = c.y;
     for (let k = 0; k < 3; k++) { const t = Math.min(1.6, Math.hypot(tx - d.x, ty - d.y) / sp); tx = c.x + c.vx * t * 0.95; ty = c.y + c.vy * t * 0.95; }
@@ -529,10 +541,11 @@
       if (P.t > readT) { runRead(g, d, P, dt, dir); return; }
     }
     if (P.thrown && b.state === 'air') {
-      // chase the ball down when it is near my area
-      const near = Math.hypot(d.x - b.tx, d.y - b.ty);
-      if (d.mode === 'man' && d.assign >= 0) { const r = g.players[d.assign]; if (r.id === P.target || near < 9) mv(d, b.tx, b.ty, dt, 1); else mv(d, r.x + dir * 1.2, r.y, dt, 1); return; }
-      if (near < 7) { mv(d, b.tx, b.ty, dt, 1); return; }
+      // break on the ball: everybody who can get there goes to where it comes down (a man defender whose man is not the target only leaves him when the ball is close)
+      const near = Math.hypot(d.x - b.tx, d.y - b.ty), reach = SPD[d.role] * d.sp * Math.max(0.2, P.tl || 0.6) * 1.15 + CATCH_R;
+      if (d.mode === 'man' && d.assign >= 0) { const r = g.players[d.assign]; if (r.id === P.target || near < Math.min(12, reach)) mv(d, b.tx, b.ty, dt, 1); else mv(d, r.x + dir * 1.2, r.y, dt, 1); return; }
+      if (d.mode !== 'rush' && d.mode !== 'spy' && near < Math.max(10, Math.min(18, reach))) { mv(d, b.tx, b.ty, dt, 1); return; }
+      if (d.mode === 'rush' && P.kind === 'pass' && near < 7) { mv(d, b.tx, b.ty, dt, 1); return; }
     }
     if (d.mode === 'spy') { // shadow the QB a few yards off, and go after him if he runs
       if (c && c.id === qb.id && (P.scrambling || P.t > 1.2)) { mv(d, c.x + c.vx * 0.3, c.y + c.vy * 0.3, dt, 1); return; }
@@ -544,13 +557,26 @@
       if (P.kind === 'run' && !drawFake) { const cc = carrierOf(g); if (cc) pursue(g, d, cc, dt, 0.97); else mv(d, d.x, d.y, dt, 0); return; }
       const t = c || qb; pursue(g, d, t, dt, d.free ? 1 : 0.9); return;
     }
-    if (d.mode === 'man' && d.assign >= 0) { const r = g.players[d.assign]; mv(d, r.x + dir * 1.2 + r.vx * 0.3, r.y + r.vy * 0.3, dt, 1); return; } // anticipate the break: stay a step ahead of where he is going
+    if (d.mode === 'man' && d.assign >= 0) { // stay a step ahead of where he is going, a bit deeper than him (more room against a fast receiver) and on the inside
+      const r = g.players[d.assign], sepX = (d.x - r.x) * dir, fast = Math.hypot(r.vx, r.vy) > 5.5, cushion = fast ? 1.6 : 0.9;
+      mv(d, r.x + dir * cushion + r.vx * 0.42, r.y + r.vy * 0.42 + (CY - r.y) * 0.05, dt, sepX < -1 ? 1.12 : 1); return;
+    }
     if (d.mode === 'zone' && d.zone) {
-      // hold the spot, slide toward the ball side, pick up whoever comes into it
-      let tx = d.zone.x, ty = d.zone.y + (b.y - d.zone.y) * 0.18;
-      const come = O.filter((o) => (RECEIVERS.includes(o.k)) && Math.hypot(o.x - d.zone.x, o.y - d.zone.y) < 6.5).sort((a, b2) => Math.hypot(a.x - d.zone.x, a.y - d.zone.y) - Math.hypot(b2.x - d.zone.x, b2.y - d.zone.y))[0];
-      if (come && P.t > 1.0) { tx = come.x + dir * 1.4; ty = come.y; }
-      mv(d, tx, ty, dt, 0.95); return;
+      // pattern matching: every receiver who comes into an area is picked up by the zone defender closest to him, who stays a little deeper than him;
+      // a receiver who goes through to the next zone is passed on. A defender with nobody in his area holds his spot and slides toward the ball.
+      const Z = d.zone, mates = D.filter((e) => e.mode === 'zone' && e.zone && e.stun <= 0 && e.eng < 0);
+      let mine = null, ms = 1e9;
+      for (const o of O) {
+        if (!RECEIVERS.includes(o.k) || o.id === qb.id) continue;
+        const depth = (o.x - Z.x) * dir, side = Math.abs(o.y - Z.y);
+        if (depth < -3.5 || depth > 11 || side > 10.5 || (o.x - g.los) * dir < 1) continue; // not in my area (or still on the line)
+        if (mates.some((e) => e !== d && dist(e, o) < dist(d, o) - 0.4)) continue; // somebody else is closer: he has him
+        const sc = dist(d, o) - depth * 0.15; if (sc < ms) { ms = sc; mine = o; }
+      }
+      if (mine && P.t > 0.5) { const cush = (mine.x - g.los) * dir > 7 ? 2.4 : 1.4; mv(d, mine.x + dir * cush + mine.vx * 0.35, mine.y + mine.vy * 0.35, dt, 1); return; }
+      // the area is empty: drop back with the deepest receiver coming (never let one get behind), otherwise hold the spot
+      let deepest = 0; for (const o of O) if (RECEIVERS.includes(o.k) && o.id !== qb.id && Math.abs(o.y - Z.y) < 12) deepest = Math.max(deepest, (o.x - Z.x) * dir);
+      mv(d, Z.x + dir * clamp(deepest - 9, 0, 12), Z.y + (b.y - Z.y) * 0.18, dt, 0.95); return;
     }
     mv(d, d.x, d.y, dt, 0);
   }
@@ -558,7 +584,7 @@
     const c = carrierOf(g); if (!c) return mv(p, p.x, p.y, dt, 0);
     const dir = p.team === 0 ? 1 : -1, foes = g.players.filter((q) => q.team !== p.team);
     const foe = foes.sort((a, b) => dist(a, c) - dist(b, c))[Math.min(foes.length - 1, p.k % 4)];
-    if (foe && dist(p, foe) < 14) { mv(p, foe.x - dir * 0.3, foe.y, dt, 0.9); if (dist(p, foe) < 1.1) foe.stun = Math.max(foe.stun, 0.1); }
+    if (foe && dist(p, foe) < 14) { mv(p, foe.x - dir * 0.3, foe.y, dt, 0.9); if (dist(p, foe) < 1.1) blockHit(foe, dt); }
     else mv(p, c.x + dir * 3, c.y + (p.k % 2 ? 3 : -3), dt, 0.9);
   }
 
@@ -581,7 +607,7 @@
         d.eng = ol.id; ol.eng = d.id;
         // a person on offence has a harder time when the line is beaten: the engage time shrinks with the level
         const lv = { easy: 1.25, medium: 1, hard: 0.8 }[g.level] || 1;
-        d.engT = (P.kind === 'pass' ? 1.9 + g.rng() * 2.6 : 1.0 + g.rng() * 1.5) * (g.human[1 - d.team] ? 1 : 1) * (g.human[d.team] ? 1 : lv);
+        d.engT = (P.kind === 'pass' ? 1.3 + g.rng() * 2.2 : 1.0 + g.rng() * 1.5) * (g.human[1 - d.team] ? 1 : 1) * (g.human[d.team] ? 1 : lv);
       }
     }
   }
@@ -616,7 +642,7 @@
   function touchdown(g, c) {
     const team = c.team; g.score[team] += 7;
     g.text = (P_int(g) ? 'PICK SIX! ' : 'TOUCHDOWN! ') + g.names[team]; g.textT = 2.4;
-    g.stats[team]++; g.hist.push({ k: (g.P.kind || '') + ':td', g: 0 });
+    g.stats[team]++; g.hist.push({ k: (g.P.kind || '') + ':td', g: (c.x - g.los) * (team === 0 ? 1 : -1) });
     g.lastPlay = 'Touchdown';
     g.P.done = true; g.phase = 'dead'; g.phaseT = 2.6; g.ball.state = 'dead'; g.pendingNext = { type: 'kickoff', to: 1 - team };
   }
