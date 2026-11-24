@@ -10,6 +10,11 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const zlib = require('zlib');
+// LOW BANDWIDTH MODE (temporary, to stay inside Render's free 5 GB). On by default; set the environment variable LOW_BANDWIDTH=0 on the host to run the
+// original code paths again (arena snapshots 20 times a second with every field, pages without cache validation or gzip). The original is also tagged in
+// git as `original-before-bandwidth-cut`.
+const LOW_BW = process.env.LOW_BANDWIDTH !== '0';
 const crypto = require('crypto');
 const { promisify } = require('util');
 const { WebSocketServer } = require('ws');
@@ -951,6 +956,7 @@ function serveStatic(req, res, url) {
   file = path.resolve(file);
   if (!file.startsWith(base + path.sep)) return notFound(res);
   if (path.extname(file).toLowerCase() === '.mp3') return serveAudio(req, res, file); // audio needs Range support (Safari, seeking)
+  if (LOW_BW) return serveFileLow(req, res, file, base);
   fs.readFile(file, (err, data) => {
     if (err) return notFound(res);
     const ext = path.extname(file).toLowerCase();
@@ -962,6 +968,26 @@ function serveStatic(req, res, url) {
     if (ext === '.html') headers['Content-Security-Policy'] = CSP;
     res.writeHead(200, headers);
     res.end(req.method === 'HEAD' ? undefined : data);
+  });
+}
+// low bandwidth mode: the browser asks "has it changed?" (ETag) and gets a tiny 304 instead of the whole file, and text files are sent gzipped
+const GZ_TYPES = new Set(['.html', '.js', '.css', '.json', '.svg', '.txt', '.map']), gzCache = new Map();
+function serveFileLow(req, res, file, base) {
+  fs.stat(file, (err, st) => {
+    if (err || !st.isFile()) return notFound(res);
+    const ext = path.extname(file).toLowerCase(), etag = 'W/"' + st.size.toString(36) + '-' + Math.round(st.mtimeMs).toString(36) + '"';
+    const headers = { 'Content-Type': MIME[ext] || 'application/octet-stream', 'X-Content-Type-Options': 'nosniff', ETag: etag, 'Vary': 'Accept-Encoding',
+      'Cache-Control': base === AVATAR_DIR ? 'public, max-age=86400' : 'no-cache' };
+    if (ext === '.html') headers['Content-Security-Policy'] = CSP;
+    if (req.headers['if-none-match'] === etag) { res.writeHead(304, headers); return res.end(); }
+    fs.readFile(file, (e2, data) => {
+      if (e2) return notFound(res);
+      if (GZ_TYPES.has(ext) && data.length > 600 && /\bgzip\b/.test(req.headers['accept-encoding'] || '')) {
+        let z = gzCache.get(file); if (!z || z.etag !== etag) { z = { etag, buf: zlib.gzipSync(data, { level: 6 }) }; gzCache.set(file, z); }
+        headers['Content-Encoding'] = 'gzip'; headers['Content-Length'] = z.buf.length; res.writeHead(200, headers); return res.end(req.method === 'HEAD' ? undefined : z.buf);
+      }
+      headers['Content-Length'] = data.length; res.writeHead(200, headers); res.end(req.method === 'HEAD' ? undefined : data);
+    });
   });
 }
 function serveAudio(req, res, file) {
@@ -2310,7 +2336,7 @@ const AR = { w: 4600, h: 3200, r: 28, tick: 30, speed: 320, range: 85, cooldown:
 const bonkBoost = (bonks) => Math.min(1, Math.floor((bonks || 0) / 10) / 10);
 const AR_COLORS = ['#c8874a', '#a86b35', '#d9a066', '#8b5a2b', '#e0b07a', '#b5793f'];
 const arenaPlayers = new Map(); // key -> player
-let arenaTimer = null, arenaTickNo = 0;
+let arenaTimer = null, arenaTickNo = 0, arenaSnapNo = 0, arenaFull = false; // (arenaFull: the next snapshot carries every field, for somebody who just arrived)
 const ARENA_GROUP = ['bomber', 'sumo', 'lava', 'dizzy', 'pictionary', 'tungup', 'imposter', 'uno', 'phase10', 'discgolf']; // games with open rooms for more than 2 players
 const arenaRoomMax = (g) => (g === 'uno' || g === 'phase10' ? CR_MAX : g === 'pictionary' ? PIC_MAX : g === 'tungup' ? TU_MAX : g === 'imposter' ? Imposter.MAX_PLAYERS : GAMES[g].groomMax);
 const arenaRoomMin = (g) => (g === 'imposter' ? Imposter.MIN_PLAYERS : 3);
@@ -2415,12 +2441,12 @@ function arenaJoin(ws) {
     p = { key: ws.key, name: u.username, color: AR_COLORS[[...ws.key].reduce((a, c) => a + c.charCodeAt(0), 0) % AR_COLORS.length],
       x: sp.x, y: sp.y, vx: 0, vy: 0, facing: 0, input: { up: false, down: false, left: false, right: false, aim: 0 },
       cooldown: 0, swing: 0, stunned: 0, score: 0, q: gearOf(u), boost: bonkBoost(u.bonks), streak: 0, z: false, hp: SD_HP, fall: 0, lastHit: null, ws };
-    arenaPlayers.set(ws.key, p);
+    arenaPlayers.set(ws.key, p); arenaFull = true;
     arenaBroadcast({ t: 'arena_event', type: 'join', name: p.name });
   }
   if (p.ws !== ws) { p.unlocked = false; p.auto = false; } // a new visit starts without the secret
   p.ws = ws;
-  wsSend(ws, { t: 'arena_welcome', boink: hasBoink(ws.key), chat: arenaChatLog.slice(-12), you: ws.key, bonks: (db.users[ws.key] && db.users[ws.key].bonks) || 0, ...arenaInfo() });
+  wsSend(ws, { t: 'arena_welcome', lowbw: LOW_BW, boink: hasBoink(ws.key), chat: arenaChatLog.slice(-12), you: ws.key, bonks: (db.users[ws.key] && db.users[ws.key].bonks) || 0, ...arenaInfo() });
   if (!arenaTimer) arenaTimer = setInterval(arenaStep, 1000 / AR.tick);
 }
 function arenaLeave(key, quiet) {
@@ -2576,7 +2602,18 @@ function arenaStep() {
 
   if (sdDirty && now - sdSentAt > 1000) { sdDirty = false; sdSentAt = now; arenaBroadcast({ t: 'arena_sd', board: sdBoard() }); }
   arenaTickNo++;
-  if (arenaTickNo % 3 === 2) return; // snapshots go out at 20 per second
+  if (LOW_BW ? arenaTickNo % 3 !== 0 : arenaTickNo % 3 === 2) return; // snapshots go out at 20 per second (low bandwidth mode: 10 per second)
+  if (LOW_BW) { // low bandwidth: the name, colour and gear (which hardly ever change) go out every two seconds and when somebody arrives; every other field is left out when it is at its default
+    const full = arenaFull || ++arenaSnapNo % 20 === 0; arenaFull = false;
+    const lite = [...arenaPlayers.values()].map((p) => {
+      const o = { id: p.key, x: Math.round(p.x), y: Math.round(p.y), f: Math.round(p.facing * 100) / 100, sc: p.score };
+      if (p.swing > 0) o.s = 1; if (p.stunned > 0) o.st = 1; if (p.z) { o.z = 1; o.hp = Math.max(0, Math.round(p.hp == null ? SD_HP : p.hp)); } if (p.streak) o.k = p.streak; if (p.fall > 0) o.fl = Math.round(p.fall * 100) / 100;
+      if (full) { o.n = p.name; o.c = p.color; o.q = p.q; }
+      return o;
+    });
+    const logs = arenaLogs.filter((l) => l.order.length).map((l) => [l.id, l.order.length, l.since === null ? -1 : Math.max(0, Math.ceil(AR.hold - (now - l.since) / 1000))]);
+    return arenaBroadcast({ t: 'arena_state', ts: now, players: lite, logs });
+  }
   const players = [...arenaPlayers.values()].map((p) => ({
     id: p.key, n: p.name, c: p.color, x: Math.round(p.x), y: Math.round(p.y),
     f: Math.round(p.facing * 100) / 100, s: p.swing > 0 ? 1 : 0, st: p.stunned > 0 ? 1 : 0, sc: p.score, q: p.q, z: p.z ? 1 : 0, hp: p.z ? Math.max(0, Math.round(p.hp == null ? SD_HP : p.hp)) : -1, k: p.streak, fl: p.fall > 0 ? Math.round(p.fall * 100) / 100 : 0,

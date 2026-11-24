@@ -9,7 +9,8 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   let ctx = canvas.getContext("2d");
   const mainCtx = ctx;
   const Shop = window.TungShop, G = window.TungGear;
-  const INTERP_DELAY = 100; // ms behind real time, so movement looks smooth
+  let interpDelay = 100, lowbw = false; // ms behind real time, so movement looks smooth (the server's low bandwidth mode sends fewer snapshots, so a little further behind)
+  const who = {}; // the name, colour and gear of every tung (low bandwidth snapshots only carry them now and then)
 
   let myId = null, arena = { w: 4600, h: 3200 }, radius = 28, holdSecs = 10, safe = null, showdown = null, sdBoard = { cur: [], all: [] }, me$ = { bonks: 0, pct: 0 };
   let logs = [];                 // the logs, from the server's welcome
@@ -45,13 +46,17 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     switch (m.t) {
       case "arena_boink": boinkOn = true; { const b = document.querySelector("#shopTabs [data-tab=ward]"); if (b) { b.classList.remove("flash"); void b.offsetWidth; b.classList.add("flash"); } bonkSound(1); } break;
       case "arena_welcome":
-        boinkOn = !!m.boink; boinkAuto = false; boinkLabel(); myId = m.you; arena = m.arena; radius = m.radius; holdSecs = m.hold; logs = m.logs; safe = m.safe; showdown = m.showdown; sdBoard = m.board || sdBoard; wheel = m.wheel ? { ...m.wheel } : null; wheelSpin = null; if (chatLog.childElementCount === 0) for (const c of m.chat || []) addChat(c, false); me$ = { bonks: m.bonks || 0, pct: Math.round(Math.min(1, Math.floor((m.bonks || 0) / 10) / 10) * 100) }; joined = true;
+        lowbw = !!m.lowbw; interpDelay = lowbw ? 170 : 100; boinkOn = !!m.boink; boinkAuto = false; boinkLabel(); myId = m.you; arena = m.arena; radius = m.radius; holdSecs = m.hold; logs = m.logs; safe = m.safe; showdown = m.showdown; sdBoard = m.board || sdBoard; wheel = m.wheel ? { ...m.wheel } : null; wheelSpin = null; if (chatLog.childElementCount === 0) for (const c of m.chat || []) addChat(c, false); me$ = { bonks: m.bonks || 0, pct: Math.round(Math.min(1, Math.floor((m.bonks || 0) / 10) / 10) * 100) }; joined = true;
         $("gate").hidden = true; $("scores").hidden = false;
         loadShop(); loadBoard();
         break;
       case "arena_chat": addChat(m, true); break;
       case "arena_state":
         serverOffset = Date.now() - m.ts; lastStateAt = Date.now();
+        for (const p of m.players) { // snapshots leave out whatever is unchanged or at its default: fill it back in
+          if (p.n !== undefined) who[p.id] = { n: p.n, c: p.c, q: p.q }; else if (who[p.id]) { p.n = who[p.id].n; p.c = who[p.id].c; p.q = who[p.id].q; }
+          if (p.hp === undefined) p.hp = -1; if (p.k === undefined) p.k = 0; if (p.fl === undefined) p.fl = 0; if (p.s === undefined) p.s = 0; if (p.st === undefined) p.st = 0; if (p.z === undefined) p.z = 0;
+        }
         logState = {}; for (const l of m.logs) logState[l[0]] = l;
         snapshots.push(m); while (snapshots.length > 30) snapshots.shift();
         // the server no longer has us (we were dropped while a game page was open, or the socket was replaced): ask to come back in
@@ -313,6 +318,13 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
     if (boinkBtn) boinkBtn.hidden = !(joined && boinkOn);
   }, 500);
 
+  // low bandwidth mode: a tab left in the background for a minute stops receiving the arena (it joins again by itself when you come back to it)
+  let hiddenTimer = 0;
+  document.addEventListener("visibilitychange", () => {
+    clearTimeout(hiddenTimer);
+    if (document.visibilityState === "hidden" && lowbw) hiddenTimer = setTimeout(() => { if (joined && document.visibilityState === "hidden") { T.send({ t: "arena_leave" }); joined = false; myId = null; snapshots.length = 0; } }, 60000);
+  });
+
   let lastSent = "";
   function sendInput() {
     if (!joined) return;
@@ -334,7 +346,7 @@ try { sessionStorage.removeItem("tungArenaReturn"); } catch (_) {}
   // ---------- smoothing ----------
   function rendered() {
     if (!snapshots.length) return [];
-    const rt = Date.now() - serverOffset - INTERP_DELAY;
+    const rt = Date.now() - serverOffset - interpDelay;
     let older = snapshots[0], newer = snapshots[snapshots.length - 1];
     for (let i = snapshots.length - 1; i > 0; i--) if (snapshots[i - 1].ts <= rt) { older = snapshots[i - 1]; newer = snapshots[i]; break; }
     const span = newer.ts - older.ts, k = span > 0 ? Math.min(1, Math.max(0, (rt - older.ts) / span)) : 1;
